@@ -33,7 +33,7 @@ struct RootTabView: View {
                 LibraryView()
             }
 
-            Tab("设置", systemImage: "gearshape", value: .settings) {
+            Tab("设置", systemImage: "gear", value: .settings) {
                 SettingsView()
             }
 
