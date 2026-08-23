@@ -25,7 +25,7 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("主页", systemImage: "house", value: .home) {
+            Tab("主页", systemImage: "house.fill", value: .home) {
                 HomeView()
             }
 
