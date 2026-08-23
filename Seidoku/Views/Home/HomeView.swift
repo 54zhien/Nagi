@@ -1,6 +1,6 @@
 //
 //  HomeView.swift
-//  NovelReader
+//  Seidoku
 //
 //  主页：继续阅读入口（第一阶段先做骨架，书库数据接入后填充）
 //

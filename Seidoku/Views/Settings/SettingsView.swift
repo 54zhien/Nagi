@@ -1,6 +1,6 @@
 //
 //  SettingsView.swift
-//  NovelReader
+//  Seidoku
 //
 //  设置：阅读偏好等（第一阶段占位，后续实现）
 //

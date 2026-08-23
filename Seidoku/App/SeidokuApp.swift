@@ -1,6 +1,6 @@
 //
-//  NovelReaderApp.swift
-//  NovelReader
+//  SeidokuApp.swift
+//  Seidoku
 //
 //  App 入口 + 根 Tab 视图（底部 tab 栏，搜索分离式）
 //
@@ -8,7 +8,7 @@
 import SwiftUI
 
 @main
-struct NovelReaderApp: App {
+struct SeidokuApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView()

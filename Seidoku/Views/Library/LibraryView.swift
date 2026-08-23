@@ -1,6 +1,6 @@
 //
 //  LibraryView.swift
-//  NovelReader
+//  Seidoku
 //
 //  书库：书架列表 + 导入入口（第一阶段占位，后续实现导入/书架）
 //

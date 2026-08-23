@@ -26,8 +26,8 @@ jobs:
       - name: Build (unsigned)
         run: |
           xcodebuild \
-            -project NovelReader.xcodeproj \
-            -target NovelReader \
+            -project Seidoku.xcodeproj \
+            -target Seidoku \
             -configuration Release \
             -sdk iphoneos \
             SYMROOT=build \
@@ -38,15 +38,15 @@ jobs:
 
       - name: Package IPA
         run: |
-          APP_PATH="build/Release-iphoneos/NovelReader.app"
+          APP_PATH="build/Release-iphoneos/Seidoku.app"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
-          zip -r NovelReader-unsigned.ipa Payload/
-          ls -lh NovelReader-unsigned.ipa
+          zip -r Seidoku-unsigned.ipa Payload/
+          ls -lh Seidoku-unsigned.ipa
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NovelReader-unsigned-ipa
-          path: NovelReader-unsigned.ipa
+          name: Seidoku-unsigned-ipa
+          path: Seidoku-unsigned.ipa
           retention-days: 30
