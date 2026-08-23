@@ -14,6 +14,7 @@
 		4A0000000000000000000005 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000005 /* SearchView.swift */; };
 		4A0000000000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000006 /* Assets.xcassets */; };
 		4A0000000000000000000007 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000008 /* AppIcon.icon */; };
+		4A0000000000000000000008 /* FileImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000009 /* FileImportService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,6 +26,7 @@
 		3A0000000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3A0000000000000000000007 /* Seidoku.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Seidoku.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A0000000000000000000008 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		3A0000000000000000000009 /* FileImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +55,7 @@
 				2A0000000000000000000004 /* Views */,
 				3A0000000000000000000006 /* Assets.xcassets */,
 				3A0000000000000000000008 /* AppIcon.icon */,
+				2A000000000000000000000A /* Services */,
 			);
 			path = Seidoku;
 			sourceTree = "<group>";
@@ -106,6 +109,14 @@
 				3A0000000000000000000005 /* SearchView.swift */,
 			);
 			path = Search;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000000A /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000009 /* FileImportService.swift */,
+			);
+			path = Services;
 			sourceTree = "<group>";
 		};
 		2A0000000000000000000009 /* Products */ = {
@@ -191,6 +202,7 @@
 				4A0000000000000000000003 /* LibraryView.swift in Sources */,
 				4A0000000000000000000004 /* SettingsView.swift in Sources */,
 				4A0000000000000000000005 /* SearchView.swift in Sources */,
+				4A0000000000000000000008 /* FileImportService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -292,7 +304,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -317,7 +329,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
