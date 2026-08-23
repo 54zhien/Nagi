@@ -25,7 +25,7 @@ jobs:
             -target NovelReader \
             -configuration Release \
             -sdk iphoneos \
-            -derivedDataPath DerivedData \
+            SYMROOT=build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -33,7 +33,7 @@ jobs:
 
       - name: Package IPA
         run: |
-          APP_PATH="DerivedData/Build/Products/Release-iphoneos/NovelReader.app"
+          APP_PATH="build/Release-iphoneos/NovelReader.app"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -r NovelReader-unsigned.ipa Payload/
