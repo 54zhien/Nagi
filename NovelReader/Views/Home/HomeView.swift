@@ -21,7 +21,6 @@ struct HomeView: View {
                         description: Text("去「书库」导入你的第一本小说")
                     )
                     .frame(maxWidth: .infinity, minHeight: 160)
-                    .glassEffect()
                 }
                 .padding()
             }
