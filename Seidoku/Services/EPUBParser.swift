@@ -213,7 +213,7 @@ struct EPUBParser {
 
     /// 统计 spine 里的 itemref 数量（章节数）。
     private func countSpineItems(_ xml: String) -> Int {
-        let matches = xml.ranges(of: #"<itemref\b"#, options: [.regularExpression, .caseInsensitive])
+        let matches = xml.ranges(of: #"<itemref\b"#, options: [.caseInsensitive])
         return matches.count
     }
 }
