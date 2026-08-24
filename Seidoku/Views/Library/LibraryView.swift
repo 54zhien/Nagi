@@ -27,7 +27,11 @@ struct LibraryView: View {
                 } else {
                     List {
                         ForEach(books) { book in
-                            BookRow(book: book)
+                            NavigationLink {
+                                ReaderView(book: book)
+                            } label: {
+                                BookRow(book: book)
+                            }
                         }
                     }
                 }

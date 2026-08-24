@@ -2,21 +2,56 @@
 //  EPUBParser.swift
 //  Seidoku
 //
-//  EPUB 解析：用 ZIPFoundation 解压 → 定位 OPF → 提取元数据（书名/作者）+ 章节数。
+//  EPUB 解析：用 ZIPFoundation 解压 → 定位 OPF → 提取元数据 + 章节列表 + 章节正文。
 //
 
 import Foundation
 
 struct EPUBParser {
     func parse(url: URL) throws -> ParsedBook {
-        let archive: Archive
+        let archive = try openArchive(url)
+        let (opfXml, opfDir) = try opfDocument(archive)
+
+        let title = extractTag(opfXml, tag: "title") ?? url.deletingPathExtension().lastPathComponent
+        let author = extractTag(opfXml, tag: "creator")
+        let chapters = try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
+
+        return ParsedBook(title: title, author: author, chapterCount: chapters.count, content: "")
+    }
+
+    /// 章节列表（spine 阅读顺序）。
+    func loadChapters(url: URL) throws -> [BookChapter] {
+        let archive = try openArchive(url)
+        let (opfXml, opfDir) = try opfDocument(archive)
+        return try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
+    }
+
+    /// 加载某章正文（XHTML → 纯文本）。
+    func loadChapterContent(url: URL, href: String) throws -> String {
+        let archive = try openArchive(url)
+        guard let entry = archive[href] else {
+            throw ParseError.invalidArchive
+        }
+        var data = Data()
+        _ = try archive.extract(entry, consumer: { data.append($0) })
+        guard let html = String(data: data, encoding: .utf8) else {
+            throw ParseError.invalidArchive
+        }
+        return Self.htmlToText(html)
+    }
+
+    // MARK: - 内部
+
+    private func openArchive(_ url: URL) throws -> Archive {
         do {
-            archive = try Archive(url: url, accessMode: .read)
+            return try Archive(url: url, accessMode: .read)
         } catch {
             throw ParseError.cannotRead("无法打开 EPUB：\(error.localizedDescription)")
         }
+    }
 
-        // 1. 定位 OPF（container.xml）
+    /// 返回 (OPF XML 文本, OPF 所在目录)。
+    private func opfDocument(_ archive: Archive) throws -> (String, String) {
         guard
             let containerXml = try extractString(archive, path: "META-INF/container.xml"),
             let opfPath = extractOPFPath(from: containerXml),
@@ -24,42 +59,73 @@ struct EPUBParser {
         else {
             throw ParseError.invalidArchive
         }
-
-        // 2. 解析 OPF 元数据
-        let title = extractTag(opfXml, tag: "title") ?? url.deletingPathExtension().lastPathComponent
-        let author = extractTag(opfXml, tag: "creator")
-
-        // 3. 章节数（spine itemref 数量）
-        let chapterCount = countSpineItems(opfXml)
-
-        return ParsedBook(title: title, author: author, chapterCount: chapterCount, content: "")
+        let opfDir = (opfPath as NSString).deletingLastPathComponent
+        return (opfXml, opfDir)
     }
 
-    // MARK: - ZIPFoundation 辅助
+    /// 从 OPF 提取章节列表（manifest + spine）。
+    private func chapters(from archive: Archive, opfXml: String, opfDir: String) throws -> [BookChapter] {
+        let manifest = parseManifest(opfXml)      // id -> href
+        let spine = parseSpine(opfXml)            // [idref]
+        guard !spine.isEmpty else {
+            throw ParseError.invalidArchive
+        }
 
-    /// 从 archive 按路径提取并转为字符串。
+        var chapters: [BookChapter] = []
+        for (index, idref) in spine.enumerated() {
+            guard let href = manifest[idref] else { continue }
+            let fullPath = resolve(href: href, relativeTo: opfDir)
+            chapters.append(BookChapter(
+                id: fullPath,
+                title: "第 \(index + 1) 章",
+                href: fullPath,
+                index: index
+            ))
+        }
+        return chapters
+    }
+
+    private func parseManifest(_ opfXml: String) -> [String: String] {
+        var result: [String: String] = [:]
+        for element in matches(of: #"<item\b[^>]*>"#, in: opfXml) {
+            if let id = extractAttr(element, name: "id"),
+               let href = extractAttr(element, name: "href") {
+                result[id] = href
+            }
+        }
+        return result
+    }
+
+    private func parseSpine(_ opfXml: String) -> [String] {
+        var result: [String] = []
+        for element in matches(of: #"<itemref\b[^>]*>"#, in: opfXml) {
+            if let idref = extractAttr(element, name: "idref") {
+                result.append(idref)
+            }
+        }
+        return result
+    }
+
+    private func resolve(href: String, relativeTo dir: String) -> String {
+        if dir.isEmpty { return href }
+        return (dir as NSString).appendingPathComponent(href)
+    }
+
     private func extractString(_ archive: Archive, path: String) throws -> String? {
         guard let entry = archive[path] else { return nil }
         var data = Data()
-        _ = try archive.extract(entry, consumer: { chunk in
-            data.append(chunk)
-        })
+        _ = try archive.extract(entry, consumer: { data.append($0) })
         return String(data: data, encoding: .utf8)
     }
 
-    // MARK: - XML 正则解析
-
-    /// 从 container.xml 提取第一个 rootfile 的 full-path。
     private func extractOPFPath(from xml: String) -> String? {
         guard let range = xml.range(of: #"full-path\s*=\s*"([^"]+)""#, options: .regularExpression) else {
             return nil
         }
-        let match = xml[range]
-        let parts = match.split(separator: "\"")
+        let parts = xml[range].split(separator: "\"")
         return parts.count >= 2 ? String(parts[1]) : nil
     }
 
-    /// 提取 <dc:title> / <dc:creator> 等标签内容（兼容 namespace 前缀）。
     private func extractTag(_ xml: String, tag: String) -> String? {
         let pattern = "<[^>]*:" + tag + "[^>]*>(.*?)</[^>]*:" + tag + ">"
         guard let range = xml.range(of: pattern, options: [.regularExpression, .caseInsensitive]) else {
@@ -71,11 +137,35 @@ struct EPUBParser {
         return content.isEmpty ? nil : content
     }
 
-    /// 统计 spine 里的 itemref 数量（章节数）。
-    private func countSpineItems(_ xml: String) -> Int {
-        guard let regex = try? NSRegularExpression(pattern: #"<itemref\b"#, options: .caseInsensitive) else {
-            return 0
+    private func extractAttr(_ element: String, name: String) -> String? {
+        let pattern = name + #"\s*=\s*"([^"]*)""#
+        guard let range = element.range(of: pattern, options: .regularExpression) else { return nil }
+        let parts = element[range].split(separator: "\"")
+        return parts.count >= 2 ? String(parts[1]) : nil
+    }
+
+    private func matches(of pattern: String, in text: String) -> [String] {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else { return [] }
+        let ns = text as NSString
+        return regex.matches(in: text, range: NSRange(location: 0, length: ns.length)).compactMap {
+            Range($0.range, in: text).map { String(text[$0]) }
         }
-        return regex.numberOfMatches(in: xml, range: NSRange(xml.startIndex..., in: xml))
+    }
+
+    /// XHTML → 纯文本（保留段落换行）。
+    static func htmlToText(_ html: String) -> String {
+        var text = html
+        text = text.replacingOccurrences(of: #"</(p|div|h[1-6]|li|blockquote|tr)>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
+        text = text.replacingOccurrences(of: #"<(br|hr)\s*/?>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
+        text = text.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)
+        text = text.replacingOccurrences(of: "&amp;", with: "&")
+        text = text.replacingOccurrences(of: "&lt;", with: "<")
+        text = text.replacingOccurrences(of: "&gt;", with: ">")
+        text = text.replacingOccurrences(of: "&quot;", with: "\"")
+        text = text.replacingOccurrences(of: "&apos;", with: "'")
+        text = text.replacingOccurrences(of: "&nbsp;", with: " ")
+        text = text.replacingOccurrences(of: "&#160;", with: " ")
+        text = text.replacingOccurrences(of: #"\n{3,}"#, with: "\n\n", options: .regularExpression)
+        return text.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 }

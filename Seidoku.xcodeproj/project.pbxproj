@@ -41,6 +41,13 @@
 		4A0000000000000000000021 /* FileManager+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000021 /* FileManager+ZIP.swift */; };
 		4A0000000000000000000022 /* FileManager+ZIPDeprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000022 /* FileManager+ZIPDeprecated.swift */; };
 		4A0000000000000000000023 /* URL+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000023 /* URL+ZIP.swift */; };
+		4A0000000000000000000024 /* Chapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000024 /* Chapter.swift */; };
+		4A0000000000000000000025 /* ReaderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000025 /* ReaderSettings.swift */; };
+		4A0000000000000000000026 /* TextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000026 /* TextPaginator.swift */; };
+		4A0000000000000000000027 /* ReaderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000027 /* ReaderViewModel.swift */; };
+		4A0000000000000000000028 /* PageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000028 /* PageTextView.swift */; };
+		4A0000000000000000000029 /* PageViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000029 /* PageViewController.swift */; };
+		4A000000000000000000002A /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002A /* ReaderView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -79,6 +86,13 @@
 		3A0000000000000000000021 /* FileManager+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+ZIP.swift"; sourceTree = "<group>"; };
 		3A0000000000000000000022 /* FileManager+ZIPDeprecated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+ZIPDeprecated.swift"; sourceTree = "<group>"; };
 		3A0000000000000000000023 /* URL+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ZIP.swift"; sourceTree = "<group>"; };
+		3A0000000000000000000024 /* Chapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chapter.swift; sourceTree = "<group>"; };
+		3A0000000000000000000025 /* ReaderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettings.swift; sourceTree = "<group>"; };
+		3A0000000000000000000026 /* TextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPaginator.swift; sourceTree = "<group>"; };
+		3A0000000000000000000027 /* ReaderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderViewModel.swift; sourceTree = "<group>"; };
+		3A0000000000000000000028 /* PageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTextView.swift; sourceTree = "<group>"; };
+		3A0000000000000000000029 /* PageViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageViewController.swift; sourceTree = "<group>"; };
+		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -111,6 +125,7 @@
 				2A000000000000000000000B /* Models */,
 				2A000000000000000000000C /* Persistence */,
 				2A000000000000000000000D /* ViewModels */,
+				2A000000000000000000000F /* Features */,
 				2A000000000000000000000E /* Vendor */,
 			);
 			path = Seidoku;
@@ -181,6 +196,8 @@
 			isa = PBXGroup;
 			children = (
 				3A000000000000000000000A /* Book.swift */,
+				3A0000000000000000000024 /* Chapter.swift */,
+				3A0000000000000000000025 /* ReaderSettings.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -199,6 +216,50 @@
 				3A000000000000000000000E /* LibraryViewModel.swift */,
 			);
 			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000000F /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				2A0000000000000000000010 /* Reader */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000010 /* Reader */ = {
+			isa = PBXGroup;
+			children = (
+				2A0000000000000000000011 /* Engine */,
+				2A0000000000000000000012 /* ViewModel */,
+				2A0000000000000000000013 /* View */,
+			);
+			path = Reader;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000011 /* Engine */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000026 /* TextPaginator.swift */,
+			);
+			path = Engine;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000012 /* ViewModel */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000027 /* ReaderViewModel.swift */,
+			);
+			path = ViewModel;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000013 /* View */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000028 /* PageTextView.swift */,
+				3A0000000000000000000029 /* PageViewController.swift */,
+				3A000000000000000000002A /* ReaderView.swift */,
+			);
+			path = View;
 			sourceTree = "<group>";
 		};
 		2A000000000000000000000E /* Vendor */ = {
@@ -339,6 +400,13 @@
 				4A0000000000000000000021 /* FileManager+ZIP.swift in Sources */,
 				4A0000000000000000000022 /* FileManager+ZIPDeprecated.swift in Sources */,
 				4A0000000000000000000023 /* URL+ZIP.swift in Sources */,
+				4A0000000000000000000024 /* Chapter.swift in Sources */,
+				4A0000000000000000000025 /* ReaderSettings.swift in Sources */,
+				4A0000000000000000000026 /* TextPaginator.swift in Sources */,
+				4A0000000000000000000027 /* ReaderViewModel.swift in Sources */,
+				4A0000000000000000000028 /* PageTextView.swift in Sources */,
+				4A0000000000000000000029 /* PageViewController.swift in Sources */,
+				4A000000000000000000002A /* ReaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -440,7 +508,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.3.6;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -465,7 +533,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.3.6;
+				MARKETING_VERSION = 0.4.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
