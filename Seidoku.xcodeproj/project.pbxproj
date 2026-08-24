@@ -51,6 +51,66 @@
 		4A000000000000000000002A /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002A /* ReaderView.swift */; };
 		4A000000000000000000002B /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002B /* DocumentPicker.swift */; };
 		4A000000000000000000002C /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002C /* ShareSheet.swift */; };
+		4A0000000000000000000033 /* Attribute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000033 /* Attribute.swift */; };
+		4A0000000000000000000034 /* Attributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000034 /* Attributes.swift */; };
+		4A0000000000000000000035 /* BinarySearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000035 /* BinarySearch.swift */; };
+		4A0000000000000000000036 /* BooleanAttribute.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000036 /* BooleanAttribute.swift */; };
+		4A0000000000000000000037 /* ByteSlice.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000037 /* ByteSlice.swift */; };
+		4A0000000000000000000038 /* CharacterExt.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000038 /* CharacterExt.swift */; };
+		4A0000000000000000000039 /* CharacterReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000039 /* CharacterReader.swift */; };
+		4A000000000000000000003A /* Cleaner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000003A /* Cleaner.swift */; };
+		4A000000000000000000003B /* Collector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000003B /* Collector.swift */; };
+		4A000000000000000000003C /* CombiningEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000003C /* CombiningEvaluator.swift */; };
+		4A000000000000000000003D /* Comment.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000003D /* Comment.swift */; };
+		4A000000000000000000003E /* CssSelector.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000003E /* CssSelector.swift */; };
+		4A000000000000000000003F /* DataNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000003F /* DataNode.swift */; };
+		4A0000000000000000000040 /* DebugTrace.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000040 /* DebugTrace.swift */; };
+		4A0000000000000000000041 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000041 /* Document.swift */; };
+		4A0000000000000000000042 /* DocumentType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000042 /* DocumentType.swift */; };
+		4A0000000000000000000043 /* Element.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000043 /* Element.swift */; };
+		4A0000000000000000000044 /* ElementQuery.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000044 /* ElementQuery.swift */; };
+		4A0000000000000000000045 /* Elements.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000045 /* Elements.swift */; };
+		4A0000000000000000000046 /* Entities.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000046 /* Entities.swift */; };
+		4A0000000000000000000047 /* Evaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000047 /* Evaluator.swift */; };
+		4A0000000000000000000048 /* Exception.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000048 /* Exception.swift */; };
+		4A0000000000000000000049 /* FormElement.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000049 /* FormElement.swift */; };
+		4A000000000000000000004A /* HtmlTreeBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000004A /* HtmlTreeBuilder.swift */; };
+		4A000000000000000000004B /* HtmlTreeBuilderState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000004B /* HtmlTreeBuilderState.swift */; };
+		4A000000000000000000004C /* LRUCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000004C /* LRUCache.swift */; };
+		4A000000000000000000004D /* Mutex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000004D /* Mutex.swift */; };
+		4A000000000000000000004E /* Node.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000004E /* Node.swift */; };
+		4A000000000000000000004F /* NodeTraversor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000004F /* NodeTraversor.swift */; };
+		4A0000000000000000000050 /* NodeVisitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000050 /* NodeVisitor.swift */; };
+		4A0000000000000000000051 /* OrderedSet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000051 /* OrderedSet.swift */; };
+		4A0000000000000000000052 /* ParseError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000052 /* ParseError.swift */; };
+		4A0000000000000000000053 /* ParseErrorList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000053 /* ParseErrorList.swift */; };
+		4A0000000000000000000054 /* ParseSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000054 /* ParseSettings.swift */; };
+		4A0000000000000000000055 /* Parser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000055 /* Parser.swift */; };
+		4A0000000000000000000056 /* ParsingStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000056 /* ParsingStrings.swift */; };
+		4A0000000000000000000057 /* Pattern.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000057 /* Pattern.swift */; };
+		4A0000000000000000000058 /* Profiler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000058 /* Profiler.swift */; };
+		4A0000000000000000000059 /* QueryParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000059 /* QueryParser.swift */; };
+		4A000000000000000000005A /* QueryParserCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000005A /* QueryParserCache.swift */; };
+		4A000000000000000000005B /* SourceRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000005B /* SourceRange.swift */; };
+		4A000000000000000000005C /* StreamReader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000005C /* StreamReader.swift */; };
+		4A000000000000000000005D /* String.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000005D /* String.swift */; };
+		4A000000000000000000005E /* StringBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000005E /* StringBuilder.swift */; };
+		4A000000000000000000005F /* StringUtil.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000005F /* StringUtil.swift */; };
+		4A0000000000000000000060 /* StructuralEvaluator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000060 /* StructuralEvaluator.swift */; };
+		4A0000000000000000000061 /* SwiftSoup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000061 /* SwiftSoup.swift */; };
+		4A0000000000000000000062 /* Tag.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000062 /* Tag.swift */; };
+		4A0000000000000000000063 /* TextNode.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000063 /* TextNode.swift */; };
+		4A0000000000000000000064 /* Token.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000064 /* Token.swift */; };
+		4A0000000000000000000065 /* TokenQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000065 /* TokenQueue.swift */; };
+		4A0000000000000000000066 /* Tokeniser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000066 /* Tokeniser.swift */; };
+		4A0000000000000000000067 /* TokeniserState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000067 /* TokeniserState.swift */; };
+		4A0000000000000000000068 /* TreeBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000068 /* TreeBuilder.swift */; };
+		4A0000000000000000000069 /* UTF8Arrays.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000069 /* UTF8Arrays.swift */; };
+		4A000000000000000000006A /* UnicodeScalar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000006A /* UnicodeScalar.swift */; };
+		4A000000000000000000006B /* Validate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000006B /* Validate.swift */; };
+		4A000000000000000000006C /* Whitelist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000006C /* Whitelist.swift */; };
+		4A000000000000000000006D /* XmlDeclaration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000006D /* XmlDeclaration.swift */; };
+		4A000000000000000000006E /* XmlTreeBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000006E /* XmlTreeBuilder.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -99,6 +159,66 @@
 		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		3A000000000000000000002B /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
 		3A000000000000000000002C /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		3A0000000000000000000033 /* Attribute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attribute.swift; sourceTree = "<group>"; };
+		3A0000000000000000000034 /* Attributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Attributes.swift; sourceTree = "<group>"; };
+		3A0000000000000000000035 /* BinarySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BinarySearch.swift; sourceTree = "<group>"; };
+		3A0000000000000000000036 /* BooleanAttribute.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BooleanAttribute.swift; sourceTree = "<group>"; };
+		3A0000000000000000000037 /* ByteSlice.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ByteSlice.swift; sourceTree = "<group>"; };
+		3A0000000000000000000038 /* CharacterExt.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterExt.swift; sourceTree = "<group>"; };
+		3A0000000000000000000039 /* CharacterReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CharacterReader.swift; sourceTree = "<group>"; };
+		3A000000000000000000003A /* Cleaner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Cleaner.swift; sourceTree = "<group>"; };
+		3A000000000000000000003B /* Collector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Collector.swift; sourceTree = "<group>"; };
+		3A000000000000000000003C /* CombiningEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CombiningEvaluator.swift; sourceTree = "<group>"; };
+		3A000000000000000000003D /* Comment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Comment.swift; sourceTree = "<group>"; };
+		3A000000000000000000003E /* CssSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CssSelector.swift; sourceTree = "<group>"; };
+		3A000000000000000000003F /* DataNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DataNode.swift; sourceTree = "<group>"; };
+		3A0000000000000000000040 /* DebugTrace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugTrace.swift; sourceTree = "<group>"; };
+		3A0000000000000000000041 /* Document.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Document.swift; sourceTree = "<group>"; };
+		3A0000000000000000000042 /* DocumentType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentType.swift; sourceTree = "<group>"; };
+		3A0000000000000000000043 /* Element.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Element.swift; sourceTree = "<group>"; };
+		3A0000000000000000000044 /* ElementQuery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ElementQuery.swift; sourceTree = "<group>"; };
+		3A0000000000000000000045 /* Elements.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Elements.swift; sourceTree = "<group>"; };
+		3A0000000000000000000046 /* Entities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Entities.swift; sourceTree = "<group>"; };
+		3A0000000000000000000047 /* Evaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Evaluator.swift; sourceTree = "<group>"; };
+		3A0000000000000000000048 /* Exception.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Exception.swift; sourceTree = "<group>"; };
+		3A0000000000000000000049 /* FormElement.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormElement.swift; sourceTree = "<group>"; };
+		3A000000000000000000004A /* HtmlTreeBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HtmlTreeBuilder.swift; sourceTree = "<group>"; };
+		3A000000000000000000004B /* HtmlTreeBuilderState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HtmlTreeBuilderState.swift; sourceTree = "<group>"; };
+		3A000000000000000000004C /* LRUCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LRUCache.swift; sourceTree = "<group>"; };
+		3A000000000000000000004D /* Mutex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Mutex.swift; sourceTree = "<group>"; };
+		3A000000000000000000004E /* Node.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Node.swift; sourceTree = "<group>"; };
+		3A000000000000000000004F /* NodeTraversor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeTraversor.swift; sourceTree = "<group>"; };
+		3A0000000000000000000050 /* NodeVisitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NodeVisitor.swift; sourceTree = "<group>"; };
+		3A0000000000000000000051 /* OrderedSet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrderedSet.swift; sourceTree = "<group>"; };
+		3A0000000000000000000052 /* ParseError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParseError.swift; sourceTree = "<group>"; };
+		3A0000000000000000000053 /* ParseErrorList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParseErrorList.swift; sourceTree = "<group>"; };
+		3A0000000000000000000054 /* ParseSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParseSettings.swift; sourceTree = "<group>"; };
+		3A0000000000000000000055 /* Parser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Parser.swift; sourceTree = "<group>"; };
+		3A0000000000000000000056 /* ParsingStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ParsingStrings.swift; sourceTree = "<group>"; };
+		3A0000000000000000000057 /* Pattern.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Pattern.swift; sourceTree = "<group>"; };
+		3A0000000000000000000058 /* Profiler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Profiler.swift; sourceTree = "<group>"; };
+		3A0000000000000000000059 /* QueryParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryParser.swift; sourceTree = "<group>"; };
+		3A000000000000000000005A /* QueryParserCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QueryParserCache.swift; sourceTree = "<group>"; };
+		3A000000000000000000005B /* SourceRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SourceRange.swift; sourceTree = "<group>"; };
+		3A000000000000000000005C /* StreamReader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StreamReader.swift; sourceTree = "<group>"; };
+		3A000000000000000000005D /* String.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = String.swift; sourceTree = "<group>"; };
+		3A000000000000000000005E /* StringBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringBuilder.swift; sourceTree = "<group>"; };
+		3A000000000000000000005F /* StringUtil.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StringUtil.swift; sourceTree = "<group>"; };
+		3A0000000000000000000060 /* StructuralEvaluator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StructuralEvaluator.swift; sourceTree = "<group>"; };
+		3A0000000000000000000061 /* SwiftSoup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftSoup.swift; sourceTree = "<group>"; };
+		3A0000000000000000000062 /* Tag.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tag.swift; sourceTree = "<group>"; };
+		3A0000000000000000000063 /* TextNode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextNode.swift; sourceTree = "<group>"; };
+		3A0000000000000000000064 /* Token.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Token.swift; sourceTree = "<group>"; };
+		3A0000000000000000000065 /* TokenQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenQueue.swift; sourceTree = "<group>"; };
+		3A0000000000000000000066 /* Tokeniser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokeniser.swift; sourceTree = "<group>"; };
+		3A0000000000000000000067 /* TokeniserState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokeniserState.swift; sourceTree = "<group>"; };
+		3A0000000000000000000068 /* TreeBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TreeBuilder.swift; sourceTree = "<group>"; };
+		3A0000000000000000000069 /* UTF8Arrays.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UTF8Arrays.swift; sourceTree = "<group>"; };
+		3A000000000000000000006A /* UnicodeScalar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnicodeScalar.swift; sourceTree = "<group>"; };
+		3A000000000000000000006B /* Validate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Validate.swift; sourceTree = "<group>"; };
+		3A000000000000000000006C /* Whitelist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Whitelist.swift; sourceTree = "<group>"; };
+		3A000000000000000000006D /* XmlDeclaration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XmlDeclaration.swift; sourceTree = "<group>"; };
+		3A000000000000000000006E /* XmlTreeBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = XmlTreeBuilder.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -132,6 +252,7 @@
 				2A000000000000000000000C /* Persistence */,
 				2A000000000000000000000D /* ViewModels */,
 				2A000000000000000000000F /* Features */,
+				2A0000000000000000000015 /* SwiftSoup */,
 				2A000000000000000000000E /* Vendor */,
 			);
 			path = Seidoku;
@@ -271,6 +392,73 @@
 			path = View;
 			sourceTree = "<group>";
 		};
+		2A0000000000000000000015 /* SwiftSoup */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000033 /* Attribute.swift */,
+				3A0000000000000000000034 /* Attributes.swift */,
+				3A0000000000000000000035 /* BinarySearch.swift */,
+				3A0000000000000000000036 /* BooleanAttribute.swift */,
+				3A0000000000000000000037 /* ByteSlice.swift */,
+				3A0000000000000000000038 /* CharacterExt.swift */,
+				3A0000000000000000000039 /* CharacterReader.swift */,
+				3A000000000000000000003A /* Cleaner.swift */,
+				3A000000000000000000003B /* Collector.swift */,
+				3A000000000000000000003C /* CombiningEvaluator.swift */,
+				3A000000000000000000003D /* Comment.swift */,
+				3A000000000000000000003E /* CssSelector.swift */,
+				3A000000000000000000003F /* DataNode.swift */,
+				3A0000000000000000000040 /* DebugTrace.swift */,
+				3A0000000000000000000041 /* Document.swift */,
+				3A0000000000000000000042 /* DocumentType.swift */,
+				3A0000000000000000000043 /* Element.swift */,
+				3A0000000000000000000044 /* ElementQuery.swift */,
+				3A0000000000000000000045 /* Elements.swift */,
+				3A0000000000000000000046 /* Entities.swift */,
+				3A0000000000000000000047 /* Evaluator.swift */,
+				3A0000000000000000000048 /* Exception.swift */,
+				3A0000000000000000000049 /* FormElement.swift */,
+				3A000000000000000000004A /* HtmlTreeBuilder.swift */,
+				3A000000000000000000004B /* HtmlTreeBuilderState.swift */,
+				3A000000000000000000004C /* LRUCache.swift */,
+				3A000000000000000000004D /* Mutex.swift */,
+				3A000000000000000000004E /* Node.swift */,
+				3A000000000000000000004F /* NodeTraversor.swift */,
+				3A0000000000000000000050 /* NodeVisitor.swift */,
+				3A0000000000000000000051 /* OrderedSet.swift */,
+				3A0000000000000000000052 /* ParseError.swift */,
+				3A0000000000000000000053 /* ParseErrorList.swift */,
+				3A0000000000000000000054 /* ParseSettings.swift */,
+				3A0000000000000000000055 /* Parser.swift */,
+				3A0000000000000000000056 /* ParsingStrings.swift */,
+				3A0000000000000000000057 /* Pattern.swift */,
+				3A0000000000000000000058 /* Profiler.swift */,
+				3A0000000000000000000059 /* QueryParser.swift */,
+				3A000000000000000000005A /* QueryParserCache.swift */,
+				3A000000000000000000005B /* SourceRange.swift */,
+				3A000000000000000000005C /* StreamReader.swift */,
+				3A000000000000000000005D /* String.swift */,
+				3A000000000000000000005E /* StringBuilder.swift */,
+				3A000000000000000000005F /* StringUtil.swift */,
+				3A0000000000000000000060 /* StructuralEvaluator.swift */,
+				3A0000000000000000000061 /* SwiftSoup.swift */,
+				3A0000000000000000000062 /* Tag.swift */,
+				3A0000000000000000000063 /* TextNode.swift */,
+				3A0000000000000000000064 /* Token.swift */,
+				3A0000000000000000000065 /* TokenQueue.swift */,
+				3A0000000000000000000066 /* Tokeniser.swift */,
+				3A0000000000000000000067 /* TokeniserState.swift */,
+				3A0000000000000000000068 /* TreeBuilder.swift */,
+				3A0000000000000000000069 /* UTF8Arrays.swift */,
+				3A000000000000000000006A /* UnicodeScalar.swift */,
+				3A000000000000000000006B /* Validate.swift */,
+				3A000000000000000000006C /* Whitelist.swift */,
+				3A000000000000000000006D /* XmlDeclaration.swift */,
+				3A000000000000000000006E /* XmlTreeBuilder.swift */,
+			);
+			path = "Vendor/SwiftSoup";
+			sourceTree = "<group>";
+		};
 		2A000000000000000000000E /* Vendor */ = {
 			isa = PBXGroup;
 			children = (
@@ -379,6 +567,66 @@
 			files = (
 				4A0000000000000000000001 /* SeidokuApp.swift in Sources */,
 				4A000000000000000000002D /* AppImportState.swift in Sources */,
+				4A0000000000000000000033 /* Attribute.swift in Sources */,
+				4A0000000000000000000034 /* Attributes.swift in Sources */,
+				4A0000000000000000000035 /* BinarySearch.swift in Sources */,
+				4A0000000000000000000036 /* BooleanAttribute.swift in Sources */,
+				4A0000000000000000000037 /* ByteSlice.swift in Sources */,
+				4A0000000000000000000038 /* CharacterExt.swift in Sources */,
+				4A0000000000000000000039 /* CharacterReader.swift in Sources */,
+				4A000000000000000000003A /* Cleaner.swift in Sources */,
+				4A000000000000000000003B /* Collector.swift in Sources */,
+				4A000000000000000000003C /* CombiningEvaluator.swift in Sources */,
+				4A000000000000000000003D /* Comment.swift in Sources */,
+				4A000000000000000000003E /* CssSelector.swift in Sources */,
+				4A000000000000000000003F /* DataNode.swift in Sources */,
+				4A0000000000000000000040 /* DebugTrace.swift in Sources */,
+				4A0000000000000000000041 /* Document.swift in Sources */,
+				4A0000000000000000000042 /* DocumentType.swift in Sources */,
+				4A0000000000000000000043 /* Element.swift in Sources */,
+				4A0000000000000000000044 /* ElementQuery.swift in Sources */,
+				4A0000000000000000000045 /* Elements.swift in Sources */,
+				4A0000000000000000000046 /* Entities.swift in Sources */,
+				4A0000000000000000000047 /* Evaluator.swift in Sources */,
+				4A0000000000000000000048 /* Exception.swift in Sources */,
+				4A0000000000000000000049 /* FormElement.swift in Sources */,
+				4A000000000000000000004A /* HtmlTreeBuilder.swift in Sources */,
+				4A000000000000000000004B /* HtmlTreeBuilderState.swift in Sources */,
+				4A000000000000000000004C /* LRUCache.swift in Sources */,
+				4A000000000000000000004D /* Mutex.swift in Sources */,
+				4A000000000000000000004E /* Node.swift in Sources */,
+				4A000000000000000000004F /* NodeTraversor.swift in Sources */,
+				4A0000000000000000000050 /* NodeVisitor.swift in Sources */,
+				4A0000000000000000000051 /* OrderedSet.swift in Sources */,
+				4A0000000000000000000052 /* ParseError.swift in Sources */,
+				4A0000000000000000000053 /* ParseErrorList.swift in Sources */,
+				4A0000000000000000000054 /* ParseSettings.swift in Sources */,
+				4A0000000000000000000055 /* Parser.swift in Sources */,
+				4A0000000000000000000056 /* ParsingStrings.swift in Sources */,
+				4A0000000000000000000057 /* Pattern.swift in Sources */,
+				4A0000000000000000000058 /* Profiler.swift in Sources */,
+				4A0000000000000000000059 /* QueryParser.swift in Sources */,
+				4A000000000000000000005A /* QueryParserCache.swift in Sources */,
+				4A000000000000000000005B /* SourceRange.swift in Sources */,
+				4A000000000000000000005C /* StreamReader.swift in Sources */,
+				4A000000000000000000005D /* String.swift in Sources */,
+				4A000000000000000000005E /* StringBuilder.swift in Sources */,
+				4A000000000000000000005F /* StringUtil.swift in Sources */,
+				4A0000000000000000000060 /* StructuralEvaluator.swift in Sources */,
+				4A0000000000000000000061 /* SwiftSoup.swift in Sources */,
+				4A0000000000000000000062 /* Tag.swift in Sources */,
+				4A0000000000000000000063 /* TextNode.swift in Sources */,
+				4A0000000000000000000064 /* Token.swift in Sources */,
+				4A0000000000000000000065 /* TokenQueue.swift in Sources */,
+				4A0000000000000000000066 /* Tokeniser.swift in Sources */,
+				4A0000000000000000000067 /* TokeniserState.swift in Sources */,
+				4A0000000000000000000068 /* TreeBuilder.swift in Sources */,
+				4A0000000000000000000069 /* UTF8Arrays.swift in Sources */,
+				4A000000000000000000006A /* UnicodeScalar.swift in Sources */,
+				4A000000000000000000006B /* Validate.swift in Sources */,
+				4A000000000000000000006C /* Whitelist.swift in Sources */,
+				4A000000000000000000006D /* XmlDeclaration.swift in Sources */,
+				4A000000000000000000006E /* XmlTreeBuilder.swift in Sources */,
 				4A0000000000000000000002 /* HomeView.swift in Sources */,
 				4A0000000000000000000003 /* LibraryView.swift in Sources */,
 				4A0000000000000000000004 /* SettingsView.swift in Sources */,
@@ -521,7 +769,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.8.2;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -547,7 +795,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.8.2;
+				MARKETING_VERSION = 0.9.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

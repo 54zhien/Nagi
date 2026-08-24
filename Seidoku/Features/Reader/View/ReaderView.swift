@@ -41,6 +41,7 @@ struct ReaderView: View {
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showTOC) { tocSheet }
         .statusBarHidden(!showControls)
+        .toolbar(.hidden, for: .tabBar)
     }
 
     // MARK: - 正文内容（三模式）
@@ -121,6 +122,7 @@ struct ReaderView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.regularMaterial)
+        .tint(.primary)
     }
 
     private var bottomBar: some View {
@@ -150,6 +152,7 @@ struct ReaderView: View {
         .padding(.horizontal)
         .padding(.vertical, 10)
         .background(.regularMaterial)
+        .tint(.primary)
     }
 
     // MARK: - 设置面板

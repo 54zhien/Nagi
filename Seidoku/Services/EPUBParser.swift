@@ -152,9 +152,39 @@ struct EPUBParser {
         }
     }
 
-    /// XHTML → 纯文本（保留段落换行）。
+    /// XHTML → 纯文本（SwiftSoup 解析，保留段落，忽略 style/script）。
     static func htmlToText(_ html: String) -> String {
+        guard let doc = try? SwiftSoup.parse(html),
+              let body = try? doc.body() else {
+            return Self.legacyHtmlToText(html)
+        }
+
+        // 提取块级文本元素，保留段落结构
+        let selector = "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, th"
+        guard let elements = try? body.select(selector) else {
+            return Self.legacyHtmlToText(html)
+        }
+
+        var paragraphs: [String] = []
+        for element in elements {
+            let text = (try? element.text())?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            if !text.isEmpty {
+                paragraphs.append(text)
+            }
+        }
+
+        if paragraphs.isEmpty {
+            return ((try? body.text()) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return paragraphs.joined(separator: "\n\n")
+    }
+
+    /// 正则 fallback（SwiftSoup 不可用时）。
+    static func legacyHtmlToText(_ html: String) -> String {
         var text = html
+        text = text.replacingOccurrences(of: #"<style[^>]*>.*?</style>"#, with: "", options: [.regularExpression, .caseInsensitive])
+        text = text.replacingOccurrences(of: #"<script[^>]*>.*?</script>"#, with: "", options: [.regularExpression, .caseInsensitive])
+        text = text.replacingOccurrences(of: #"<!--.*?-->"#, with: "", options: [.regularExpression, .caseInsensitive])
         text = text.replacingOccurrences(of: #"</(p|div|h[1-6]|li|blockquote|tr)>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
         text = text.replacingOccurrences(of: #"<(br|hr)\s*/?>"#, with: "\n", options: [.regularExpression, .caseInsensitive])
         text = text.replacingOccurrences(of: #"<[^>]+>"#, with: "", options: .regularExpression)

@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct SearchView: View {
+    @State private var searchText = ""
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -21,6 +23,7 @@ struct SearchView: View {
             .scrollEdgeEffectStyle(.automatic, for: .all)
             .navigationTitle("搜索")
         }
+        .searchable(text: $searchText, prompt: "搜索书库")
     }
 }
 
