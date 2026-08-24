@@ -45,7 +45,7 @@ enum DocumentPickerPresenter {
         }
 
         let coordinator = DocumentPickerCoordinator(onPick: onPick, onCancel: onCancel)
-        let picker = UIDocumentPickerViewController(forOpeningContentTypes: allowedContentTypes)
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: allowedContentTypes, asCopy: true)
         picker.allowsMultipleSelection = allowsMultipleSelection
         picker.delegate = coordinator
         root.present(picker, animated: true)
