@@ -11,7 +11,6 @@ struct FileImportService {
     enum ImportError: LocalizedError {
         case cannotCreateDirectory(String)
         case copyFailed(String)
-        case accessDenied(String)
 
         var errorDescription: String? {
             switch self {
@@ -19,8 +18,6 @@ struct FileImportService {
                 return "无法创建导入目录：\(message)"
             case .copyFailed(let message):
                 return message
-            case .accessDenied(let name):
-                return "无法访问「\(name)」：文件权限获取失败"
             }
         }
     }
@@ -49,10 +46,7 @@ struct FileImportService {
             defer {
                 if accessing { url.stopAccessingSecurityScopedResource() }
             }
-            // 权限获取失败要明确报错，不能继续复制
-            guard accessing else {
-                throw ImportError.accessDenied(url.lastPathComponent)
-            }
+            // 注意：asCopy:true 返回的 URL 已在 app 沙盒内，startAccessing 会返回 false（属正常，无需 security-scoped 权限），仍可直接复制。
 
             let destination = importsDirectory.appendingPathComponent(url.lastPathComponent)
             do {
