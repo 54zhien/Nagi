@@ -1157,7 +1157,7 @@ open class Token {
     
     final class StartTag: Tag {
         @usableFromInline
-        var resolvedTag: SwiftSoup.Tag? = nil
+        var resolvedTag: Tag? = nil
         @usableFromInline
         var resolvedTagPreservesCase: Bool = false
         @usableFromInline
@@ -1179,21 +1179,21 @@ open class Token {
         }
 
         @inline(__always)
-        func resolveTag(_ settings: ParseSettings, isSelfClosing: Bool) throws -> SwiftSoup.Tag {
+        func resolveTag(_ settings: ParseSettings, isSelfClosing: Bool) throws -> Tag {
             if let cached = resolvedTag,
                resolvedTagPreservesCase == settings.preservesTagCase(),
                resolvedTagIsSelfClosing == isSelfClosing {
                 return cached
             }
-            let resolved: SwiftSoup.Tag
+            let resolved: Tag
             if settings.preservesTagCase() {
-                resolved = try SwiftSoup.Tag.valueOf(try name(), settings, isSelfClosing: isSelfClosing)
-            } else if let fastTag = SwiftSoup.Tag.valueOfTagId(tagId) {
+                resolved = try Tag.valueOf(try name(), settings, isSelfClosing: isSelfClosing)
+            } else if let fastTag = Tag.valueOfTagId(tagId) {
                 resolved = fastTag
             } else if let normalName = normalName() {
-                resolved = try SwiftSoup.Tag.valueOfNormalized(normalName, isSelfClosing: isSelfClosing)
+                resolved = try Tag.valueOfNormalized(normalName, isSelfClosing: isSelfClosing)
             } else {
-                resolved = try SwiftSoup.Tag.valueOf(try name(), settings, isSelfClosing: isSelfClosing)
+                resolved = try Tag.valueOf(try name(), settings, isSelfClosing: isSelfClosing)
             }
             resolvedTag = resolved
             resolvedTagPreservesCase = settings.preservesTagCase()

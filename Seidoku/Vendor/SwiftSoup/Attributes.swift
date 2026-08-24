@@ -98,7 +98,7 @@ open class Attributes: NSCopying {
     
     // TODO: Delegate would be cleaner...
     @usableFromInline
-    weak var ownerElement: SwiftSoup.Element?
+    weak var ownerElement: Element?
     
     public init() {
         attributes.reserveCapacity(16)
@@ -222,7 +222,7 @@ open class Attributes: NSCopying {
             if equalsSlice(normalizedKey, UTF8Arrays.class_) {
                 touchedClass = true
             }
-            if equalsSlice(normalizedKey, SwiftSoup.Element.idString) {
+            if equalsSlice(normalizedKey, Element.idString) {
                 touchedId = true
             }
             if let index = localIndex?[keyForIndex] {
@@ -280,7 +280,7 @@ open class Attributes: NSCopying {
         if equalsSlice(normalizedKey, UTF8Arrays.class_) {
             ownerElement?.markClassQueryIndexDirty()
         }
-        if equalsSlice(normalizedKey, SwiftSoup.Element.idString) {
+        if equalsSlice(normalizedKey, Element.idString) {
             ownerElement?.markIdQueryIndexDirty()
         }
         ownerElement?.markAttributeQueryIndexDirty()
@@ -559,7 +559,7 @@ open class Attributes: NSCopying {
             if normalizedKey == UTF8Arrays.class_ {
                 ownerElement?.markClassQueryIndexDirty()
             }
-            if normalizedKey == SwiftSoup.Element.idString {
+            if normalizedKey == Element.idString {
                 ownerElement?.markIdQueryIndexDirty()
             }
             ownerElement?.markAttributeQueryIndexDirty()
@@ -583,7 +583,7 @@ open class Attributes: NSCopying {
             if normalizedKey == UTF8Arrays.class_ {
                 ownerElement?.markClassQueryIndexDirty()
             }
-            if normalizedKey == SwiftSoup.Element.idString {
+            if normalizedKey == Element.idString {
                 ownerElement?.markIdQueryIndexDirty()
             }
             ownerElement?.markAttributeQueryIndexDirty()
@@ -637,7 +637,7 @@ open class Attributes: NSCopying {
                 if normalizedKey == UTF8Arrays.class_ {
                     ownerElement.markClassQueryIndexDirty()
                 }
-                if normalizedKey == SwiftSoup.Element.idString {
+                if normalizedKey == Element.idString {
                     ownerElement.markIdQueryIndexDirty()
                 }
                 ownerElement.markAttributeValueQueryIndexDirty(for: key)
@@ -666,7 +666,7 @@ open class Attributes: NSCopying {
             if normalizedKey == UTF8Arrays.class_ {
                 dirtyClass = true
             }
-            if normalizedKey == SwiftSoup.Element.idString {
+            if normalizedKey == Element.idString {
                 dirtyId = true
             }
             ownerElement?.markAttributeValueQueryIndexDirty(for: key)
@@ -731,7 +731,7 @@ open class Attributes: NSCopying {
             if normalizedKey == UTF8Arrays.class_ {
                 ownerElement?.markClassQueryIndexDirty()
             }
-            if normalizedKey == SwiftSoup.Element.idString {
+            if normalizedKey == Element.idString {
                 ownerElement?.markIdQueryIndexDirty()
             }
             ownerElement?.markAttributeValueQueryIndexDirty(for: key)

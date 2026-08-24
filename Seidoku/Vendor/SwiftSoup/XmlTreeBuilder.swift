@@ -13,7 +13,7 @@ import Foundation
  
  Usage example:
  ```swift
- let xmlDoc = SwiftSoup.parse(html, baseUrl, Parser.xmlParser())
+ let xmlDoc = parse(html, baseUrl, Parser.xmlParser())
  ```
  */
 public class XmlTreeBuilder: TreeBuilder {
@@ -117,7 +117,7 @@ public class XmlTreeBuilder: TreeBuilder {
                                   // so we do a bit of a hack and parse the data as an element to pull the attributes out
             let data: String = comment.getData()
             if (data.count > 1 && (data.startsWith("!") || data.startsWith("?"))) {
-                let doc: Document = try SwiftSoup.parse("<" + data.substring(1, data.count - 2) + ">", String(decoding: baseUri, as: UTF8.self), Parser.xmlParser())
+                let doc: Document = try parse("<" + data.substring(1, data.count - 2) + ">", String(decoding: baseUri, as: UTF8.self), Parser.xmlParser())
                 let el: Element = doc.child(0)
                 insert = XmlDeclaration(settings.normalizeTag(el.tagNameUTF8()), comment.getBaseUriUTF8(), data.startsWith("!"))
                 insert.getAttributes()?.addAll(incoming: el.getAttributes())

@@ -1241,7 +1241,7 @@ open class Node: Equatable, Hashable {
             } else {
                 clone.attributes = attrs.clone()
             }
-            clone.attributes?.ownerElement = clone as? SwiftSoup.Element
+            clone.attributes?.ownerElement = clone as? Element
         } else {
             clone.attributes = nil
         }
