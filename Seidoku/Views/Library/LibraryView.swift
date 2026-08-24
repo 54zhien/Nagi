@@ -13,7 +13,7 @@ struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @State private var viewModel = LibraryViewModel()
-    @State private var isImporterPresented = false
+    @State private var pickerCoordinator: DocumentPickerCoordinator?
 
     var body: some View {
         NavigationStack {
@@ -40,26 +40,18 @@ struct LibraryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        isImporterPresented = true
+                        pickerCoordinator = DocumentPickerPresenter.present(
+                            allowedContentTypes: [.plainText, .epub],
+                            allowsMultipleSelection: true,
+                            onPick: { files in
+                                viewModel.importAndParse(files, into: modelContext)
+                            }
+                        )
                     } label: {
                         Image(systemName: "plus")
                     }
                     .accessibilityLabel("导入小说")
                 }
-            }
-            .sheet(isPresented: $isImporterPresented) {
-                DocumentPicker(
-                    allowedContentTypes: [.plainText, .epub],
-                    allowsMultipleSelection: true,
-                    onPick: { files in
-                        isImporterPresented = false
-                        viewModel.importAndParse(files, into: modelContext)
-                    },
-                    onCancel: {
-                        isImporterPresented = false
-                    }
-                )
-                .ignoresSafeArea()
             }
             .alert(
                 "导入失败",

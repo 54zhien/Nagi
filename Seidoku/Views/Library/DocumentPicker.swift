@@ -2,45 +2,53 @@
 //  DocumentPicker.swift
 //  Seidoku
 //
-//  UIKit UIDocumentPickerViewController 的 SwiftUI 包装。
-//  替代 SwiftUI 的 .fileImporter（后者在真机 iOS 26 有已知 bug）。
+//  用 UIKit 的 rootViewController.present 直接弹出 UIDocumentPickerViewController，
+//  绕开 SwiftUI .sheet 与 UIKit picker 的双重 modal 嵌套（后者会导致 delegate 回调不触发）。
 //
 
 import SwiftUI
 import UniformTypeIdentifiers
 
-struct DocumentPicker: UIViewControllerRepresentable {
-    let allowedContentTypes: [UTType]
-    let allowsMultipleSelection: Bool
-    let onPick: ([URL]) -> Void
-    let onCancel: () -> Void
+final class DocumentPickerCoordinator: NSObject, UIDocumentPickerDelegate {
+    private let onPick: ([URL]) -> Void
+    private let onCancel: () -> Void
 
-    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+    init(onPick: @escaping ([URL]) -> Void, onCancel: @escaping () -> Void) {
+        self.onPick = onPick
+        self.onCancel = onCancel
+    }
+
+    func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+        onPick(urls)
+    }
+
+    func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+        onCancel()
+    }
+}
+
+enum DocumentPickerPresenter {
+    /// 从 key window 的 rootViewController present picker。
+    @discardableResult
+    static func present(
+        allowedContentTypes: [UTType],
+        allowsMultipleSelection: Bool,
+        onPick: @escaping ([URL]) -> Void,
+        onCancel: @escaping () -> Void = {}
+    ) -> DocumentPickerCoordinator? {
+        guard let root = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?
+            .rootViewController else {
+            return nil
+        }
+
+        let coordinator = DocumentPickerCoordinator(onPick: onPick, onCancel: onCancel)
         let picker = UIDocumentPickerViewController(forOpeningContentTypes: allowedContentTypes)
         picker.allowsMultipleSelection = allowsMultipleSelection
-        picker.delegate = context.coordinator
-        return picker
-    }
-
-    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator {
-        Coordinator(self)
-    }
-
-    final class Coordinator: NSObject, UIDocumentPickerDelegate {
-        let parent: DocumentPicker
-
-        init(_ parent: DocumentPicker) {
-            self.parent = parent
-        }
-
-        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
-            parent.onPick(urls)
-        }
-
-        func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-            parent.onCancel()
-        }
+        picker.delegate = coordinator
+        root.present(picker, animated: true)
+        return coordinator
     }
 }
