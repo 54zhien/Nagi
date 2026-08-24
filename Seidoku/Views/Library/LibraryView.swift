@@ -47,17 +47,19 @@ struct LibraryView: View {
                     .accessibilityLabel("导入小说")
                 }
             }
-            .fileImporter(
-                isPresented: $isImporterPresented,
-                allowedContentTypes: [.plainText, .epub],
-                allowsMultipleSelection: true
-            ) { result in
-                switch result {
-                case .success(let files):
-                    viewModel.importAndParse(files, into: modelContext)
-                case .failure(let error):
-                    viewModel.errorMessage = error.localizedDescription
-                }
+            .sheet(isPresented: $isImporterPresented) {
+                DocumentPicker(
+                    allowedContentTypes: [.plainText, .epub],
+                    allowsMultipleSelection: true,
+                    onPick: { files in
+                        isImporterPresented = false
+                        viewModel.importAndParse(files, into: modelContext)
+                    },
+                    onCancel: {
+                        isImporterPresented = false
+                    }
+                )
+                .ignoresSafeArea()
             }
             .alert(
                 "导入失败",
