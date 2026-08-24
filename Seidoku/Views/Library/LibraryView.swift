@@ -107,8 +107,8 @@ private struct BookRow: View {
 }
 
 extension UTType {
-    /// EPUB 用文件扩展名动态类型；系统未映射时回退到通用数据类型。
-    static let epub = UTType(filenameExtension: "epub") ?? .data
+    /// EPUB 的标准 UTI（IDPF），conformingTo 数据。
+    static let epub = UTType(exportedAs: "org.idpf.epub-container", conformingTo: .data)
 }
 
 #Preview {
