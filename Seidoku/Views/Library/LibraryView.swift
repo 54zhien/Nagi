@@ -14,6 +14,12 @@ struct LibraryView: View {
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @State private var viewModel = LibraryViewModel()
     @State private var pickerCoordinator: DocumentPickerCoordinator?
+    @State private var bookToRename: Book?
+    @State private var renameText = ""
+    @State private var bookToShare: Book?
+    @State private var showShareSheet = false
+    @State private var bookToDelete: Book?
+    @State private var showDeleteConfirm = false
 
     var body: some View {
         NavigationStack {
@@ -31,6 +37,26 @@ struct LibraryView: View {
                                 ReaderView(book: book)
                             } label: {
                                 BookRow(book: book)
+                            }
+                            .contextMenu {
+                                Button {
+                                    bookToRename = book
+                                    renameText = book.title
+                                } label: {
+                                    Label("重命名", systemImage: "pencil")
+                                }
+                                Button {
+                                    bookToShare = book
+                                    showShareSheet = true
+                                } label: {
+                                    Label("分享", systemImage: "square.and.arrow.up")
+                                }
+                                Button(role: .destructive) {
+                                    bookToDelete = book
+                                    showDeleteConfirm = true
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
                             }
                         }
                     }
@@ -63,6 +89,33 @@ struct LibraryView: View {
                 Button("好", role: .cancel) {}
             } message: {
                 Text(viewModel.errorMessage ?? "")
+            }
+            .alert("重命名", isPresented: Binding(
+                get: { bookToRename != nil },
+                set: { if !$0 { bookToRename = nil } }
+            )) {
+                TextField("新名称", text: $renameText)
+                Button("确定") {
+                    if let book = bookToRename {
+                        viewModel.rename(book, to: renameText, context: modelContext)
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            }
+            .alert("删除", isPresented: $showDeleteConfirm) {
+                Button("删除", role: .destructive) {
+                    if let book = bookToDelete {
+                        viewModel.delete(book, context: modelContext)
+                    }
+                }
+                Button("取消", role: .cancel) {}
+            } message: {
+                Text("确定删除「\(bookToDelete?.title ?? "")」吗？此操作不可撤销。")
+            }
+            .sheet(isPresented: $showShareSheet) {
+                if let book = bookToShare {
+                    ShareSheet(items: [URL(fileURLWithPath: book.sourceURL)])
+                }
             }
         }
     }

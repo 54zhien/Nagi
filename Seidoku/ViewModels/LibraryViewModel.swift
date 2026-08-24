@@ -81,4 +81,46 @@ final class LibraryViewModel {
         }
         return try await task.value
     }
+
+    // MARK: - 书库操作
+
+    /// 重命名：改文件名 + 改书名。
+    func rename(_ book: Book, to newName: String, context: ModelContext) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let oldURL = URL(fileURLWithPath: book.sourceURL)
+        let ext = oldURL.pathExtension
+        let newURL = oldURL.deletingLastPathComponent()
+            .appendingPathComponent(trimmed)
+            .appendingPathExtension(ext)
+
+        if oldURL.lastPathComponent != newURL.lastPathComponent {
+            do {
+                try FileManager.default.moveItem(at: oldURL, to: newURL)
+            } catch {
+                errorMessage = "重命名失败：\(error.localizedDescription)"
+                return
+            }
+        }
+
+        book.title = trimmed
+        book.sourceURL = newURL.path
+        do {
+            try context.save()
+        } catch {
+            errorMessage = "保存失败：\(error.localizedDescription)"
+        }
+    }
+
+    /// 删除：删文件 + 删 SwiftData 记录。
+    func delete(_ book: Book, context: ModelContext) {
+        try? FileManager.default.removeItem(at: URL(fileURLWithPath: book.sourceURL))
+        context.delete(book)
+        do {
+            try context.save()
+        } catch {
+            errorMessage = "删除失败：\(error.localizedDescription)"
+        }
+    }
 }

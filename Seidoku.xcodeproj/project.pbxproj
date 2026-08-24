@@ -49,6 +49,7 @@
 		4A0000000000000000000029 /* PageViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000029 /* PageViewController.swift */; };
 		4A000000000000000000002A /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002A /* ReaderView.swift */; };
 		4A000000000000000000002B /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002B /* DocumentPicker.swift */; };
+		4A000000000000000000002C /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002C /* ShareSheet.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -95,6 +96,7 @@
 		3A0000000000000000000029 /* PageViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageViewController.swift; sourceTree = "<group>"; };
 		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		3A000000000000000000002B /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
+		3A000000000000000000002C /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -165,6 +167,7 @@
 			children = (
 				3A0000000000000000000003 /* LibraryView.swift */,
 				3A000000000000000000002B /* DocumentPicker.swift */,
+				3A000000000000000000002C /* ShareSheet.swift */,
 			);
 			path = Library;
 			sourceTree = "<group>";
@@ -411,6 +414,7 @@
 				4A0000000000000000000029 /* PageViewController.swift in Sources */,
 				4A000000000000000000002A /* ReaderView.swift in Sources */,
 				4A000000000000000000002B /* DocumentPicker.swift in Sources */,
+				4A000000000000000000002C /* ShareSheet.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -512,7 +516,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.4.5;
+				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -537,7 +541,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.4.5;
+				MARKETING_VERSION = 0.5.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
