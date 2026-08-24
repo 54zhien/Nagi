@@ -45,8 +45,7 @@ struct LibraryView: View {
             }
             .fileImporter(
                 isPresented: $isImporterPresented,
-                allowedContentTypes: [.plainText, .epub],
-                allowsMultipleSelection: false
+                allowedContentTypes: [.plainText, .epub]
             ) { result in
                 handleImport(result)
             }
