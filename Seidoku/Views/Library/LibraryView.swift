@@ -43,13 +43,6 @@ struct LibraryView: View {
                     .accessibilityLabel("导入小说")
                 }
             }
-            .fileImporter(
-                isPresented: $isImporterPresented,
-                allowedContentTypes: [.plainText, .epub],
-                allowsMultipleSelection: true
-            ) { result in
-                handleImport(result)
-            }
             .alert(
                 "导入失败",
                 isPresented: Binding(
@@ -61,6 +54,12 @@ struct LibraryView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
+        }
+        .fileImporter(
+            isPresented: $isImporterPresented,
+            allowedContentTypes: [.item]
+        ) { result in
+            handleImport(result)
         }
     }
 
