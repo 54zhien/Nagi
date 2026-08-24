@@ -25,7 +25,7 @@ struct HomeView: View {
                 }
                 .padding()
             }
-            .scrollEdgeEffectStyle(.soft, for: .all)
+            .scrollEdgeEffectStyle(.automatic, for: .all)
             .navigationTitle("主页")
         }
     }

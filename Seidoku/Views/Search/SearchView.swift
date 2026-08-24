@@ -18,7 +18,7 @@ struct SearchView: View {
                 )
                 .frame(maxWidth: .infinity, minHeight: 400)
             }
-            .scrollEdgeEffectStyle(.soft, for: .all)
+            .scrollEdgeEffectStyle(.automatic, for: .all)
             .navigationTitle("搜索")
         }
     }

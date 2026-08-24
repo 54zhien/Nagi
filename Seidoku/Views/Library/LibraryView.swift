@@ -56,7 +56,7 @@ struct LibraryView: View {
                             }
                         }
                     }
-                    .scrollEdgeEffectStyle(.soft, for: .all)
+                    .scrollEdgeEffectStyle(.automatic, for: .all)
                 }
             }
             .navigationTitle("书库")
