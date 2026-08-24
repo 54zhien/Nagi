@@ -13,11 +13,11 @@ struct SeidokuApp: App {
     var body: some Scene {
         WindowGroup {
             RootTabView()
+                .onOpenURL { url in
+                    handleIncomingFile(url)
+                }
         }
         .modelContainer(Persistence.container)
-        .onOpenURL { url in
-            handleIncomingFile(url)
-        }
     }
 
     /// 处理通过「用 Seidoku 打开」传入的文件。
