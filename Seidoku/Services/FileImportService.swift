@@ -2,7 +2,7 @@
 //  FileImportService.swift
 //  Seidoku
 //
-//  文件导入服务：把用户从「文件」App 选择的 EPUB/TXT 复制到 App 沙盒。
+//  文件导入服务：把用户从「文件」App 选择的 EPUB/TXT 复制到 App 沙盒，返回沙盒内路径。
 //
 
 import Foundation
@@ -28,8 +28,9 @@ struct FileImportService {
             .appendingPathComponent("Imports", isDirectory: true)
     }
 
-    /// 把选中的文件复制到沙盒，正确处理 security-scoped 权限。
-    func importFiles(_ urls: [URL]) throws {
+    /// 把选中的文件复制到沙盒，正确处理 security-scoped 权限，返回复制后的文件路径。
+    @discardableResult
+    func importFiles(_ urls: [URL]) throws -> [URL] {
         do {
             try FileManager.default.createDirectory(
                 at: importsDirectory,
@@ -39,6 +40,7 @@ struct FileImportService {
             throw ImportError.cannotCreateDirectory(error.localizedDescription)
         }
 
+        var imported: [URL] = []
         for url in urls {
             let accessing = url.startAccessingSecurityScopedResource()
             defer {
@@ -51,9 +53,11 @@ struct FileImportService {
                     try FileManager.default.removeItem(at: destination)
                 }
                 try FileManager.default.copyItem(at: url, to: destination)
+                imported.append(destination)
             } catch {
                 throw ImportError.copyFailed("导入「\(url.lastPathComponent)」失败：\(error.localizedDescription)")
             }
         }
+        return imported
     }
 }

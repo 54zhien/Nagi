@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct SeidokuApp: App {
@@ -13,6 +14,7 @@ struct SeidokuApp: App {
         WindowGroup {
             RootTabView()
         }
+        .modelContainer(Persistence.container)
     }
 }
 

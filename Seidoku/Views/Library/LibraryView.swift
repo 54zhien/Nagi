@@ -6,21 +6,32 @@
 //
 
 import SwiftUI
+import SwiftData
 import UniformTypeIdentifiers
 
 struct LibraryView: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
+    @State private var viewModel = LibraryViewModel()
     @State private var isImporterPresented = false
-    @State private var importErrorMessage: String?
-
-    private let importService = FileImportService()
 
     var body: some View {
         NavigationStack {
-            ContentUnavailableView(
-                "书库是空的",
-                systemImage: "books.vertical",
-                description: Text("点右上角 + 导入 TXT / EPUB 小说")
-            )
+            Group {
+                if books.isEmpty {
+                    ContentUnavailableView(
+                        "书库是空的",
+                        systemImage: "books.vertical",
+                        description: Text("点右上角 + 导入 TXT / EPUB 小说")
+                    )
+                } else {
+                    List {
+                        ForEach(books) { book in
+                            BookRow(book: book)
+                        }
+                    }
+                }
+            }
             .navigationTitle("书库")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -42,13 +53,13 @@ struct LibraryView: View {
             .alert(
                 "导入失败",
                 isPresented: Binding(
-                    get: { importErrorMessage != nil },
-                    set: { if !$0 { importErrorMessage = nil } }
+                    get: { viewModel.errorMessage != nil },
+                    set: { if !$0 { viewModel.errorMessage = nil } }
                 )
             ) {
                 Button("好", role: .cancel) {}
             } message: {
-                Text(importErrorMessage ?? "")
+                Text(viewModel.errorMessage ?? "")
             }
         }
     }
@@ -56,14 +67,42 @@ struct LibraryView: View {
     private func handleImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            do {
-                try importService.importFiles(urls)
-            } catch {
-                importErrorMessage = error.localizedDescription
-            }
+            viewModel.importAndParse(urls, into: modelContext)
         case .failure(let error):
-            importErrorMessage = error.localizedDescription
+            viewModel.errorMessage = error.localizedDescription
         }
+    }
+}
+
+// MARK: - 书籍行
+
+private struct BookRow: View {
+    let book: Book
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(book.title)
+                .font(.headline)
+                .lineLimit(1)
+            if let author = book.author, !author.isEmpty {
+                Text(author)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Text(formatLabel)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private var formatLabel: String {
+        let formatName = book.format == .epub ? "EPUB" : "TXT"
+        if book.chapterCount > 0 {
+            return "\(formatName) · \(book.chapterCount) 章"
+        }
+        return formatName
     }
 }
 
@@ -74,4 +113,5 @@ extension UTType {
 
 #Preview {
     LibraryView()
+        .modelContainer(Persistence.container)
 }
