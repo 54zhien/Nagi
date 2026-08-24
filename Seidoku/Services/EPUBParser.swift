@@ -154,7 +154,7 @@ struct EPUBParser {
 
     /// XHTML → 纯文本（SwiftSoup 解析，保留段落，忽略 style/script）。
     static func htmlToText(_ html: String) -> String {
-        guard let doc = try? parse(html),
+        guard let doc = try? SwiftSoup.parse(html),
               let body = try? doc.body() else {
             return Self.legacyHtmlToText(html)
         }
