@@ -25,8 +25,7 @@ struct LibraryView: View {
                 if books.isEmpty {
                     ContentUnavailableView(
                         "书库是空的",
-                        systemImage: "books.vertical",
-                        description: Text("点右上角 + 导入 TXT / EPUB 小说")
+                        systemImage: "books.vertical"
                     )
                 } else {
                     List {
@@ -57,6 +56,7 @@ struct LibraryView: View {
                             }
                         }
                     }
+                    .scrollEdgeEffectStyle(.soft)
                 }
             }
             .navigationTitle("书库")

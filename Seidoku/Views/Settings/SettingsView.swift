@@ -17,6 +17,7 @@ struct SettingsView: View {
                     Label("主题", systemImage: "circle.lefthalf.filled")
                 }
             }
+            .scrollEdgeEffectStyle(.soft)
             .navigationTitle("设置")
         }
     }

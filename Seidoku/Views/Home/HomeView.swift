@@ -17,13 +17,13 @@ struct HomeView: View {
                     // 空态：书库还没有书（后续接真实最近阅读数据）
                     ContentUnavailableView(
                         "还没有书",
-                        systemImage: "book",
-                        description: Text("去「书库」导入你的第一本小说")
+                        systemImage: "book"
                     )
                     .frame(maxWidth: .infinity, minHeight: 160)
                 }
                 .padding()
             }
+            .scrollEdgeEffectStyle(.soft)
             .navigationTitle("主页")
         }
     }
