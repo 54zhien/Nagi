@@ -16,8 +16,6 @@ struct LibraryView: View {
     @State private var pickerCoordinator: DocumentPickerCoordinator?
     @State private var bookToRename: Book?
     @State private var renameText = ""
-    @State private var bookToShare: Book?
-    @State private var showShareSheet = false
     @State private var bookToDelete: Book?
     @State private var showDeleteConfirm = false
 
@@ -46,8 +44,7 @@ struct LibraryView: View {
                                     Label("重命名", systemImage: "pencil")
                                 }
                                 Button {
-                                    bookToShare = book
-                                    showShareSheet = true
+                                    SharePresenter.present(items: [URL(fileURLWithPath: book.sourceURL)])
                                 } label: {
                                     Label("分享", systemImage: "square.and.arrow.up")
                                 }
@@ -111,11 +108,6 @@ struct LibraryView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("确定删除「\(bookToDelete?.title ?? "")」吗？此操作不可撤销。")
-            }
-            .sheet(isPresented: $showShareSheet) {
-                if let book = bookToShare {
-                    ShareSheet(items: [URL(fileURLWithPath: book.sourceURL)])
-                }
             }
         }
     }

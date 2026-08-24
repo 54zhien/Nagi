@@ -15,6 +15,27 @@ struct SeidokuApp: App {
             RootTabView()
         }
         .modelContainer(Persistence.container)
+        .onOpenURL { url in
+            handleIncomingFile(url)
+        }
+    }
+
+    /// 处理通过「用 Seidoku 打开」传入的文件。
+    @MainActor
+    private func handleIncomingFile(_ url: URL) {
+        Task {
+            do {
+                let files = try FileImportService().importFiles([url])
+                let results = try await LibraryViewModel.parseBooksInBackground(files)
+                let context = Persistence.container.mainContext
+                for result in results {
+                    context.insert(result.makeBook())
+                }
+                try context.save()
+            } catch {
+                print("打开文件导入失败：\(error.localizedDescription)")
+            }
+        }
     }
 }
 

@@ -1,18 +1,24 @@
 //
-//  ShareSheet.swift
+//  SharePresenter.swift
 //  Seidoku
 //
-//  系统分享面板（UIActivityViewController 的 SwiftUI 包装）。
+//  用 UIKit 的 rootViewController 直接 present UIActivityViewController（系统原生分享面板），
+//  绕开 SwiftUI .sheet 双重 modal 嵌套导致的空白问题。
 //
 
-import SwiftUI
+import UIKit
 
-struct ShareSheet: UIViewControllerRepresentable {
-    let items: [Any]
+enum SharePresenter {
+    static func present(items: [Any]) {
+        guard let root = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .flatMap({ $0.windows })
+            .first(where: { $0.isKeyWindow })?
+            .rootViewController else {
+            return
+        }
 
-    func makeUIViewController(context: Context) -> UIActivityViewController {
-        UIActivityViewController(activityItems: items, applicationActivities: nil)
+        let activityVC = UIActivityViewController(activityItems: items, applicationActivities: nil)
+        root.present(activityVC, animated: true)
     }
-
-    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
 }
