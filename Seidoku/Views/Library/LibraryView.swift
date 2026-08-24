@@ -43,6 +43,13 @@ struct LibraryView: View {
                     .accessibilityLabel("导入小说")
                 }
             }
+            .fileImporter(
+                isPresented: $isImporterPresented,
+                allowedContentTypes: [.plainText, .epub],
+                allowsMultipleSelection: false
+            ) { result in
+                handleImport(result)
+            }
             .alert(
                 "导入失败",
                 isPresented: Binding(
@@ -54,12 +61,6 @@ struct LibraryView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-        }
-        .fileImporter(
-            isPresented: $isImporterPresented,
-            allowedContentTypes: [.item]
-        ) { result in
-            handleImport(result)
         }
     }
 
@@ -106,8 +107,8 @@ private struct BookRow: View {
 }
 
 extension UTType {
-    /// EPUB 没有系统内置 UTType，用文件扩展名动态类型。
-    static let epub = UTType(filenameExtension: "epub") ?? .data
+    /// EPUB 的标准 UTI（IDPF 定义）。
+    static let epub = UTType(importedAs: "org.idpf.epub-container")
 }
 
 #Preview {
