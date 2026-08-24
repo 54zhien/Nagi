@@ -136,20 +136,25 @@ enum ZipExtractor {
         stream.zalloc = nil
         stream.zfree = nil
         stream.opaque = nil
-        stream.next_in = UnsafeMutablePointer<Bytef>(mutating: input)
-        stream.avail_in = uInt(input.count)
 
-        guard inflateInit2_(&stream, -15, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size)) == Z_OK else {
-            return nil
-        }
-        defer { inflateEnd(&stream) }
-
+        var input = input
         var output = [UInt8](repeating: 0, count: max(expectedSize, 1))
-        output.withUnsafeMutableBufferPointer { buffer in
-            stream.next_out = buffer.baseAddress
-            stream.avail_out = uInt(buffer.count)
+        var status: Int32 = -1
+
+        input.withUnsafeMutableBufferPointer { inBuffer in
+            stream.next_in = inBuffer.baseAddress
+            stream.avail_in = uInt(inBuffer.count)
+            guard inflateInit2_(&stream, -15, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size)) == Z_OK else {
+                return
+            }
+            defer { inflateEnd(&stream) }
+            output.withUnsafeMutableBufferPointer { outBuffer in
+                stream.next_out = outBuffer.baseAddress
+                stream.avail_out = uInt(outBuffer.count)
+                status = inflate(&stream, Z_FINISH)
+            }
         }
-        let status = inflate(&stream, Z_FINISH)
+
         guard status == Z_STREAM_END || status == Z_OK else { return nil }
         return Data(output.prefix(Int(stream.total_out)))
     }
