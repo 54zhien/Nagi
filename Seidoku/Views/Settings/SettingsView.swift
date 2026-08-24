@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct SettingsView: View {
+    @State private var showNavBar = true
+
     var body: some View {
         NavigationStack {
             List {
@@ -18,7 +20,19 @@ struct SettingsView: View {
                 }
             }
             .scrollEdgeEffectStyle(.soft, for: .all)
+            .onScrollGeometryChange(for: CGFloat.self) { geo in
+                geo.contentOffset.y
+            } action: { oldValue, newValue in
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    if newValue - oldValue > 8 {
+                        showNavBar = false
+                    } else if newValue - oldValue < -8 {
+                        showNavBar = true
+                    }
+                }
+            }
             .navigationTitle("设置")
+            .toolbar(showNavBar ? .visible : .hidden, for: .navigationBar)
         }
     }
 }
