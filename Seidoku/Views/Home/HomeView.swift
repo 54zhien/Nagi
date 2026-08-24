@@ -10,22 +10,22 @@ import SwiftUI
 struct HomeView: View {
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .topLeading) {
-                // 空态：屏幕中央（与书库空态对齐）
-                ContentUnavailableView(
-                    "还没有书",
-                    systemImage: "book"
-                )
-
-                // 顶部"继续阅读"
-                VStack(alignment: .leading) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
                     Text("继续阅读")
                         .font(.title2.bold())
                         .foregroundStyle(.primary)
-                        .padding()
-                    Spacer()
+                        .padding(.top, 8)
+
+                    ContentUnavailableView(
+                        "还没有书",
+                        systemImage: "book"
+                    )
+                    .frame(maxWidth: .infinity, minHeight: 400)
                 }
+                .padding()
             }
+            .scrollEdgeEffectStyle(.soft, for: .all)
             .navigationTitle("主页")
         }
     }
