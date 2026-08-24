@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import ZIPFoundation
 
 enum ParseError: LocalizedError {
     case cannotRead(String)
