@@ -45,7 +45,7 @@ struct LibraryView: View {
             }
             .fileImporter(
                 isPresented: $isImporterPresented,
-                allowedContentTypes: [.plainText, .zip],
+                allowedContentTypes: [.plainText, .epub],
                 allowsMultipleSelection: true
             ) { result in
                 switch result {
@@ -100,6 +100,11 @@ private struct BookRow: View {
         }
         return formatName
     }
+}
+
+extension UTType {
+    /// EPUB 用文件扩展名动态类型；系统未映射时回退到通用数据类型。
+    static let epub = UTType(filenameExtension: "epub") ?? .data
 }
 
 #Preview {
