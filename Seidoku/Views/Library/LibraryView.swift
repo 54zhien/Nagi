@@ -63,10 +63,10 @@ struct LibraryView: View {
         }
     }
 
-    private func handleImport(_ result: Result<[URL], Error>) {
+    private func handleImport(_ result: Result<URL, Error>) {
         switch result {
-        case .success(let urls):
-            viewModel.importAndParse(urls, into: modelContext)
+        case .success(let url):
+            viewModel.importAndParse([url], into: modelContext)
         case .failure(let error):
             viewModel.errorMessage = error.localizedDescription
         }
