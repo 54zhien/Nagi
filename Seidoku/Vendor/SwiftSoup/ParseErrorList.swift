@@ -11,7 +11,7 @@ public class ParseErrorList {
     private static let INITIAL_CAPACITY: Int = 16
     private let maxSize: Int
     private let initialCapacity: Int
-    private var array: Array<ParseError?> = Array<ParseError>()
+    private var array: Array<SwiftSoupParseError?> = Array<SwiftSoupParseError>()
 
     init(_ initialCapacity: Int, _ maxSize: Int) {
         self.maxSize = maxSize
@@ -40,11 +40,11 @@ public class ParseErrorList {
     //        return ObjectIdentifier(leftFoo) == ObjectIdentifier(rightFoo)
     //    }
 
-    open func add(_ e: ParseError) {
+    open func add(_ e: SwiftSoupParseError) {
         array.append(e)
     }
 
-    open func add(_ index: Int, _ element: ParseError) {
+    open func add(_ index: Int, _ element: SwiftSoupParseError) {
         array.insert(element, at: index)
     }
 

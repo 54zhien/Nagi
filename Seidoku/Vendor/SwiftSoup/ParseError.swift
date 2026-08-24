@@ -1,5 +1,5 @@
 //
-//  ParseError.swift
+//  SwiftSoupParseError.swift
 //  SwiftSoup
 //
 //  Created by Nabil Chatbi on 19/10/16.
@@ -10,7 +10,7 @@ import Foundation
 /**
  * A Parse Error records an error in the input HTML that occurs in either the tokenisation or the tree building phase.
  */
-open class ParseError {
+open class SwiftSoupParseError {
     private let pos: Int
     private let errorMsg: String
 

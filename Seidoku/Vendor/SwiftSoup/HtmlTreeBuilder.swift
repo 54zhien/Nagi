@@ -253,7 +253,7 @@ class HtmlTreeBuilder: TreeBuilder {
     
     func error(_ state: HtmlTreeBuilderState) {
         if (tracksErrors && errors.canAddError() && currentToken != nil) {
-            errors.add(ParseError(reader.getPos(), "Unexpected token [\(currentToken!.tokenType())] when in state [\(state.rawValue)]"))
+            errors.add(SwiftSoupParseError(reader.getPos(), "Unexpected token [\(currentToken!.tokenType())] when in state [\(state.rawValue)]"))
         }
     }
     

@@ -1164,7 +1164,7 @@ final class Tokeniser {
             return
         }
         if (errors != nil && errors!.canAddError()) {
-            errors?.add(ParseError(reader.getPos(), "Unexpected character '\(String(reader.current()))' in input state [\(state.description)]"))
+            errors?.add(SwiftSoupParseError(reader.getPos(), "Unexpected character '\(String(reader.current()))' in input state [\(state.description)]"))
         }
     }
     
@@ -1173,7 +1173,7 @@ final class Tokeniser {
             return
         }
         if (errors != nil && errors!.canAddError()) {
-            errors?.add(ParseError(reader.getPos(), "Unexpectedly reached end of file (EOF) in input state [\(state.description)]"))
+            errors?.add(SwiftSoupParseError(reader.getPos(), "Unexpectedly reached end of file (EOF) in input state [\(state.description)]"))
         }
     }
     
@@ -1182,7 +1182,7 @@ final class Tokeniser {
             return
         }
         if (errors != nil && errors!.canAddError()) {
-            errors?.add(ParseError(reader.getPos(), "Invalid character reference: \(message)"))
+            errors?.add(SwiftSoupParseError(reader.getPos(), "Invalid character reference: \(message)"))
         }
     }
     
@@ -1191,7 +1191,7 @@ final class Tokeniser {
             return
         }
         if (errors != nil && errors!.canAddError()) {
-            errors?.add(ParseError(reader.getPos(), errorMsg))
+            errors?.add(SwiftSoupParseError(reader.getPos(), errorMsg))
         }
     }
     
