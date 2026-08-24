@@ -207,11 +207,11 @@ struct ReaderView: View {
                 } label: {
                     HStack {
                         Text(chapter.title)
-                            .foregroundStyle(chapter.index == viewModel.currentChapterIndex ? .tint : .primary)
+                            .foregroundColor(chapter.index == viewModel.currentChapterIndex ? .accentColor : .primary)
                         Spacer()
                         if chapter.index == viewModel.currentChapterIndex {
                             Image(systemName: "checkmark")
-                                .foregroundStyle(.tint)
+                                .foregroundColor(.accentColor)
                         }
                     }
                 }
