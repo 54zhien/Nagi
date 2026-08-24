@@ -45,9 +45,15 @@ struct LibraryView: View {
             }
             .fileImporter(
                 isPresented: $isImporterPresented,
-                allowedContentTypes: [.plainText, .epub]
+                allowedContentTypes: [.plainText, .zip],
+                allowsMultipleSelection: true
             ) { result in
-                handleImport(result)
+                switch result {
+                case .success(let files):
+                    viewModel.importAndParse(files, into: modelContext)
+                case .failure(let error):
+                    viewModel.errorMessage = error.localizedDescription
+                }
             }
             .alert(
                 "导入失败",
@@ -60,15 +66,6 @@ struct LibraryView: View {
             } message: {
                 Text(viewModel.errorMessage ?? "")
             }
-        }
-    }
-
-    private func handleImport(_ result: Result<URL, Error>) {
-        switch result {
-        case .success(let url):
-            viewModel.importAndParse([url], into: modelContext)
-        case .failure(let error):
-            viewModel.errorMessage = error.localizedDescription
         }
     }
 }
@@ -103,11 +100,6 @@ private struct BookRow: View {
         }
         return formatName
     }
-}
-
-extension UTType {
-    /// EPUB 的标准 UTI（IDPF 定义）。
-    static let epub = UTType(importedAs: "org.idpf.epub-container")
 }
 
 #Preview {
