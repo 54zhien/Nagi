@@ -7,20 +7,6 @@
 
 import Foundation
 
-enum ParseError: LocalizedError {
-    case cannotRead(String)
-    case emptyContent
-    case invalidArchive
-
-    var errorDescription: String? {
-        switch self {
-        case .cannotRead(let message): return "读取文件失败：\(message)"
-        case .emptyContent: return "文件内容为空"
-        case .invalidArchive: return "EPUB 文件损坏或格式无效"
-        }
-    }
-}
-
 struct EPUBParser {
     func parse(url: URL) throws -> ParsedBook {
         let archive: Archive
