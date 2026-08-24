@@ -8,8 +8,6 @@
 import SwiftUI
 
 struct HomeView: View {
-    @State private var showNavBar = true
-
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -28,19 +26,7 @@ struct HomeView: View {
                 .padding()
             }
             .scrollEdgeEffectStyle(.soft, for: .all)
-            .onScrollGeometryChange(for: CGFloat.self) { geo in
-                geo.contentOffset.y
-            } action: { oldValue, newValue in
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    if newValue - oldValue > 8 {
-                        showNavBar = false
-                    } else if newValue - oldValue < -8 {
-                        showNavBar = true
-                    }
-                }
-            }
             .navigationTitle("主页")
-            .toolbar(showNavBar ? .visible : .hidden, for: .navigationBar)
         }
     }
 }

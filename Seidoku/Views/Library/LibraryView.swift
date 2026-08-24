@@ -18,7 +18,6 @@ struct LibraryView: View {
     @State private var renameText = ""
     @State private var bookToDelete: Book?
     @State private var showDeleteConfirm = false
-    @State private var showNavBar = true
 
     var body: some View {
         NavigationStack {
@@ -58,21 +57,9 @@ struct LibraryView: View {
                         }
                     }
                     .scrollEdgeEffectStyle(.soft, for: .all)
-                    .onScrollGeometryChange(for: CGFloat.self) { geo in
-                        geo.contentOffset.y
-                    } action: { oldValue, newValue in
-                        withAnimation(.easeInOut(duration: 0.25)) {
-                            if newValue - oldValue > 8 {
-                                showNavBar = false
-                            } else if newValue - oldValue < -8 {
-                                showNavBar = true
-                            }
-                        }
-                    }
                 }
             }
             .navigationTitle("书库")
-            .toolbar(showNavBar ? .visible : .hidden, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
