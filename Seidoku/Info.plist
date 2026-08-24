@@ -20,8 +20,6 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>LSSupportsOpeningDocumentsInPlace</key>
-	<true/>
 	<key>NSAccentColorName</key>
 	<string>AccentColor</string>
 	<key>UIApplicationSceneManifest</key>

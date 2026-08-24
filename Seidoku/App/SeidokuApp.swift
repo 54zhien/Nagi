@@ -32,8 +32,9 @@ struct SeidokuApp: App {
                     context.insert(result.makeBook())
                 }
                 try context.save()
+                AppImportState.shared.message = "已导入「\(results.first?.title ?? "书")」"
             } catch {
-                print("打开文件导入失败：\(error.localizedDescription)")
+                AppImportState.shared.message = "导入失败：\(error.localizedDescription)"
             }
         }
     }
@@ -45,6 +46,7 @@ struct SeidokuApp: App {
 /// - 搜索 tab 通过 `role: .search` 与其它 tab 分离，独立分隔显示
 struct RootTabView: View {
     @State private var selection: AppTab = .home
+    @State private var importState = AppImportState.shared
 
     var body: some View {
         TabView(selection: $selection) {
@@ -65,6 +67,14 @@ struct RootTabView: View {
             }
         }
         .tabViewStyle(.sidebarAdaptable)
+        .alert("导入", isPresented: Binding(
+            get: { importState.message != nil },
+            set: { if !$0 { importState.message = nil } }
+        )) {
+            Button("好", role: .cancel) {}
+        } message: {
+            Text(importState.message ?? "")
+        }
     }
 }
 

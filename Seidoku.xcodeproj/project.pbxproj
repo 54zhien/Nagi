@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		4A0000000000000000000001 /* SeidokuApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000001 /* SeidokuApp.swift */; };
+		4A000000000000000000002D /* AppImportState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002D /* AppImportState.swift */; };
 		4A0000000000000000000002 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000002 /* HomeView.swift */; };
 		4A0000000000000000000003 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000003 /* LibraryView.swift */; };
 		4A0000000000000000000004 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000004 /* SettingsView.swift */; };
@@ -54,6 +55,7 @@
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* SeidokuApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeidokuApp.swift; sourceTree = "<group>"; };
+		3A000000000000000000002D /* AppImportState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppImportState.swift; sourceTree = "<group>"; };
 		3A0000000000000000000002 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000003 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000004 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
@@ -139,6 +141,7 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000001 /* SeidokuApp.swift */,
+				3A000000000000000000002D /* AppImportState.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -375,6 +378,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A0000000000000000000001 /* SeidokuApp.swift in Sources */,
+				4A000000000000000000002D /* AppImportState.swift in Sources */,
 				4A0000000000000000000002 /* HomeView.swift in Sources */,
 				4A0000000000000000000003 /* LibraryView.swift in Sources */,
 				4A0000000000000000000004 /* SettingsView.swift in Sources */,
@@ -517,7 +521,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -543,7 +547,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.6.0;
+				MARKETING_VERSION = 0.6.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
