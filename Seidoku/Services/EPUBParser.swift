@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import SwiftSoup
 
 struct EPUBParser {
     func parse(url: URL) throws -> ParsedBook {
