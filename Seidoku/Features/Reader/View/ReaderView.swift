@@ -52,18 +52,19 @@ struct ReaderView: View {
             .navigationBarBackButtonHidden(true)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .principal) {
-                    titleControl
-                }
-
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         dismiss()
                     } label: {
                         Image(systemName: "xmark")
                             .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 44, height: 44)
                     }
+                    .controlSize(.large)
+                    .buttonBorderShape(.circle)
+                    .frame(
+                        width: ReaderControlMetrics.diameter,
+                        height: ReaderControlMetrics.diameter
+                    )
                     .accessibilityLabel("退出阅读器")
                     .accessibilityHint("返回上一个页面")
                 }
@@ -149,21 +150,6 @@ struct ReaderView: View {
     }
 
     // MARK: - Liquid Glass 阅读器 chrome
-
-    /// principal placement 由系统负责将标题保持在导航栏中心；宽度上限避免长标题
-    /// 挤压右上角退出控件，超出部分按尾部省略显示。
-    private var titleControl: some View {
-        Text(viewModel.book.title)
-            .font(.subheadline)
-            .lineLimit(1)
-            .truncationMode(.tail)
-            .padding(.horizontal, 12)
-            .frame(maxWidth: 200, minHeight: 44, maxHeight: 44)
-            .glassEffect(.regular, in: .capsule)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("书籍标题")
-            .accessibilityValue(viewModel.book.title)
-    }
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
@@ -252,18 +238,30 @@ struct ReaderView: View {
                 }
             } label: {
                 Image(systemName: "xmark.triangle.circle.square")
-                    .font(.system(size: 18, weight: .semibold))
+                    .font(.system(size: ReaderControlMetrics.menuIconPointSize, weight: .semibold))
             }
             .controlSize(.large)
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
-            .frame(width: 44, height: 44)
+            .frame(
+                width: ReaderControlMetrics.diameter,
+                height: ReaderControlMetrics.diameter
+            )
             .accessibilityLabel("阅读选项")
             .accessibilityHint("打开目录、翻页和排版设置")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, ReaderControlMetrics.edgeInset)
+        .padding(.top, ReaderControlMetrics.topInset)
+        .padding(.bottom, ReaderControlMetrics.bottomInset)
         .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private enum ReaderControlMetrics {
+        static let diameter: CGFloat = 44
+        static let edgeInset: CGFloat = 24
+        static let menuIconPointSize: CGFloat = 21
+        static let topInset: CGFloat = 8
+        static let bottomInset: CGFloat = 16
     }
 }
 
