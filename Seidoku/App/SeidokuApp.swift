@@ -51,6 +51,37 @@ struct RootTabView: View {
     @State private var importState = AppImportState.shared
 
     var body: some View {
+        tabViewContent
+            .onChange(of: selection) { _, newSelection in
+                // The searchable modifier is structurally present only for the
+                // dedicated search tab, so regular tabs cannot render a search drawer.
+                isSearchPresented = newSelection == .search
+            }
+            .alert("导入", isPresented: Binding(
+                get: { importState.message != nil },
+                set: { if !$0 { importState.message = nil } }
+            )) {
+                Button("好", role: .cancel) {}
+            } message: {
+                Text(importState.message ?? "")
+            }
+    }
+
+    @ViewBuilder
+    private var tabViewContent: some View {
+        if selection == .search {
+            tabView
+                .searchable(
+                    text: $searchText,
+                    isPresented: $isSearchPresented,
+                    prompt: "搜索书名"
+                )
+        } else {
+            tabView
+        }
+    }
+
+    private var tabView: some View {
         TabView(selection: $selection) {
             Tab("主页", image: "homeIcon", value: .home) {
                 HomeView()
@@ -68,26 +99,8 @@ struct RootTabView: View {
                 SearchView(searchText: $searchText)
             }
         }
-        .searchable(
-            text: $searchText,
-            isPresented: $isSearchPresented,
-            prompt: "搜索书名"
-        )
         .tabViewSearchActivation(.searchTabSelection)
         .tabViewStyle(.sidebarAdaptable)
-        .onChange(of: selection) { _, newSelection in
-            // Keep the global searchable modifier hidden on the three regular tabs.
-            // Selecting the dedicated search tab presents it and focuses the field.
-            isSearchPresented = newSelection == .search
-        }
-        .alert("导入", isPresented: Binding(
-            get: { importState.message != nil },
-            set: { if !$0 { importState.message = nil } }
-        )) {
-            Button("好", role: .cancel) {}
-        } message: {
-            Text(importState.message ?? "")
-        }
     }
 }
 
