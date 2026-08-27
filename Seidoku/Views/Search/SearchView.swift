@@ -22,7 +22,11 @@ struct SearchView: View {
                         description: Text("输入书名关键词查找书籍")
                     )
                 } else if matchingBooks.isEmpty {
-                    ContentUnavailableView.search(text: searchText)
+                    ContentUnavailableView(
+                        "未找到书籍",
+                        systemImage: "magnifyingglass",
+                        description: Text("没有找到书名中包含“\(searchText)”的书籍")
+                    )
                 } else {
                     List(matchingBooks) { book in
                         NavigationLink {
