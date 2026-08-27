@@ -19,43 +19,55 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        ZStack {
-            viewModel.theme.background
-                .ignoresSafeArea()
+        NavigationStack {
+            ZStack {
+                viewModel.theme.background
+                    .ignoresSafeArea()
 
-            GeometryReader { geo in
-                content
-                    .onAppear {
-                        viewModel.pageSize = geo.size
-                        Task { await viewModel.load() }
+                GeometryReader { geo in
+                    content
+                        .onAppear {
+                            viewModel.pageSize = geo.size
+                            Task { await viewModel.load() }
+                        }
+                        .onChange(of: geo.size) { _, newSize in
+                            viewModel.pageSize = newSize
+                        }
+                        // 只让正文响应“显示/隐藏控件”手势，避免点击控件时误触发。
+                        .contentShape(Rectangle())
+                        .onTapGesture(perform: toggleControls)
+                        .accessibilityAction(
+                            named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
+                            toggleControls
+                        )
+                }
+            }
+            // 使用 safeAreaInset 将阅读器控件放在系统安全区内，正文不会被 Home
+            // Indicator 遮挡；控件本身仍保持漂浮在正文之上的阅读器 chrome 层。
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if showControls {
+                    bottomBar
+                }
+            }
+            .navigationBarBackButtonHidden(true)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    titleControl
+                }
+
+                ToolbarItem(placement: .topBarTrailing) {
+                    SeidokuGlassIconButton(action: { dismiss() }) {
+                        Image(systemName: "xmark")
                     }
-                    .onChange(of: geo.size) { _, newSize in
-                        viewModel.pageSize = newSize
-                    }
-                    // 只让正文响应“显示/隐藏控件”手势，避免点击控件时误触发。
-                    .contentShape(Rectangle())
-                    .onTapGesture(perform: toggleControls)
-                    .accessibilityAction(
-                        named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
-                        toggleControls
-                    )
+                    .accessibilityLabel("退出阅读器")
+                    .accessibilityHint("返回上一个页面")
+                }
             }
-        }
-        // 使用 safeAreaInset 将阅读器控件放在系统安全区内，正文不会被刘海或 Home
-        // Indicator 遮挡；控件本身仍保持漂浮在正文之上的阅读器 chrome 层。
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if showControls {
-                topBar
-            }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if showControls {
-                bottomBar
-            }
+            .toolbar(showControls ? .visible : .hidden, for: .navigationBar)
         }
         .statusBarHidden(!showControls)
         .toolbar(.hidden, for: .tabBar)
-        .toolbar(.hidden, for: .navigationBar)
     }
 
     private func toggleControls() {
@@ -134,58 +146,28 @@ struct ReaderView: View {
 
     // MARK: - Liquid Glass 阅读器 chrome
 
-    private var topBar: some View {
-        HStack(spacing: 12) {
-            Spacer(minLength: 44)
-
-            VStack(spacing: 2) {
-                Text(viewModel.book.title)
-                    .font(.subheadline)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-                Text(viewModel.currentChapter?.title ?? "")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.center)
-            }
+    /// principal placement 由系统负责将标题保持在导航栏中心；宽度上限避免长标题
+    /// 挤压右上角退出控件，超出部分按尾部省略显示。
+    private var titleControl: some View {
+        Text(viewModel.book.title)
+            .font(.subheadline)
+            .lineLimit(1)
+            .truncationMode(.tail)
             .padding(.horizontal, 12)
-            .padding(.vertical, 6)
+            .frame(maxWidth: 200, minHeight: 44, maxHeight: 44)
             .glassEffect(.regular, in: .capsule)
-            .accessibilityElement(children: .combine)
-
-            Spacer(minLength: 44)
-
-            SeidokuGlassIconButton(action: { dismiss() }) {
-                Image(systemName: "arrow.uturn.forward")
-            }
-            .accessibilityLabel("退出阅读器")
-            .accessibilityHint("返回上一个页面")
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
-        .frame(maxWidth: .infinity)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("书籍标题")
+            .accessibilityValue(viewModel.book.title)
     }
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
             Spacer(minLength: 0)
 
-            Text("\(viewModel.pages.isEmpty ? 0 : viewModel.currentPageIndex + 1) / \(viewModel.pages.count)")
-                .font(.caption.monospacedDigit())
-                .foregroundStyle(.secondary)
-                .padding(.horizontal, 12)
-                .frame(minHeight: 44)
-                .glassEffect(.regular, in: .capsule)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("阅读进度")
-                .accessibilityValue(
-                    "第 \(viewModel.pages.isEmpty ? 0 : viewModel.currentPageIndex + 1) 页，共 \(viewModel.pages.count) 页"
-                )
-
             Menu {
                 Section("阅读") {
-                    Menu("目录", systemImage: "list.bullet") {
+                    Menu("目录", systemImage: "xmark.triangle.circle.square") {
                         if viewModel.chapters.isEmpty {
                             Text("暂无目录")
                         } else {
@@ -265,8 +247,8 @@ struct ReaderView: View {
                     }
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.title3)
+                Image(systemName: "xmark.triangle.circle.square")
+                    .font(.title3.weight(.semibold))
                     .frame(width: 44, height: 44)
             }
             .buttonStyle(.glass)
@@ -293,7 +275,7 @@ struct SeidokuGlassIconButton<Label: View>: View {
 
     var body: some View {
         Button(action: action, label: label)
-            .frame(minWidth: 44, minHeight: 44)
+            .frame(width: 44, height: 44)
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
     }
