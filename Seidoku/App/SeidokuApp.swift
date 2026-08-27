@@ -47,6 +47,7 @@ struct SeidokuApp: App {
 struct RootTabView: View {
     @State private var selection: AppTab = .home
     @State private var searchText = ""
+    @State private var isSearchPresented = false
     @State private var importState = AppImportState.shared
 
     var body: some View {
@@ -67,9 +68,18 @@ struct RootTabView: View {
                 SearchView(searchText: $searchText)
             }
         }
-        .searchable(text: $searchText, prompt: "搜索书名")
+        .searchable(
+            text: $searchText,
+            isPresented: $isSearchPresented,
+            prompt: "搜索书名"
+        )
         .tabViewSearchActivation(.searchTabSelection)
         .tabViewStyle(.sidebarAdaptable)
+        .onChange(of: selection) { _, newSelection in
+            // Keep the global searchable modifier hidden on the three regular tabs.
+            // Selecting the dedicated search tab presents it and focuses the field.
+            isSearchPresented = newSelection == .search
+        }
         .alert("导入", isPresented: Binding(
             get: { importState.message != nil },
             set: { if !$0 { importState.message = nil } }
