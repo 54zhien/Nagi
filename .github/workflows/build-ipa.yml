@@ -23,14 +23,21 @@ jobs:
           sudo xcode-select -s /Applications/Xcode_26.3.app
           xcodebuild -version
 
+      - name: Resolve package dependencies
+        run: |
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project Seidoku.xcodeproj \
+            -scheme Seidoku
+
       - name: Build (unsigned)
         run: |
           xcodebuild \
             -project Seidoku.xcodeproj \
-            -target Seidoku \
+            -scheme Seidoku \
             -configuration Release \
-            -sdk iphoneos \
-            SYMROOT=build \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
@@ -38,7 +45,7 @@ jobs:
 
       - name: Package IPA
         run: |
-          APP_PATH="build/Release-iphoneos/Seidoku.app"
+          APP_PATH="build/Build/Products/Release-iphoneos/Seidoku.app"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -r Seidoku-unsigned.ipa Payload/
