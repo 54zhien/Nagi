@@ -49,6 +49,7 @@ final class ReaderViewModel {
 
     func load() async {
         isLoading = true
+        errorMessage = nil
         defer { isLoading = false }
         do {
             chapters = try epubParser.loadChapters(url: bookURL)
@@ -62,12 +63,34 @@ final class ReaderViewModel {
     }
 
     func loadCurrentChapter() async {
-        guard currentChapterIndex < chapters.count else { return }
-        let chapter = chapters[currentChapterIndex]
+        await loadReadableChapter(searchDirection: 1, showLastPage: false)
+    }
+
+    /// 读取目标章节；纯图片封面、空白页等没有文字的 spine 项会自动跳过。
+    private func loadReadableChapter(searchDirection: Int, showLastPage: Bool) async {
+        guard !chapters.isEmpty else { return }
+        var candidate = currentChapterIndex
+
         do {
-            currentContent = try epubParser.loadChapterContent(url: bookURL, href: chapter.href)
-            repaginate()
-            currentPageIndex = 0
+            while chapters.indices.contains(candidate) {
+                let chapter = chapters[candidate]
+                let content = try epubParser.loadChapterContent(url: bookURL, href: chapter.href)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if !content.isEmpty {
+                    currentChapterIndex = candidate
+                    currentContent = content
+                    errorMessage = nil
+                    repaginate()
+                    currentPageIndex = showLastPage ? max(0, pages.count - 1) : 0
+                    return
+                }
+                candidate += searchDirection
+            }
+
+            currentContent = ""
+            pages = []
+            fullText = NSAttributedString()
+            errorMessage = "此 EPUB 没有找到可阅读的文字内容"
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -121,7 +144,7 @@ final class ReaderViewModel {
             currentPageIndex += 1
         } else if currentChapterIndex < chapters.count - 1 {
             currentChapterIndex += 1
-            Task { await loadCurrentChapter() }
+            Task { await loadReadableChapter(searchDirection: 1, showLastPage: false) }
         }
     }
 
@@ -131,13 +154,8 @@ final class ReaderViewModel {
             currentPageIndex -= 1
         } else if currentChapterIndex > 0 {
             currentChapterIndex -= 1
-            Task { await loadPreviousChapterAtEnd() }
+            Task { await loadReadableChapter(searchDirection: -1, showLastPage: true) }
         }
-    }
-
-    private func loadPreviousChapterAtEnd() async {
-        await loadCurrentChapter()
-        currentPageIndex = max(0, pages.count - 1)
     }
 
     // MARK: - 进度（后续接 SwiftData 保存）

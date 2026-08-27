@@ -69,6 +69,8 @@ struct ReaderView: View {
                     background: viewModel.theme.background,
                     currentPage: $viewModel.currentPageIndex
                 )
+                // 每个章节拥有独立分页控制器，避免复用上一章的 UIKit 页面缓存。
+                .id(viewModel.currentChapter?.id ?? "")
             case .horizontal:
                 PageViewController(
                     pages: viewModel.pages,
@@ -77,6 +79,7 @@ struct ReaderView: View {
                     background: viewModel.theme.background,
                     currentPage: $viewModel.currentPageIndex
                 )
+                .id(viewModel.currentChapter?.id ?? "")
             case .vertical:
                 ScrollableTextView(attributedText: viewModel.fullText, insets: readerInsets)
             }
@@ -136,9 +139,29 @@ struct ReaderView: View {
 
             Spacer()
 
+            Button {
+                viewModel.goPrevious()
+            } label: {
+                Image(systemName: "chevron.left")
+            }
+            .disabled(!viewModel.canGoPrevious)
+            .accessibilityLabel("上一页")
+
+            Spacer()
+
             Text("\(viewModel.currentPageIndex + 1) / \(viewModel.pages.count)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
+
+            Spacer()
+
+            Button {
+                viewModel.goNext()
+            } label: {
+                Image(systemName: "chevron.right")
+            }
+            .disabled(!viewModel.canGoNext)
+            .accessibilityLabel("下一页")
 
             Spacer()
 
