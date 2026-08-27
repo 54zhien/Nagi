@@ -10,39 +10,81 @@ import UIKit
 
 struct ReaderView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var viewModel: ReaderViewModel
     @State private var showControls = true
-    @State private var showSettings = false
-    @State private var showTOC = false
 
     init(book: Book) {
         _viewModel = State(initialValue: ReaderViewModel(book: book))
     }
 
     var body: some View {
-        GeometryReader { geo in
-            content
-                .onAppear {
-                    viewModel.pageSize = geo.size
-                    Task { await viewModel.load() }
-                }
-                .onChange(of: geo.size) { _, newSize in
-                    viewModel.pageSize = newSize
-                }
+        ZStack {
+            viewModel.theme.background
+                .ignoresSafeArea()
+
+            GeometryReader { geo in
+                content
+                    .onAppear {
+                        viewModel.pageSize = geo.size
+                        Task { await viewModel.load() }
+                    }
+                    .onChange(of: geo.size) { _, newSize in
+                        viewModel.pageSize = newSize
+                    }
+                    // 只让正文响应“显示/隐藏控件”手势，避免点击控件时误触发。
+                    .contentShape(Rectangle())
+                    .onTapGesture(perform: toggleControls)
+                    .accessibilityAction(
+                        named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
+                        toggleControls
+                    )
+            }
         }
-        .background(viewModel.theme.background)
-        .ignoresSafeArea()
-        .overlay(alignment: .top) { if showControls { topBar } }
-        .overlay(alignment: .bottom) { if showControls { bottomBar } }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.2)) { showControls.toggle() }
+        // 使用 safeAreaInset 将阅读器控件放在系统安全区内，正文不会被刘海或 Home
+        // Indicator 遮挡；控件本身仍保持漂浮在正文之上的阅读器 chrome 层。
+        .safeAreaInset(edge: .top, spacing: 0) {
+            if showControls {
+                topBar
+            }
         }
-        .sheet(isPresented: $showSettings) { settingsSheet }
-        .sheet(isPresented: $showTOC) { tocSheet }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if showControls {
+                bottomBar
+            }
+        }
         .statusBarHidden(!showControls)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar(.hidden, for: .navigationBar)
     }
+
+    private func toggleControls() {
+        if accessibilityReduceMotion {
+            showControls.toggle()
+        } else {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                showControls.toggle()
+            }
+        }
+    }
+
+    private func selectChapter(_ chapter: BookChapter) {
+        guard chapter.index != viewModel.currentChapterIndex else { return }
+        viewModel.currentChapterIndex = chapter.index
+        Task { await viewModel.loadCurrentChapter() }
+    }
+
+    @ViewBuilder
+    private func menuOptionLabel(_ title: String, isSelected: Bool) -> some View {
+        if isSelected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
+    }
+
+    private let fontSizeOptions: [Double] = [12, 14, 17, 20, 24, 30]
+    private let lineSpacingOptions: [Double] = [0, 4, 6, 8, 12, 16]
 
     // MARK: - 正文内容（三模式）
 
@@ -90,167 +132,170 @@ struct ReaderView: View {
         UIEdgeInsets(top: 24, left: viewModel.horizontalInset, bottom: 24, right: viewModel.horizontalInset)
     }
 
-    // MARK: - 工具栏
+    // MARK: - Liquid Glass 阅读器 chrome
 
     private var topBar: some View {
-        HStack {
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .accessibilityLabel("返回")
-
-            Spacer()
+        HStack(spacing: 12) {
+            Spacer(minLength: 44)
 
             VStack(spacing: 2) {
                 Text(viewModel.book.title)
                     .font(.subheadline)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
                 Text(viewModel.currentChapter?.title ?? "")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.center)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .glassEffect(.regular, in: .capsule)
+            .accessibilityElement(children: .combine)
 
-            Spacer()
+            Spacer(minLength: 44)
 
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "textformat.size")
+            SeidokuGlassIconButton(action: { dismiss() }) {
+                Image(systemName: "arrow.uturn.forward")
             }
-            .accessibilityLabel("排版设置")
+            .accessibilityLabel("退出阅读器")
+            .accessibilityHint("返回上一个页面")
         }
-        .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(.regularMaterial)
-        .tint(.primary)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity)
     }
 
     private var bottomBar: some View {
-        HStack {
-            Button {
-                showTOC = true
-            } label: {
-                Image(systemName: "list.bullet")
-            }
-            .accessibilityLabel("目录")
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
 
-            Spacer()
-
-            Button {
-                viewModel.goPrevious()
-            } label: {
-                Image(systemName: "chevron.left")
-            }
-            .disabled(!viewModel.canGoPrevious)
-            .accessibilityLabel("上一页")
-
-            Spacer()
-
-            Text("\(viewModel.currentPageIndex + 1) / \(viewModel.pages.count)")
-                .font(.caption)
+            Text("\(viewModel.pages.isEmpty ? 0 : viewModel.currentPageIndex + 1) / \(viewModel.pages.count)")
+                .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 44)
+                .glassEffect(.regular, in: .capsule)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("阅读进度")
+                .accessibilityValue(
+                    "第 \(viewModel.pages.isEmpty ? 0 : viewModel.currentPageIndex + 1) 页，共 \(viewModel.pages.count) 页"
+                )
 
-            Spacer()
-
-            Button {
-                viewModel.goNext()
-            } label: {
-                Image(systemName: "chevron.right")
-            }
-            .disabled(!viewModel.canGoNext)
-            .accessibilityLabel("下一页")
-
-            Spacer()
-
-            Button {
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape")
-            }
-            .accessibilityLabel("设置")
-        }
-        .padding(.horizontal)
-        .padding(.vertical, 10)
-        .background(.regularMaterial)
-        .tint(.primary)
-    }
-
-    // MARK: - 设置面板
-
-    private var settingsSheet: some View {
-        NavigationStack {
-            Form {
-                Section("字号") {
-                    HStack {
-                        Text("小")
-                        Slider(value: $viewModel.fontSize, in: 12...30, step: 1)
-                        Text("大")
+            Menu {
+                Section("阅读") {
+                    Menu("目录", systemImage: "list.bullet") {
+                        if viewModel.chapters.isEmpty {
+                            Text("暂无目录")
+                        } else {
+                            ForEach(viewModel.chapters) { chapter in
+                                Button {
+                                    selectChapter(chapter)
+                                } label: {
+                                    menuOptionLabel(
+                                        chapter.title,
+                                        isSelected: chapter.index == viewModel.currentChapterIndex
+                                    )
+                                }
+                            }
+                        }
                     }
+
+                    Button {
+                        viewModel.goPrevious()
+                    } label: {
+                        Label("上一页", systemImage: "chevron.left")
+                    }
+                    .disabled(!viewModel.canGoPrevious)
+
+                    Button {
+                        viewModel.goNext()
+                    } label: {
+                        Label("下一页", systemImage: "chevron.right")
+                    }
+                    .disabled(!viewModel.canGoNext)
                 }
-                Section("行距") {
-                    Slider(value: $viewModel.lineSpacing, in: 0...16, step: 1)
-                }
-                Section("主题") {
-                    Picker("主题", selection: $viewModel.theme) {
+
+                Section("排版") {
+                    Menu("字号", systemImage: "textformat.size") {
+                        ForEach(fontSizeOptions, id: \.self) { size in
+                            Button {
+                                viewModel.fontSize = size
+                            } label: {
+                                menuOptionLabel(
+                                    "\(Int(size)) 磅",
+                                    isSelected: viewModel.fontSize == size
+                                )
+                            }
+                        }
+                    }
+
+                    Menu("行距", systemImage: "arrow.up.and.down.text.horizontal") {
+                        ForEach(lineSpacingOptions, id: \.self) { spacing in
+                            Button {
+                                viewModel.lineSpacing = spacing
+                            } label: {
+                                menuOptionLabel(
+                                    spacing == 0 ? "默认" : "\(Int(spacing)) 磅",
+                                    isSelected: viewModel.lineSpacing == spacing
+                                )
+                            }
+                        }
+                    }
+
+                    Menu("主题", systemImage: "circle.lefthalf.filled") {
                         ForEach(ReaderTheme.allCases) { theme in
-                            Text(theme.label).tag(theme)
+                            Button {
+                                viewModel.theme = theme
+                            } label: {
+                                menuOptionLabel(theme.label, isSelected: viewModel.theme == theme)
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
-                }
-                Section("翻页方式") {
-                    Picker("翻页方式", selection: $viewModel.transition) {
+
+                    Menu("翻页方式", systemImage: "book.pages") {
                         ForEach(PageTransitionMode.allCases) { mode in
-                            Text(mode.label).tag(mode)
+                            Button {
+                                viewModel.transition = mode
+                            } label: {
+                                menuOptionLabel(mode.label, isSelected: viewModel.transition == mode)
+                            }
                         }
                     }
-                    .pickerStyle(.segmented)
                 }
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .font(.title3)
+                    .frame(width: 44, height: 44)
             }
-            .navigationTitle("阅读设置")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { showSettings = false }
-                }
-            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .accessibilityLabel("阅读选项")
+            .accessibilityHint("打开目录、翻页和排版设置")
         }
-        .presentationDetents([.medium, .large])
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
+/// 项目级图标控件标准：使用 Apple Liquid Glass，并保证 iOS 最小 44pt 触控区域。
+/// 普通文字按钮、工具栏和菜单优先使用 SwiftUI 原生控件；自定义图标按钮统一复用此组件。
+struct SeidokuGlassIconButton<Label: View>: View {
+    private let action: () -> Void
+    private let label: () -> Label
+
+    init(action: @escaping () -> Void, @ViewBuilder label: @escaping () -> Label) {
+        self.action = action
+        self.label = label
     }
 
-    // MARK: - 目录
-
-    private var tocSheet: some View {
-        NavigationStack {
-            List(viewModel.chapters) { chapter in
-                Button {
-                    viewModel.currentChapterIndex = chapter.index
-                    showTOC = false
-                    Task { await viewModel.loadCurrentChapter() }
-                } label: {
-                    HStack {
-                        Text(chapter.title)
-                            .foregroundColor(chapter.index == viewModel.currentChapterIndex ? .accentColor : .primary)
-                        Spacer()
-                        if chapter.index == viewModel.currentChapterIndex {
-                            Image(systemName: "checkmark")
-                                .foregroundColor(.accentColor)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("目录")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("完成") { showTOC = false }
-                }
-            }
-        }
-        .presentationDetents([.medium, .large])
+    var body: some View {
+        Button(action: action, label: label)
+            .frame(minWidth: 44, minHeight: 44)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
     }
 }
 

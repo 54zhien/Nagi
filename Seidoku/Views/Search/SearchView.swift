@@ -11,6 +11,7 @@ import SwiftData
 struct SearchView: View {
     @Query(sort: \Book.title) private var books: [Book]
     @Binding var searchText: String
+    @State private var selectedBook: Book?
 
     var body: some View {
         NavigationStack {
@@ -29,16 +30,27 @@ struct SearchView: View {
                     )
                 } else {
                     List(matchingBooks) { book in
-                        NavigationLink {
-                            ReaderView(book: book)
+                        Button {
+                            selectedBook = book
                         } label: {
                             BookRow(book: book)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
             .navigationTitle("搜索")
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { selectedBook != nil },
+                set: { if !$0 { selectedBook = nil } }
+            )
+        ) {
+            if let selectedBook {
+                ReaderView(book: selectedBook)
+            }
         }
     }
 

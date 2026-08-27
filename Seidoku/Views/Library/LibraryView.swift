@@ -18,6 +18,7 @@ struct LibraryView: View {
     @State private var renameText = ""
     @State private var bookToDelete: Book?
     @State private var showDeleteConfirm = false
+    @State private var selectedBook: Book?
 
     var body: some View {
         NavigationStack {
@@ -30,11 +31,12 @@ struct LibraryView: View {
                 } else {
                     List {
                         ForEach(books) { book in
-                            NavigationLink {
-                                ReaderView(book: book)
+                            Button {
+                                selectedBook = book
                             } label: {
                                 BookRow(book: book)
                             }
+                            .buttonStyle(.plain)
                             .contextMenu {
                                 Button {
                                     bookToRename = book
@@ -108,6 +110,16 @@ struct LibraryView: View {
                 Button("取消", role: .cancel) {}
             } message: {
                 Text("确定删除「\(bookToDelete?.title ?? "")」吗？此操作不可撤销。")
+            }
+        }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { selectedBook != nil },
+                set: { if !$0 { selectedBook = nil } }
+            )
+        ) {
+            if let selectedBook {
+                ReaderView(book: selectedBook)
             }
         }
     }
