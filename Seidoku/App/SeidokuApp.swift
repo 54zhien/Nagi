@@ -46,6 +46,7 @@ struct SeidokuApp: App {
 /// - 搜索 tab 通过 `role: .search` 与其它 tab 分离，独立分隔显示
 struct RootTabView: View {
     @State private var selection: AppTab = .home
+    @State private var searchText = ""
     @State private var importState = AppImportState.shared
 
     var body: some View {
@@ -63,9 +64,11 @@ struct RootTabView: View {
             }
 
             Tab("搜索", systemImage: "magnifyingglass", value: .search, role: .search) {
-                SearchView()
+                SearchView(searchText: $searchText)
             }
         }
+        .searchable(text: $searchText, prompt: "搜索书名")
+        .tabViewSearchActivation(.searchTabSelection)
         .tabViewStyle(.sidebarAdaptable)
         .alert("导入", isPresented: Binding(
             get: { importState.message != nil },

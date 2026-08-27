@@ -115,7 +115,7 @@ struct LibraryView: View {
 
 // MARK: - 书籍行
 
-private struct BookRow: View {
+struct BookRow: View {
     let book: Book
 
     var body: some View {
