@@ -57,8 +57,12 @@ struct ReaderView: View {
                 }
 
                 ToolbarItem(placement: .topBarTrailing) {
-                    SeidokuGlassIconButton(action: { dismiss() }) {
+                    Button {
+                        dismiss()
+                    } label: {
                         Image(systemName: "xmark")
+                            .font(.system(size: 18, weight: .semibold))
+                            .frame(width: 44, height: 44)
                     }
                     .accessibilityLabel("退出阅读器")
                     .accessibilityHint("返回上一个页面")
@@ -248,36 +252,18 @@ struct ReaderView: View {
                 }
             } label: {
                 Image(systemName: "xmark.triangle.circle.square")
-                    .font(.title3.weight(.semibold))
-                    .frame(width: 44, height: 44)
+                    .font(.system(size: 18, weight: .semibold))
             }
+            .controlSize(.large)
             .buttonStyle(.glass)
             .buttonBorderShape(.circle)
+            .frame(width: 44, height: 44)
             .accessibilityLabel("阅读选项")
             .accessibilityHint("打开目录、翻页和排版设置")
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 8)
         .frame(maxWidth: .infinity, alignment: .trailing)
-    }
-}
-
-/// 项目级图标控件标准：使用 Apple Liquid Glass，并保证 iOS 最小 44pt 触控区域。
-/// 普通文字按钮、工具栏和菜单优先使用 SwiftUI 原生控件；自定义图标按钮统一复用此组件。
-struct SeidokuGlassIconButton<Label: View>: View {
-    private let action: () -> Void
-    private let label: () -> Label
-
-    init(action: @escaping () -> Void, @ViewBuilder label: @escaping () -> Label) {
-        self.action = action
-        self.label = label
-    }
-
-    var body: some View {
-        Button(action: action, label: label)
-            .frame(width: 44, height: 44)
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
     }
 }
 
