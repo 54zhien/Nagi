@@ -59,10 +59,28 @@ struct ReaderChrome<Content: View>: View {
                     .transition(.opacity)
             }
         }
-        .overlay(alignment: .bottom) {
+        // Apple 的 containerCornerOffset 会根据当前窗口的真实圆角、系统 UI 和窗口形状
+        // 调整角落控件的位置，不再用固定的屏幕尺寸或手工猜测圆角半径。
+        .overlay(alignment: .bottomLeading) {
             if showControls {
-                bottomBar
-                    .transition(.opacity)
+                bottomControl(
+                    "目录",
+                    systemImage: "list.bullet",
+                    edges: [.bottom, .leading],
+                    action: onTableOfContents
+                )
+                .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .bottomTrailing) {
+            if showControls {
+                bottomControl(
+                    "主题与排版",
+                    systemImage: "xmark.triangle.circle.square",
+                    edges: [.bottom, .trailing],
+                    action: onSettings
+                )
+                .transition(.opacity)
             }
         }
         // UIKit 阅读器会自行处理分页手势；这个 simultaneous 手势只负责统一收起控件。
@@ -85,64 +103,21 @@ struct ReaderChrome<Content: View>: View {
         )
     }
 
-    private var bottomBar: some View {
-        GeometryReader { geometry in
-            let cornerInsets = geometry.containerCornerInsets
-            let leadingCenter = bottomCornerCenter(
-                cornerInsets.bottomLeading,
-                in: geometry.size,
-                isLeading: true
-            )
-            let trailingCenter = bottomCornerCenter(
-                cornerInsets.bottomTrailing,
-                in: geometry.size,
-                isLeading: false
-            )
-
-            GlassEffectContainer(spacing: 12) {
-                ZStack {
-                    controlButton(
-                        "目录",
-                        systemImage: "list.bullet",
-                        action: onTableOfContents
-                    )
-                    .position(leadingCenter)
-
-                    controlButton(
-                        "主题与排版",
-                        systemImage: "xmark.triangle.circle.square",
-                        action: onSettings
-                    )
-                    .position(trailingCenter)
-                }
-                .frame(width: geometry.size.width, height: geometry.size.height)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func bottomCornerCenter(
-        _ cornerInset: CGSize,
-        in size: CGSize,
-        isLeading: Bool
-    ) -> CGPoint {
-        // CornerInsets 的横纵值可能因为 Home Indicator 或其他系统 UI 而不一致。
-        // 圆角圆心必须使用同一个半径距离，取较大值可避免控件被压到屏幕底边。
-        let centerDistance = cornerCenterDistance(cornerInset)
-        let x = isLeading ? centerDistance : size.width - centerDistance
-        let y = size.height - centerDistance
-        return CGPoint(x: x, y: y)
-    }
-
-    private func cornerCenterDistance(_ cornerInset: CGSize) -> CGFloat {
-        // containerCornerInsets 是系统根据当前窗口形状和系统 UI 计算出的动态值。
-        // 优先使用测量值，让按钮圆心随真实屏幕圆角定位；只有平直窗口返回 0 时，
-        // 才使用回退值，并确保圆形控件不会越过容器边界。
-        let measuredInset = max(cornerInset.width, cornerInset.height)
-        guard measuredInset > 0 else {
-            return ReaderControlMetrics.fallbackCornerCenterInset
-        }
-        return max(ReaderControlMetrics.diameter / 2, measuredInset)
+    private func bottomControl(
+        _ label: String,
+        systemImage: String,
+        edges: Edge.Set,
+        action: @escaping () -> Void
+    ) -> some View {
+        controlButton(
+            label,
+            systemImage: systemImage,
+            action: action
+        )
+        // 这是 iOS 26 SwiftUI 针对窗口圆角的布局 API。它把控件从对应角落的
+        // container corner inset 移开，同时保留控件尺寸，从而让圆形控件稳定地
+        // 落在屏幕圆角圆心，而不是依赖某一款设备的固定 padding。
+        .containerCornerOffset(edges)
     }
 
     private func controlButton(
@@ -190,8 +165,7 @@ private enum ReaderControlMetrics {
     static let exitDiameter: CGFloat = 48
     static let exitIconPointSize: CGFloat = 20
     static let exitTopInset: CGFloat = 0
-    static let exitTrailingInset: CGFloat = 12
-    static let fallbackCornerCenterInset: CGFloat = 44
+    static let exitTrailingInset: CGFloat = 24
     static let swipeMinimumDistance: CGFloat = 10
 }
 
