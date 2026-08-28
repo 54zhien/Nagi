@@ -44,30 +44,34 @@ struct ReaderView: View {
                     .navigationBarBackButtonHidden(true)
                     .toolbar(.hidden, for: .navigationBar)
                 }
-
+            }
+            // 先把阅读器内容固定为外层 GeometryReader 的全屏坐标系。
+            .frame(width: container.size.width, height: container.size.height, alignment: .topLeading)
+            // 控件直接挂在同一个全屏 frame 的右上/右下角，不再依赖 offset 的父布局原点。
+            .overlay(alignment: .topTrailing) {
                 if showControls {
                     topBar
-                        .offset(
-                            ReaderControlMetrics.topControlOffset(
-                                in: container.size
-                            )
-                        )
-
-                    bottomBar
-                        .offset(
-                            ReaderControlMetrics.bottomControlOffset(
-                                in: container.size
-                            )
-                        )
+                        .padding(.top, ReaderControlMetrics.edgeInset)
+                        .padding(.trailing, ReaderControlMetrics.edgeInset)
                 }
             }
-            // 固定为外层 GeometryReader 的全屏坐标系，避免 NavigationStack 的布局尺寸影响控件位置。
-            .frame(width: container.size.width, height: container.size.height, alignment: .topLeading)
-            // 阅读正文可以延伸到全屏，控件位置则由屏幕圆角圆心决定。
-            .ignoresSafeArea()
+            .overlay(alignment: .bottomTrailing) {
+                if showControls {
+                    bottomBar
+                        .padding(.bottom, ReaderControlMetrics.edgeInset)
+                        .padding(.trailing, ReaderControlMetrics.edgeInset)
+                }
+            }
+            // 阅读正文与两个固定控件都使用这一个全屏坐标系。
+            .ignoresSafeArea(.all)
         }
+        // fullScreenCover 的根 GeometryReader 也必须覆盖系统安全区，
+        // 否则 bottomTrailing overlay 会以安全区底部而不是屏幕底部为基准。
+        .ignoresSafeArea(.all)
         // 阅读页始终沉浸显示，避免退出控件与系统状态栏重叠。
-        .toolbarVisibility(.hidden, for: .statusBar)
+        // 当前项目使用的 Xcode 26.3 SDK 尚未提供 ToolbarPlacement.statusBar，
+        // 因此使用已在本项目 GitHub 构建中验证可用的兼容 API。
+        .statusBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
     }
 
@@ -264,29 +268,11 @@ struct ReaderView: View {
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        // 两个圆形控件的圆心固定在距离屏幕对应边缘 44pt 的位置。
-        // 不再使用 containerCornerInsets：它还可能包含状态栏、Home Indicator、
+        // 控件边缘距屏幕边缘 22pt，加上半径 22pt，圆心固定在 44pt。
+        // 不使用 containerCornerInsets：它还可能包含状态栏、Home Indicator、
         // window presentation 等系统 UI 的重叠区域，并不等于硬件屏幕圆角圆心。
-        static let cornerCenterDistance: CGFloat = 44
+        static let edgeInset: CGFloat = 22
         static let menuIconPointSize: CGFloat = 21
-
-        static func topControlOffset(
-            in containerSize: CGSize
-        ) -> CGSize {
-            CGSize(
-                width: containerSize.width - cornerCenterDistance - diameter / 2,
-                height: cornerCenterDistance - diameter / 2
-            )
-        }
-
-        static func bottomControlOffset(
-            in containerSize: CGSize
-        ) -> CGSize {
-            CGSize(
-                width: containerSize.width - cornerCenterDistance - diameter / 2,
-                height: containerSize.height - cornerCenterDistance - diameter / 2
-            )
-        }
     }
 }
 
