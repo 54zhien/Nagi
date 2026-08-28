@@ -45,7 +45,7 @@
 		4A0000000000000000000024 /* Chapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000024 /* Chapter.swift */; };
 		4A0000000000000000000025 /* ReaderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000025 /* ReaderSettings.swift */; };
 		4A0000000000000000000026 /* TextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000026 /* TextPaginator.swift */; };
-		4A0000000000000000000027 /* ReaderViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000027 /* ReaderViewModel.swift */; };
+		4A0000000000000000000027 /* TXTReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000027 /* TXTReaderModel.swift */; };
 		4A0000000000000000000028 /* PageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000028 /* PageTextView.swift */; };
 		4A0000000000000000000029 /* PageViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000029 /* PageViewController.swift */; };
 		4A000000000000000000002A /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002A /* ReaderView.swift */; };
@@ -56,6 +56,8 @@
 		4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000071 /* EPUBReaderModel.swift */; };
 		4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000072 /* ReadiumNavigatorView.swift */; };
 		4A0000000000000000000073 /* EPUBReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000073 /* EPUBReaderView.swift */; };
+		4A0000000000000000000077 /* ReaderChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000077 /* ReaderChrome.swift */; };
+		4A0000000000000000000078 /* TXTReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000078 /* TXTReaderView.swift */; };
 		4A0000000000000000000074 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
 		4A0000000000000000000075 /* ReadiumStreamer in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000075 /* ReadiumStreamer */; };
 		4A0000000000000000000076 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
@@ -101,7 +103,7 @@
 		3A0000000000000000000024 /* Chapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chapter.swift; sourceTree = "<group>"; };
 		3A0000000000000000000025 /* ReaderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettings.swift; sourceTree = "<group>"; };
 		3A0000000000000000000026 /* TextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPaginator.swift; sourceTree = "<group>"; };
-		3A0000000000000000000027 /* ReaderViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderViewModel.swift; sourceTree = "<group>"; };
+		3A0000000000000000000027 /* TXTReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderModel.swift; sourceTree = "<group>"; };
 		3A0000000000000000000028 /* PageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTextView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000029 /* PageViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageViewController.swift; sourceTree = "<group>"; };
 		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
@@ -111,6 +113,8 @@
 		3A0000000000000000000071 /* EPUBReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderModel.swift; sourceTree = "<group>"; };
 		3A0000000000000000000072 /* ReadiumNavigatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000073 /* EPUBReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderView.swift; sourceTree = "<group>"; };
+		3A0000000000000000000077 /* ReaderChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChrome.swift; sourceTree = "<group>"; };
+		3A0000000000000000000078 /* TXTReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -273,7 +277,7 @@
 		2A0000000000000000000012 /* ViewModel */ = {
 			isa = PBXGroup;
 			children = (
-				3A0000000000000000000027 /* ReaderViewModel.swift */,
+				3A0000000000000000000027 /* TXTReaderModel.swift */,
 				3A0000000000000000000071 /* EPUBReaderModel.swift */,
 			);
 			path = ViewModel;
@@ -285,6 +289,8 @@
 				3A0000000000000000000028 /* PageTextView.swift */,
 				3A0000000000000000000029 /* PageViewController.swift */,
 				3A000000000000000000002A /* ReaderView.swift */,
+				3A0000000000000000000077 /* ReaderChrome.swift */,
+				3A0000000000000000000078 /* TXTReaderView.swift */,
 				3A0000000000000000000072 /* ReadiumNavigatorView.swift */,
 				3A0000000000000000000073 /* EPUBReaderView.swift */,
 			);
@@ -487,7 +493,7 @@
 				4A0000000000000000000024 /* Chapter.swift in Sources */,
 				4A0000000000000000000025 /* ReaderSettings.swift in Sources */,
 				4A0000000000000000000026 /* TextPaginator.swift in Sources */,
-				4A0000000000000000000027 /* ReaderViewModel.swift in Sources */,
+				4A0000000000000000000027 /* TXTReaderModel.swift in Sources */,
 				4A0000000000000000000028 /* PageTextView.swift in Sources */,
 				4A0000000000000000000029 /* PageViewController.swift in Sources */,
 				4A000000000000000000002A /* ReaderView.swift in Sources */,
@@ -497,6 +503,8 @@
 				4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */,
 				4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */,
 				4A0000000000000000000073 /* EPUBReaderView.swift in Sources */,
+				4A0000000000000000000077 /* ReaderChrome.swift in Sources */,
+				4A0000000000000000000078 /* TXTReaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -590,7 +598,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 29;
+			CURRENT_PROJECT_VERSION = 30;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Seidoku/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -599,7 +607,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.15.0;
+			MARKETING_VERSION = 0.16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -616,7 +624,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 29;
+			CURRENT_PROJECT_VERSION = 30;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Seidoku/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -625,7 +633,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.15.0;
+			MARKETING_VERSION = 0.16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

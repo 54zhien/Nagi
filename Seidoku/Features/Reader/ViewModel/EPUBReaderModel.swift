@@ -11,29 +11,8 @@ import ReadiumNavigator
 import ReadiumShared
 import UIKit
 
-enum EPUBReaderTheme: String, CaseIterable, Identifiable {
-    case light, sepia, dark
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .light: return "白色"
-        case .sepia: return "米黄"
-        case .dark: return "深色"
-        }
-    }
-
-    /// 与 Readium CSS 内置主题使用的正文色保持一致，供嵌入式页眉复用。
-    var contentUIColor: UIColor {
-        switch self {
-        case .light, .sepia:
-            return UIColor(red: 18 / 255, green: 18 / 255, blue: 18 / 255, alpha: 1)
-        case .dark:
-            return UIColor(red: 254 / 255, green: 254 / 255, blue: 254 / 255, alpha: 1)
-        }
-    }
-
+extension ReaderTheme {
+    /// Readium 的主题映射只属于 EPUB 渲染层，主题值本身由所有阅读格式共享。
     var readiumTheme: ReadiumNavigator.Theme {
         switch self {
         case .light: return .light
@@ -43,46 +22,7 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable {
     }
 }
 
-enum EPUBFlowMode: String, CaseIterable, Identifiable {
-    case paged, scroll
-
-    var id: String { rawValue }
-    var label: String { self == .paged ? "横向分页" : "上下滚动" }
-}
-
-/// 横向分页的过渡方式。动画层先独立保存，后续再接入具体的翻页实现。
-enum EPUBPageTransitionMode: String, CaseIterable, Identifiable {
-    case pageCurl, cover
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .pageCurl: return "仿真翻页"
-        case .cover: return "覆盖翻页"
-        }
-    }
-}
-
-enum EPUBFontFamily: String, CaseIterable, Identifiable {
-    case systemSerif
-    case systemSansSerif
-    case palatino
-    case athelas
-    case openDyslexic
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .systemSerif: return "系统衬线"
-        case .systemSansSerif: return "系统无衬线"
-        case .palatino: return "Palatino"
-        case .athelas: return "Athelas"
-        case .openDyslexic: return "OpenDyslexic"
-        }
-    }
-
+extension ReaderFontFamily {
     var readiumFontFamily: FontFamily {
         switch self {
         case .systemSerif: return .serif
@@ -124,15 +64,15 @@ final class EPUBReaderModel {
     }
 
     var fontScale: Double { didSet { preferencesDidChange() } }
-    var fontFamily: EPUBFontFamily { didSet { preferencesDidChange() } }
+    var fontFamily: ReaderFontFamily { didSet { preferencesDidChange() } }
     var lineHeight: Double { didSet { preferencesDidChange() } }
     var pageMargins: Double { didSet { preferencesDidChange() } }
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
     var contentTopInset: Double { didSet { preferencesDidChange() } }
     var contentBottomInset: Double { didSet { preferencesDidChange() } }
-    var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
-    var flowMode: EPUBFlowMode { didSet { preferencesDidChange() } }
-    var pageTransition: EPUBPageTransitionMode { didSet { persistPreferences() } }
+    var theme: ReaderTheme { didSet { preferencesDidChange() } }
+    var flowMode: ReaderFlowMode { didSet { preferencesDidChange() } }
+    var pageTransition: ReaderPageTransitionMode { didSet { persistPreferences() } }
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
 
@@ -165,15 +105,15 @@ final class EPUBReaderModel {
 
         let defaults = UserDefaults.standard
         fontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
-        fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(EPUBFontFamily.init) ?? .systemSerif
+        fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(ReaderFontFamily.init) ?? .systemSerif
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
         pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
         contentTopInset = defaults.object(forKey: PreferenceKey.contentTopInset) as? Double ?? 56
         contentBottomInset = defaults.object(forKey: PreferenceKey.contentBottomInset) as? Double ?? 32
-        theme = defaults.string(forKey: PreferenceKey.theme).flatMap(EPUBReaderTheme.init) ?? .light
-        flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(EPUBFlowMode.init) ?? .paged
-        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition).flatMap(EPUBPageTransitionMode.init) ?? .pageCurl
+        theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
+        flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(ReaderFlowMode.init) ?? .paged
+        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition).flatMap(ReaderPageTransitionMode.init) ?? .pageCurl
         publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
         showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
     }
