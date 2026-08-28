@@ -179,9 +179,14 @@ struct EPUBReaderView: View {
 
     private func cornerCenterDistance(_ measuredInset: CGFloat) -> CGFloat {
         // containerCornerInsets 是 iOS 26 根据当前窗口形状和系统 UI
-        // 计算出的动态值；没有圆角的窗口（例如部分 iPad 场景）会返回 0，
-        // 此时退回到 44pt 的可用圆心距离，避免按钮贴到屏幕边缘。
-        max(ReaderControlMetrics.fallbackCornerCenterInset, measuredInset)
+        // 计算出的动态值。优先使用系统测量值，让按钮圆心随真实屏幕
+        // 圆角向下对齐；只有平直窗口（例如部分 iPad 场景）返回 0 时，
+        // 才使用回退值，并确保圆形控件不会越过容器边界。
+        guard measuredInset > 0 else {
+            return ReaderControlMetrics.fallbackCornerCenterInset
+        }
+
+        return max(ReaderControlMetrics.diameter / 2, measuredInset)
     }
 
     private func controlButton(
@@ -382,9 +387,9 @@ struct EPUBReaderView: View {
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
         static let iconPointSize: CGFloat = 18
-        static let exitDiameter: CGFloat = 52
-        static let exitIconPointSize: CGFloat = 22
-        static let exitTopInset: CGFloat = 2
+        static let exitDiameter: CGFloat = 48
+        static let exitIconPointSize: CGFloat = 20
+        static let exitTopInset: CGFloat = 0
         static let exitTrailingInset: CGFloat = 12
         static let fallbackCornerCenterInset: CGFloat = 44
     }
