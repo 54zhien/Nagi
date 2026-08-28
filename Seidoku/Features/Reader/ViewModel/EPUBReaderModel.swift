@@ -101,8 +101,17 @@ final class EPUBReaderModel {
     var errorMessage: String?
     var title: String
     var chapterTitle = ""
+    private(set) var currentReadingHref: String?
     var progress = 0.0
     var tableOfContents: [EPUBTOCEntry] = []
+
+    var currentTOCEntryID: String? {
+        guard let currentReadingHref else { return nil }
+        let currentResource = normalizedResourceHref(currentReadingHref)
+        return tableOfContents.first {
+            normalizedResourceHref($0.link.href) == currentResource
+        }?.id
+    }
 
     var fontScale: Double { didSet { preferencesDidChange() } }
     var fontFamily: EPUBFontFamily { didSet { preferencesDidChange() } }
@@ -228,6 +237,10 @@ final class EPUBReaderModel {
         Task { await navigator.go(to: entry.link, options: .animated) }
     }
 
+    func isCurrent(_ entry: EPUBTOCEntry) -> Bool {
+        currentTOCEntryID == entry.id
+    }
+
     func resetTypography() {
         fontScale = 1.0
         fontFamily = .systemSerif
@@ -301,6 +314,7 @@ final class EPUBReaderModel {
 
     private func updateLocation(_ locator: Locator) {
         chapterTitle = locator.title ?? chapterTitle
+        currentReadingHref = locator.href.path
         if let totalProgression = locator.locations.totalProgression {
             progress = min(max(totalProgression, 0), 1)
         }
@@ -308,6 +322,15 @@ final class EPUBReaderModel {
         book.progressPercent = progress
         book.lastReadAt = .now
     }
+}
+
+private func normalizedResourceHref(_ href: String) -> String {
+    let resource = href.split(whereSeparator: { $0 == "#" || $0 == "?" }).first.map(String.init) ?? href
+    var decoded = resource.removingPercentEncoding ?? resource
+    while decoded.hasPrefix("/") {
+        decoded.removeFirst()
+    }
+    return decoded
 }
 
 extension EPUBReaderModel: EPUBNavigatorDelegate {

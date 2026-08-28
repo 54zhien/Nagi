@@ -251,18 +251,16 @@ struct EPUBReaderView: View {
                 if model.tableOfContents.isEmpty {
                     ContentUnavailableView("没有目录", systemImage: "list.bullet")
                 } else {
-                    List(model.tableOfContents) { entry in
-                        Button {
-                            model.go(to: entry)
-                            showTableOfContents = false
-                        } label: {
-                            Text(entry.title)
-                                .foregroundStyle(.primary)
-                                .padding(.leading, CGFloat(entry.depth) * 16)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                    ScrollViewReader { proxy in
+                        List(model.tableOfContents) { entry in
+                            tocRow(entry)
+                                .id(entry.id)
                         }
-                        .buttonStyle(.plain)
+                        .task(id: model.currentTOCEntryID) {
+                            guard let currentID = model.currentTOCEntryID else { return }
+                            await Task.yield()
+                            proxy.scrollTo(currentID, anchor: .center)
+                        }
                     }
                 }
             }
@@ -276,6 +274,33 @@ struct EPUBReaderView: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+    }
+
+    private func tocRow(_ entry: EPUBTOCEntry) -> some View {
+        let isCurrent = model.isCurrent(entry)
+
+        return Button {
+            model.go(to: entry)
+            showTableOfContents = false
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "bookmark.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.tint)
+                    .opacity(isCurrent ? 1 : 0)
+                    .frame(width: 18, height: 18)
+                    .accessibilityHidden(true)
+
+                Text(entry.title)
+                    .foregroundStyle(.primary)
+                    .fontWeight(isCurrent ? .semibold : .regular)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.leading, CGFloat(entry.depth) * 16)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isCurrent ? "\(entry.title)，当前阅读章节" : entry.title)
     }
 
     private func toggleControls() {
