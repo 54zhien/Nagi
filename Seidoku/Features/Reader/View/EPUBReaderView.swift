@@ -24,6 +24,7 @@ struct EPUBReaderView: View {
             content
                 .ignoresSafeArea()
         }
+        // 页眉是正文布局的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.showBookTitleInPageHeader {
                 pageHeader
@@ -95,6 +96,7 @@ struct EPUBReaderView: View {
 
     // MARK: - 阅读页页眉
 
+    // 书名嵌入正文上方，独立于 showControls 的显隐状态。
     private var pageHeader: some View {
         Text(model.title)
             .font(.caption.weight(.medium))
