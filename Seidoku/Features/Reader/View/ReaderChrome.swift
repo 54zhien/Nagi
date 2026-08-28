@@ -196,8 +196,9 @@ private struct ReaderPageHeader: View {
 }
 
 private enum ReaderControlMetrics {
-    static let diameter: CGFloat = 44
-    static let iconPointSize: CGFloat = 18
+    // 底栏控件比最小触控尺寸略大，提升沉浸式阅读中的可发现性和点击舒适度。
+    static let diameter: CGFloat = 48
+    static let iconPointSize: CGFloat = 20
     static let exitDiameter: CGFloat = 48
     static let exitIconPointSize: CGFloat = 20
     static let exitTopInset: CGFloat = 0
