@@ -263,7 +263,7 @@ struct EPUBReaderView: View {
                     .pickerStyle(.segmented)
                 }
 
-                Section("正文与屏幕边距") {
+                Section {
                     LabeledContent("上边距", value: "\(Int(model.contentTopInset)) pt")
                     Slider(value: $model.contentTopInset, in: 0 ... 160, step: 4)
                         .accessibilityLabel("正文上边距")
@@ -271,6 +271,8 @@ struct EPUBReaderView: View {
                     LabeledContent("下边距", value: "\(Int(model.contentBottomInset)) pt")
                     Slider(value: $model.contentBottomInset, in: 0 ... 160, step: 4)
                         .accessibilityLabel("正文下边距")
+                } header: {
+                    Text("正文与屏幕边距")
                 } footer: {
                     Text("最小值仍会遵守设备安全区，避免正文被刘海、动态岛或 Home Indicator 遮挡。")
                 }
