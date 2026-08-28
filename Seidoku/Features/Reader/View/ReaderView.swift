@@ -304,7 +304,10 @@ struct ReaderView: View {
         }
 
         private static func edgeInset(safeArea: CGFloat, corner: CGFloat) -> CGFloat {
-            max(minimumEdgeInset, safeArea, corner)
+            // CornerInsets 描述的是屏幕圆角的避让包围盒；圆形控件要与其圆心同心，
+            // 控件边缘到屏幕边缘的距离应扣除控件半径，而不是使用完整的 inset 高度。
+            let concentricCornerInset = max(0, corner - diameter / 2)
+            return max(minimumEdgeInset, safeArea, concentricCornerInset)
         }
     }
 }
