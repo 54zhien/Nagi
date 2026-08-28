@@ -132,18 +132,6 @@ struct EPUBReaderView: View {
 
                 Spacer(minLength: 8)
 
-                HStack(spacing: 8) {
-                    controlButton("上一页", systemImage: "chevron.left") {
-                        model.goBackward()
-                    }
-
-                    controlButton("下一页", systemImage: "chevron.right") {
-                        model.goForward()
-                    }
-                }
-
-                Spacer(minLength: 8)
-
                 controlButton("主题与排版", systemImage: "xmark.triangle.circle.square") {
                     showSettings = true
                 }
