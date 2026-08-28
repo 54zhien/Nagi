@@ -325,3 +325,4 @@ struct ScrollableTextView: UIViewRepresentable {
         textView.attributedText = attributedText
     }
 }
+
