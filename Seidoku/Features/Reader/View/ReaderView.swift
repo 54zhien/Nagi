@@ -42,6 +42,12 @@ struct ReaderView: View {
                         )
                 }
             }
+            // 顶部退出控件与底部阅读选项使用同一套显式 Liquid Glass 控件。
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showControls {
+                    topBar
+                }
+            }
             // 使用 safeAreaInset 将阅读器控件放在系统安全区内，正文不会被 Home
             // Indicator 遮挡；控件本身仍保持漂浮在正文之上的阅读器 chrome 层。
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -50,26 +56,7 @@ struct ReaderView: View {
                 }
             }
             .navigationBarBackButtonHidden(true)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 18, weight: .semibold))
-                    }
-                    .controlSize(.large)
-                    .buttonBorderShape(.circle)
-                    .frame(
-                        width: ReaderControlMetrics.diameter,
-                        height: ReaderControlMetrics.diameter
-                    )
-                    .accessibilityLabel("退出阅读器")
-                    .accessibilityHint("返回上一个页面")
-                }
-            }
-            .toolbar(showControls ? .visible : .hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .statusBarHidden(!showControls)
         .toolbar(.hidden, for: .tabBar)
@@ -150,6 +137,31 @@ struct ReaderView: View {
     }
 
     // MARK: - Liquid Glass 阅读器 chrome
+
+    private var topBar: some View {
+        HStack(spacing: 12) {
+            Spacer(minLength: 0)
+
+            Button {
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 18, weight: .semibold))
+            }
+            .controlSize(.large)
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .frame(
+                width: ReaderControlMetrics.diameter,
+                height: ReaderControlMetrics.diameter
+            )
+            .accessibilityLabel("退出阅读器")
+            .accessibilityHint("返回上一个页面")
+        }
+        .padding(.horizontal, ReaderControlMetrics.edgeInset)
+        .padding(.vertical, ReaderControlMetrics.topInset)
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
 
     private var bottomBar: some View {
         HStack(spacing: 12) {
