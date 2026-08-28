@@ -19,44 +19,54 @@ struct ReaderView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        GeometryReader { container in
             ZStack {
-                GeometryReader { geo in
-                    content
-                        .onAppear {
-                            viewModel.pageSize = geo.size
-                            Task { await viewModel.load() }
+                NavigationStack {
+                    ZStack {
+                        GeometryReader { geo in
+                            content
+                                .onAppear {
+                                    viewModel.pageSize = geo.size
+                                    Task { await viewModel.load() }
+                                }
+                                .onChange(of: geo.size) { _, newSize in
+                                    viewModel.pageSize = newSize
+                                }
+                                // 只让正文响应“显示/隐藏控件”手势，避免点击控件时误触发。
+                                .contentShape(Rectangle())
+                                .onTapGesture(perform: toggleControls)
+                                .accessibilityAction(
+                                    named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
+                                    toggleControls
+                                )
                         }
-                        .onChange(of: geo.size) { _, newSize in
-                            viewModel.pageSize = newSize
-                        }
-                        // 只让正文响应“显示/隐藏控件”手势，避免点击控件时误触发。
-                        .contentShape(Rectangle())
-                        .onTapGesture(perform: toggleControls)
-                        .accessibilityAction(
-                            named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
-                            toggleControls
+                    }
+                    .navigationBarBackButtonHidden(true)
+                    .toolbar(.hidden, for: .navigationBar)
+                }
+
+                if showControls {
+                    topBar
+                        .position(
+                            ReaderControlMetrics.topControlCenter(
+                                in: container.size,
+                                safeAreaInsets: container.safeAreaInsets,
+                                cornerInsets: container.containerCornerInsets
+                            )
+                        )
+
+                    bottomBar
+                        .position(
+                            ReaderControlMetrics.bottomControlCenter(
+                                in: container.size,
+                                safeAreaInsets: container.safeAreaInsets,
+                                cornerInsets: container.containerCornerInsets
+                            )
                         )
                 }
             }
-            .overlay(alignment: .topTrailing) {
-                if showControls {
-                    topBar
-                        .padding(.top, ReaderControlMetrics.topInset)
-                        .padding(.trailing, ReaderControlMetrics.minimumEdgeInset)
-                        .containerCornerOffset(Edge.Set.top.union(.trailing))
-                }
-            }
-            .overlay(alignment: .bottomTrailing) {
-                if showControls {
-                    bottomBar
-                        .padding(.bottom, ReaderControlMetrics.bottomInset)
-                        .padding(.trailing, ReaderControlMetrics.minimumEdgeInset)
-                        .containerCornerOffset(Edge.Set.bottom.union(.trailing))
-                }
-            }
-            .navigationBarBackButtonHidden(true)
-            .toolbar(.hidden, for: .navigationBar)
+            // 阅读正文可以延伸到全屏，控件位置则由外层容器的实际安全区和圆角数据决定。
+            .ignoresSafeArea()
         }
         .statusBarHidden(!showControls)
         .toolbar(.hidden, for: .tabBar)
@@ -255,11 +265,47 @@ struct ReaderView: View {
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        // 这是保证视觉间距的最小值；实际圆角避让由 containerCornerOffset 补充。
+        // 当设备没有额外安全区或圆角避让时，仍保留一个最小视觉间距。
         static let minimumEdgeInset: CGFloat = 24
         static let menuIconPointSize: CGFloat = 21
-        static let topInset: CGFloat = 8
-        static let bottomInset: CGFloat = 16
+
+        static func topControlCenter(
+            in containerSize: CGSize,
+            safeAreaInsets: EdgeInsets,
+            cornerInsets: RectangleCornerInsets
+        ) -> CGPoint {
+            CGPoint(
+                x: containerSize.width - edgeInset(
+                    safeArea: safeAreaInsets.trailing,
+                    corner: cornerInsets.topTrailing.width
+                ) - diameter / 2,
+                y: edgeInset(
+                    safeArea: safeAreaInsets.top,
+                    corner: cornerInsets.topTrailing.height
+                ) + diameter / 2
+            )
+        }
+
+        static func bottomControlCenter(
+            in containerSize: CGSize,
+            safeAreaInsets: EdgeInsets,
+            cornerInsets: RectangleCornerInsets
+        ) -> CGPoint {
+            CGPoint(
+                x: containerSize.width - edgeInset(
+                    safeArea: safeAreaInsets.trailing,
+                    corner: cornerInsets.bottomTrailing.width
+                ) - diameter / 2,
+                y: containerSize.height - edgeInset(
+                    safeArea: safeAreaInsets.bottom,
+                    corner: cornerInsets.bottomTrailing.height
+                ) - diameter / 2
+            )
+        }
+
+        private static func edgeInset(safeArea: CGFloat, corner: CGFloat) -> CGFloat {
+            max(minimumEdgeInset, safeArea, corner)
+        }
     }
 }
 
