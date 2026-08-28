@@ -47,12 +47,12 @@ struct EPUBReaderView: View {
         .toolbar(.hidden, for: .tabBar)
         .task {
             model.onToggleControls = toggleControls
+            model.onSwipeStart = hideControlsForSwipe
             await model.loadIfNeeded()
-            model.onPageTurn = hideControlsAfterPageTurn
         }
         .onDisappear {
             model.onToggleControls = nil
-            model.onPageTurn = nil
+            model.onSwipeStart = nil
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showTableOfContents) { tableOfContentsSheet }
@@ -275,7 +275,7 @@ struct EPUBReaderView: View {
         }
     }
 
-    private func hideControlsAfterPageTurn() {
+    private func hideControlsForSwipe() {
         guard showControls else { return }
 
         if reduceMotion {

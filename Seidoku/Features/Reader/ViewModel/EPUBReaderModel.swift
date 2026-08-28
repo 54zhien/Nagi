@@ -101,7 +101,7 @@ final class EPUBReaderModel {
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
 
     var onToggleControls: (() -> Void)?
-    var onPageTurn: (() -> Void)?
+    var onSwipeStart: (() -> Void)?
 
     private var publication: Publication?
     private var preferenceUpdateTask: Task<Void, Never>?
@@ -167,6 +167,10 @@ final class EPUBReaderModel {
                 )
             )
             navigator.delegate = self
+            navigator.addObserver(.drag(onStart: { [weak self] _ in
+                self?.onSwipeStart?()
+                return false
+            }))
             self.navigator = navigator
             hasLoaded = true
 
@@ -287,7 +291,6 @@ final class EPUBReaderModel {
 extension EPUBReaderModel: EPUBNavigatorDelegate {
     func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
         updateLocation(locator)
-        onPageTurn?()
     }
 
     func navigator(_ navigator: Navigator, didJumpTo locator: Locator) {
