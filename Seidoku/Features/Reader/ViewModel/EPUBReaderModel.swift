@@ -176,8 +176,10 @@ final class EPUBReaderModel {
                     preferences: makePreferences(),
                     disablePageTurnsWhileScrolling: true,
                     contentInset: [
-                        .compact: (top: 28, bottom: 32),
-                        .regular: (top: 48, bottom: 48),
+                        // 给正文顶部留出稳定的呼吸空间，避免贴近屏幕边缘；
+                        // 该 inset 也包含 Readium 要求的安全区预留。
+                        .compact: (top: 56, bottom: 32),
+                        .regular: (top: 64, bottom: 48),
                     ],
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6
