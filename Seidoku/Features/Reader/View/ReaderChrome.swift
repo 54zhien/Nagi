@@ -41,53 +41,38 @@ struct ReaderChrome<Content: View>: View {
     }
 
     var body: some View {
-        ZStack {
-            content
-                .ignoresSafeArea()
-        }
-        // 页眉是正文的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
-        .safeAreaInset(edge: .top, spacing: 0) {
-            if showsTitle {
-                ReaderPageHeader(title: title, color: titleColor)
+        GeometryReader { geometry in
+            ZStack {
+                content
+                    .ignoresSafeArea()
             }
-        }
-        .overlay(alignment: .topTrailing) {
-            if showControls {
-                exitButton
-                    .padding(.top, ReaderControlMetrics.exitTopInset)
-                    .padding(.trailing, ReaderControlMetrics.exitTrailingInset)
-                    .transition(.opacity)
+            // 页眉是正文的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showsTitle {
+                    ReaderPageHeader(title: title, color: titleColor)
+                }
             }
-        }
-        // Apple 的 containerCornerOffset 会根据当前窗口的真实圆角、系统 UI 和窗口形状
-        // 调整角落控件的位置，不再用固定的屏幕尺寸或手工猜测圆角半径。
-        .overlay(alignment: .bottomLeading) {
-            if showControls {
-                bottomControl(
-                    "目录",
-                    systemImage: "list.bullet",
-                    edges: [.bottom, .leading],
-                    action: onTableOfContents
-                )
-                .transition(.opacity)
+            .overlay(alignment: .topTrailing) {
+                if showControls {
+                    exitButton
+                        .padding(.top, ReaderControlMetrics.exitTopInset)
+                        .padding(.trailing, ReaderControlMetrics.exitTrailingInset)
+                        .transition(.opacity)
+                }
             }
-        }
-        .overlay(alignment: .bottomTrailing) {
-            if showControls {
-                bottomControl(
-                    "主题与排版",
-                    systemImage: "xmark.triangle.circle.square",
-                    edges: [.bottom, .trailing],
-                    action: onSettings
-                )
-                .transition(.opacity)
+            .overlay(alignment: .bottom) {
+                if showControls {
+                    bottomBar(in: geometry)
+                        .transition(.opacity)
+                }
             }
+            // UIKit 阅读器会自行处理分页手势；这个 simultaneous 手势只负责统一收起控件。
+            .simultaneousGesture(
+                DragGesture(minimumDistance: ReaderControlMetrics.swipeMinimumDistance)
+                    .onChanged { _ in onSwipeStart?() }
+            )
         }
-        // UIKit 阅读器会自行处理分页手势；这个 simultaneous 手势只负责统一收起控件。
-        .simultaneousGesture(
-            DragGesture(minimumDistance: ReaderControlMetrics.swipeMinimumDistance)
-                .onChanged { _ in onSwipeStart?() }
-        )
+        .ignoresSafeArea()
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -103,21 +88,72 @@ struct ReaderChrome<Content: View>: View {
         )
     }
 
-    private func bottomControl(
-        _ label: String,
-        systemImage: String,
-        edges: Edge.Set,
-        action: @escaping () -> Void
-    ) -> some View {
-        controlButton(
-            label,
-            systemImage: systemImage,
-            action: action
+    private func bottomBar(in geometry: GeometryProxy) -> some View {
+        let cornerInsets = geometry.containerCornerInsets
+        let leadingCenter = bottomCornerCenter(
+            cornerInsets.bottomLeading,
+            in: geometry.size,
+            isLeading: true
         )
-        // 这是 iOS 26 SwiftUI 针对窗口圆角的布局 API。它把控件从对应角落的
-        // container corner inset 移开，同时保留控件尺寸，从而让圆形控件稳定地
-        // 落在屏幕圆角圆心，而不是依赖某一款设备的固定 padding。
-        .containerCornerOffset(edges)
+        let trailingCenter = bottomCornerCenter(
+            cornerInsets.bottomTrailing,
+            in: geometry.size,
+            isLeading: false
+        )
+
+        return GlassEffectContainer(spacing: 12) {
+            ZStack {
+                controlButton(
+                    "目录",
+                    systemImage: "list.bullet",
+                    action: onTableOfContents
+                )
+                .position(leadingCenter)
+
+                controlButton(
+                    "主题与排版",
+                    systemImage: "xmark.triangle.circle.square",
+                    action: onSettings
+                )
+                .position(trailingCenter)
+            }
+            .frame(width: geometry.size.width, height: geometry.size.height)
+        }
+        .frame(width: geometry.size.width, height: geometry.size.height)
+    }
+
+    private func bottomCornerCenter(
+        _ cornerInset: CGSize,
+        in size: CGSize,
+        isLeading: Bool
+    ) -> CGPoint {
+        let radius = ReaderControlMetrics.diameter / 2
+        let horizontalDistance = cornerCenterDistance(
+            cornerInset.width,
+            maximum: max(radius, size.width - radius),
+            radius: radius
+        )
+        let verticalDistance = cornerCenterDistance(
+            cornerInset.height,
+            maximum: max(radius, size.height - radius),
+            radius: radius
+        )
+
+        return CGPoint(
+            x: isLeading ? horizontalDistance : size.width - horizontalDistance,
+            y: size.height - verticalDistance
+        )
+    }
+
+    private func cornerCenterDistance(
+        _ measuredInset: CGFloat,
+        maximum: CGFloat,
+        radius: CGFloat
+    ) -> CGFloat {
+        // containerCornerInsets 的宽高分别代表对应圆角在两个轴上的动态偏移。
+        // 分轴计算可保留不对称窗口、系统 UI 和横竖屏布局的真实几何关系；
+        // 没有圆角数据时至少保留半个控件直径，确保整个圆形控件仍在屏幕内。
+        min(max(radius, measuredInset), maximum)
     }
 
     private func controlButton(
