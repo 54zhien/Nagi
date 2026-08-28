@@ -138,8 +138,10 @@ struct EPUBReaderView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        // 44pt 控件的半径为 22pt；边缘内缩 22pt 后，按钮圆心距屏幕边缘 44pt，
+        // 与底部左右圆角的圆心保持对齐。
+        .padding(.horizontal, ReaderControlMetrics.cornerCenterInset)
+        .padding(.bottom, ReaderControlMetrics.cornerCenterInset)
     }
 
     private func controlButton(
@@ -151,7 +153,7 @@ struct EPUBReaderView: View {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .frame(width: 44, height: 44)
+                .frame(width: ReaderControlMetrics.diameter, height: ReaderControlMetrics.diameter)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -285,5 +287,10 @@ struct EPUBReaderView: View {
                 showControls = false
             }
         }
+    }
+
+    private enum ReaderControlMetrics {
+        static let diameter: CGFloat = 44
+        static let cornerCenterInset: CGFloat = 22
     }
 }
