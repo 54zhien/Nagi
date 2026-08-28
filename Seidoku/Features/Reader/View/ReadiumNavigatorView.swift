@@ -17,5 +17,3 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: EPUBNavigatorViewController, context: Context) {}
 }
-
-

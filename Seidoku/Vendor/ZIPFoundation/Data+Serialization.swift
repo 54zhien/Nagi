@@ -23,7 +23,7 @@ protocol DataSerializable {
 }
 
 extension Data {
-    public enum DataError: Error {
+    public enum SeidokuZIPDataError: Error {
         case unreadableFile
         case unwritableFile
     }
@@ -82,7 +82,7 @@ extension Data {
         let error = ferror(file)
         if error > 0 {
             bytes.deallocate()
-            throw DataError.unreadableFile
+            throw SeidokuZIPDataError.unreadableFile
         }
         #if swift(>=4.1)
         return Data(bytesNoCopy: bytes, count: bytesRead, deallocator: .custom({ buf, _ in buf.deallocate() }))
@@ -102,7 +102,7 @@ extension Data {
         }
         let error = ferror(file)
         if error > 0 {
-            throw DataError.unwritableFile
+            throw SeidokuZIPDataError.unwritableFile
         }
         return sizeWritten
     }
@@ -125,7 +125,7 @@ extension Data {
         }
         let error = ferror(file)
         if error > 0 {
-            throw DataError.unwritableFile
+            throw SeidokuZIPDataError.unwritableFile
         }
         return sizeWritten
     }

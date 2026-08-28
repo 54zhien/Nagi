@@ -255,5 +255,3 @@ struct EPUBReaderView: View {
         }
     }
 }
-
-
