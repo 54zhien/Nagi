@@ -20,7 +20,7 @@ struct ReaderView: View {
 
     var body: some View {
         GeometryReader { container in
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 NavigationStack {
                     ZStack {
                         GeometryReader { geo in
@@ -47,25 +47,25 @@ struct ReaderView: View {
 
                 if showControls {
                     topBar
-                        .position(
-                            ReaderControlMetrics.topControlCenter(
+                        .offset(
+                            ReaderControlMetrics.topControlOffset(
                                 in: container.size,
-                                safeAreaInsets: container.safeAreaInsets,
                                 cornerInsets: container.containerCornerInsets
                             )
                         )
 
                     bottomBar
-                        .position(
-                            ReaderControlMetrics.bottomControlCenter(
+                        .offset(
+                            ReaderControlMetrics.bottomControlOffset(
                                 in: container.size,
-                                safeAreaInsets: container.safeAreaInsets,
                                 cornerInsets: container.containerCornerInsets
                             )
                         )
                 }
             }
-            // 阅读正文可以延伸到全屏，控件位置则由外层容器的实际安全区和圆角数据决定。
+            // 固定为外层 GeometryReader 的全屏坐标系，避免 NavigationStack 的布局尺寸影响控件位置。
+            .frame(width: container.size.width, height: container.size.height, alignment: .topLeading)
+            // 阅读正文可以延伸到全屏，控件位置则由屏幕圆角圆心决定。
             .ignoresSafeArea()
         }
         .statusBarHidden(!showControls)
@@ -265,49 +265,56 @@ struct ReaderView: View {
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        // 当设备没有额外安全区或圆角避让时，仍保留一个最小视觉间距。
-        static let minimumEdgeInset: CGFloat = 24
+        // 系统圆角数据异常或不可用时，使用稳定的屏幕圆角圆心距离。
+        static let fallbackCornerCenterDistance: CGFloat = 44
+        static let maximumMeasuredCornerCenterDistance: CGFloat = 80
         static let menuIconPointSize: CGFloat = 21
 
-        static func topControlCenter(
+        static func topControlOffset(
             in containerSize: CGSize,
-            safeAreaInsets: EdgeInsets,
             cornerInsets: RectangleCornerInsets
-        ) -> CGPoint {
-            CGPoint(
-                x: containerSize.width - edgeInset(
-                    safeArea: safeAreaInsets.trailing,
-                    corner: cornerInsets.topTrailing.width
+        ) -> CGSize {
+            CGSize(
+                width: containerSize.width - cornerCenterDistance(
+                    from: cornerInsets.topTrailing.width,
+                    in: containerSize
                 ) - diameter / 2,
-                y: edgeInset(
-                    safeArea: safeAreaInsets.top,
-                    corner: cornerInsets.topTrailing.height
-                ) + diameter / 2
-            )
-        }
-
-        static func bottomControlCenter(
-            in containerSize: CGSize,
-            safeAreaInsets: EdgeInsets,
-            cornerInsets: RectangleCornerInsets
-        ) -> CGPoint {
-            CGPoint(
-                x: containerSize.width - edgeInset(
-                    safeArea: safeAreaInsets.trailing,
-                    corner: cornerInsets.bottomTrailing.width
-                ) - diameter / 2,
-                y: containerSize.height - edgeInset(
-                    safeArea: safeAreaInsets.bottom,
-                    corner: cornerInsets.bottomTrailing.height
+                height: cornerCenterDistance(
+                    from: cornerInsets.topTrailing.height,
+                    in: containerSize
                 ) - diameter / 2
             )
         }
 
-        private static func edgeInset(safeArea: CGFloat, corner: CGFloat) -> CGFloat {
-            // CornerInsets 描述的是屏幕圆角的避让包围盒；圆形控件要与其圆心同心，
-            // 控件边缘到屏幕边缘的距离应扣除控件半径，而不是使用完整的 inset 高度。
-            let concentricCornerInset = max(0, corner - diameter / 2)
-            return max(minimumEdgeInset, safeArea, concentricCornerInset)
+        static func bottomControlOffset(
+            in containerSize: CGSize,
+            cornerInsets: RectangleCornerInsets
+        ) -> CGSize {
+            CGSize(
+                width: containerSize.width - cornerCenterDistance(
+                    from: cornerInsets.bottomTrailing.width,
+                    in: containerSize
+                ) - diameter / 2,
+                height: containerSize.height - cornerCenterDistance(
+                    from: cornerInsets.bottomTrailing.height,
+                    in: containerSize
+                ) - diameter / 2
+            )
+        }
+
+        private static func cornerCenterDistance(from measuredValue: CGFloat, in containerSize: CGSize) -> CGFloat {
+            // containerCornerInsets 可能包含窗口 presentation 或系统 UI 的重叠区域，
+            // 因此只接受合理的屏幕圆角范围，避免异常值把控件推向屏幕中部。
+            let maximumDistance = min(
+                maximumMeasuredCornerCenterDistance,
+                min(containerSize.width, containerSize.height) / 2
+            )
+            guard measuredValue.isFinite,
+                  measuredValue >= fallbackCornerCenterDistance,
+                  measuredValue <= maximumDistance else {
+                return min(fallbackCornerCenterDistance, maximumDistance)
+            }
+            return measuredValue
         }
     }
 }
