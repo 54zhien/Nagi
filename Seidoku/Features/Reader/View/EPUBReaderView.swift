@@ -199,8 +199,10 @@ struct EPUBReaderView: View {
     private var settingsSheet: some View {
         NavigationStack {
             Form {
-                Section("界面") {
+                Section {
                     Toggle("在页眉显示书名", isOn: $model.showBookTitleInPageHeader)
+                } header: {
+                    Text("界面")
                 } footer: {
                     Text("书名只显示在阅读页页眉，不会出现在顶栏或底栏。")
                 }
