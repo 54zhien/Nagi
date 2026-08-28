@@ -29,12 +29,6 @@ struct EPUBReaderView: View {
                 pageHeader
             }
         }
-        .overlay(alignment: .topLeading) {
-            if showControls {
-                topLeadingBar
-                    .transition(.opacity)
-            }
-        }
         .overlay(alignment: .topTrailing) {
             if showControls {
                 topTrailingBar
@@ -120,12 +114,6 @@ struct EPUBReaderView: View {
         }
     }
 
-    private var topLeadingBar: some View {
-        exitButton
-            .padding(.top, 8)
-            .padding(.leading, 16)
-    }
-
     private var topTrailingBar: some View {
         exitButton
             .padding(.top, 8)
@@ -146,8 +134,6 @@ struct EPUBReaderView: View {
                         model.goBackward()
                     }
 
-                    progressView
-
                     controlButton("下一页", systemImage: "chevron.right") {
                         model.goForward()
                     }
@@ -155,7 +141,7 @@ struct EPUBReaderView: View {
 
                 Spacer(minLength: 8)
 
-                controlButton("主题与排版", systemImage: "textformat.size") {
+                controlButton("主题与排版", systemImage: "xmark.triangle.circle.square") {
                     showSettings = true
                 }
             }
@@ -163,18 +149,6 @@ struct EPUBReaderView: View {
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
-    }
-
-    private var progressView: some View {
-        let value = model.progress.formatted(.percent.precision(.fractionLength(0)))
-
-        return Text(value)
-            .font(.caption.monospacedDigit().weight(.medium))
-            .frame(minWidth: 52, minHeight: 44)
-            .glassEffect(.clear, in: .capsule)
-            .accessibilityElement(children: .ignore)
-            .accessibilityLabel("阅读进度")
-            .accessibilityValue(value)
     }
 
     private func controlButton(
