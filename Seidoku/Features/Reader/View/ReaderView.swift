@@ -42,9 +42,6 @@ struct ReaderView: View {
                         )
                 }
             }
-            // 让自定义 Liquid Glass 形状以设备/窗口边界作为容器，
-            // 这样 ConcentricRectangle 才能根据实际容器圆角计算对应圆角。
-            .ignoresSafeArea()
             // 保留与阅读器 chrome 等高的透明安全区占位，避免正文被控件遮挡。
             // 实际控件放在完整阅读器容器的 overlay 上，才能读取设备/窗口的圆角几何。
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -168,19 +165,11 @@ struct ReaderView: View {
                 .font(.system(size: 18, weight: .semibold))
         }
         .controlSize(.large)
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
         .frame(
             width: ReaderControlMetrics.diameter,
             height: ReaderControlMetrics.diameter
-        )
-        .glassEffect(
-            .regular.interactive(),
-            in: ConcentricRectangle(
-                topLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                topTrailingCorner: .concentric,
-                bottomLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                bottomTrailingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius)
-            )
         )
         .accessibilityLabel("退出阅读器")
         .accessibilityHint("返回上一个页面")
@@ -273,19 +262,11 @@ struct ReaderView: View {
                 .font(.system(size: ReaderControlMetrics.menuIconPointSize, weight: .semibold))
         }
         .controlSize(.large)
-        .buttonStyle(.plain)
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
         .frame(
             width: ReaderControlMetrics.diameter,
             height: ReaderControlMetrics.diameter
-        )
-        .glassEffect(
-            .regular.interactive(),
-            in: ConcentricRectangle(
-                topLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                topTrailingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                bottomLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                bottomTrailingCorner: .concentric
-            )
         )
         .accessibilityLabel("阅读选项")
         .accessibilityHint("打开目录、翻页和排版设置")
@@ -296,7 +277,6 @@ struct ReaderView: View {
         // 这是保证视觉间距的最小值；实际圆角避让由 containerCornerOffset 补充。
         static let minimumEdgeInset: CGFloat = 24
         static let menuIconPointSize: CGFloat = 21
-        static let fixedCornerRadius: CGFloat = 12
         static let topInset: CGFloat = 8
         static let bottomInset: CGFloat = 16
         static let topReservedHeight = diameter + topInset
