@@ -126,17 +126,19 @@ struct ReaderChrome<Content: View>: View {
         in size: CGSize,
         isLeading: Bool
     ) -> CGPoint {
-        let horizontalDistance = cornerCenterDistance(cornerInset.width)
-        let verticalDistance = cornerCenterDistance(cornerInset.height)
-        let x = isLeading ? horizontalDistance : size.width - horizontalDistance
-        let y = size.height - verticalDistance
+        // CornerInsets 的横纵值可能因为 Home Indicator 或其他系统 UI 而不一致。
+        // 圆角圆心必须使用同一个半径距离，取较大值可避免控件被压到屏幕底边。
+        let centerDistance = cornerCenterDistance(cornerInset)
+        let x = isLeading ? centerDistance : size.width - centerDistance
+        let y = size.height - centerDistance
         return CGPoint(x: x, y: y)
     }
 
-    private func cornerCenterDistance(_ measuredInset: CGFloat) -> CGFloat {
+    private func cornerCenterDistance(_ cornerInset: CGSize) -> CGFloat {
         // containerCornerInsets 是系统根据当前窗口形状和系统 UI 计算出的动态值。
         // 优先使用测量值，让按钮圆心随真实屏幕圆角定位；只有平直窗口返回 0 时，
         // 才使用回退值，并确保圆形控件不会越过容器边界。
+        let measuredInset = max(cornerInset.width, cornerInset.height)
         guard measuredInset > 0 else {
             return ReaderControlMetrics.fallbackCornerCenterInset
         }
