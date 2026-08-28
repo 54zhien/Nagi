@@ -49,16 +49,14 @@ struct ReaderView: View {
                     topBar
                         .offset(
                             ReaderControlMetrics.topControlOffset(
-                                in: container.size,
-                                cornerInsets: container.containerCornerInsets
+                                in: container.size
                             )
                         )
 
                     bottomBar
                         .offset(
                             ReaderControlMetrics.bottomControlOffset(
-                                in: container.size,
-                                cornerInsets: container.containerCornerInsets
+                                in: container.size
                             )
                         )
                 }
@@ -68,7 +66,8 @@ struct ReaderView: View {
             // 阅读正文可以延伸到全屏，控件位置则由屏幕圆角圆心决定。
             .ignoresSafeArea()
         }
-        .statusBarHidden(!showControls)
+        // 阅读页始终沉浸显示，避免退出控件与系统状态栏重叠。
+        .toolbarVisibility(.hidden, for: .statusBar)
         .toolbar(.hidden, for: .tabBar)
     }
 
@@ -265,56 +264,28 @@ struct ReaderView: View {
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        // 系统圆角数据异常或不可用时，使用稳定的屏幕圆角圆心距离。
-        static let fallbackCornerCenterDistance: CGFloat = 44
-        static let maximumMeasuredCornerCenterDistance: CGFloat = 80
+        // 两个圆形控件的圆心固定在距离屏幕对应边缘 44pt 的位置。
+        // 不再使用 containerCornerInsets：它还可能包含状态栏、Home Indicator、
+        // window presentation 等系统 UI 的重叠区域，并不等于硬件屏幕圆角圆心。
+        static let cornerCenterDistance: CGFloat = 44
         static let menuIconPointSize: CGFloat = 21
 
         static func topControlOffset(
-            in containerSize: CGSize,
-            cornerInsets: RectangleCornerInsets
+            in containerSize: CGSize
         ) -> CGSize {
             CGSize(
-                width: containerSize.width - cornerCenterDistance(
-                    from: cornerInsets.topTrailing.width,
-                    in: containerSize
-                ) - diameter / 2,
-                height: cornerCenterDistance(
-                    from: cornerInsets.topTrailing.height,
-                    in: containerSize
-                ) - diameter / 2
+                width: containerSize.width - cornerCenterDistance - diameter / 2,
+                height: cornerCenterDistance - diameter / 2
             )
         }
 
         static func bottomControlOffset(
-            in containerSize: CGSize,
-            cornerInsets: RectangleCornerInsets
+            in containerSize: CGSize
         ) -> CGSize {
             CGSize(
-                width: containerSize.width - cornerCenterDistance(
-                    from: cornerInsets.bottomTrailing.width,
-                    in: containerSize
-                ) - diameter / 2,
-                height: containerSize.height - cornerCenterDistance(
-                    from: cornerInsets.bottomTrailing.height,
-                    in: containerSize
-                ) - diameter / 2
+                width: containerSize.width - cornerCenterDistance - diameter / 2,
+                height: containerSize.height - cornerCenterDistance - diameter / 2
             )
-        }
-
-        private static func cornerCenterDistance(from measuredValue: CGFloat, in containerSize: CGSize) -> CGFloat {
-            // containerCornerInsets 可能包含窗口 presentation 或系统 UI 的重叠区域，
-            // 因此只接受合理的屏幕圆角范围，避免异常值把控件推向屏幕中部。
-            let maximumDistance = min(
-                maximumMeasuredCornerCenterDistance,
-                min(containerSize.width, containerSize.height) / 2
-            )
-            guard measuredValue.isFinite,
-                  measuredValue >= fallbackCornerCenterDistance,
-                  measuredValue <= maximumDistance else {
-                return min(fallbackCornerCenterDistance, maximumDistance)
-            }
-            return measuredValue
         }
     }
 }
