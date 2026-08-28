@@ -42,22 +42,6 @@ struct ReaderView: View {
                         )
                 }
             }
-            // 保留与阅读器 chrome 等高的透明安全区占位，避免正文被控件遮挡。
-            // 实际控件放在完整阅读器容器的 overlay 上，才能读取设备/窗口的圆角几何。
-            .safeAreaInset(edge: .top, spacing: 0) {
-                if showControls {
-                    Color.clear
-                        .frame(height: ReaderControlMetrics.topReservedHeight)
-                        .allowsHitTesting(false)
-                }
-            }
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                if showControls {
-                    Color.clear
-                        .frame(height: ReaderControlMetrics.bottomReservedHeight)
-                        .allowsHitTesting(false)
-                }
-            }
             .overlay(alignment: .topTrailing) {
                 if showControls {
                     topBar
@@ -279,8 +263,6 @@ struct ReaderView: View {
         static let menuIconPointSize: CGFloat = 21
         static let topInset: CGFloat = 8
         static let bottomInset: CGFloat = 16
-        static let topReservedHeight = diameter + topInset
-        static let bottomReservedHeight = diameter + bottomInset
     }
 }
 
