@@ -47,7 +47,8 @@ struct EPUBReaderView: View {
                     .transition(.opacity)
             }
         }
-        .statusBarHidden(!showControls)
+        // 阅读页始终沉浸显示，状态栏不随阅读控件显隐而重新出现。
+        .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
         .task {
