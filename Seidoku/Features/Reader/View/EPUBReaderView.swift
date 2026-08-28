@@ -24,7 +24,7 @@ struct EPUBReaderView: View {
             content
                 .ignoresSafeArea()
         }
-        .overlay(alignment: .top) {
+        .safeAreaInset(edge: .top, spacing: 0) {
             if model.showBookTitleInPageHeader {
                 pageHeader
             }
@@ -93,18 +93,17 @@ struct EPUBReaderView: View {
         }
     }
 
-    // MARK: - Liquid Glass 阅读器 chrome
+    // MARK: - 阅读页页眉
 
     private var pageHeader: some View {
         Text(model.title)
             .font(.caption.weight(.medium))
+            .foregroundStyle(.secondary)
             .lineLimit(1)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .frame(maxWidth: 280)
-            .glassEffect(.clear, in: .capsule)
-            .padding(.top, 8)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .padding(.top, 10)
             .padding(.horizontal, 72)
+            .padding(.bottom, 6)
             .allowsHitTesting(false)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel("页眉书名：\(model.title)")
@@ -121,6 +120,8 @@ struct EPUBReaderView: View {
             .padding(.top, 8)
             .padding(.trailing, 16)
     }
+
+    // MARK: - Liquid Glass 阅读器 chrome
 
     private var bottomBar: some View {
         GlassEffectContainer(spacing: 12) {
