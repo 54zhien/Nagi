@@ -21,9 +21,6 @@ struct ReaderView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                viewModel.theme.background
-                    .ignoresSafeArea()
-
                 GeometryReader { geo in
                     content
                         .onAppear {
