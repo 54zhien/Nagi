@@ -31,7 +31,13 @@ struct EPUBReaderView: View {
         }
         .overlay(alignment: .topLeading) {
             if showControls {
-                topBar
+                topLeadingBar
+                    .transition(.opacity)
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            if showControls {
+                topTrailingBar
                     .transition(.opacity)
             }
         }
@@ -107,12 +113,22 @@ struct EPUBReaderView: View {
             .accessibilityLabel("页眉书名：\(model.title)")
     }
 
-    private var topBar: some View {
+    private var exitButton: some View {
         controlButton("退出阅读器", systemImage: "xmark") {
             dismiss()
         }
-        .padding(.top, 8)
-        .padding(.leading, 16)
+    }
+
+    private var topLeadingBar: some View {
+        exitButton
+            .padding(.top, 8)
+            .padding(.leading, 16)
+    }
+
+    private var topTrailingBar: some View {
+        exitButton
+            .padding(.top, 8)
+            .padding(.trailing, 16)
     }
 
     private var bottomBar: some View {
