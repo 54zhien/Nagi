@@ -183,6 +183,15 @@ struct EPUBReaderView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+
+                    if model.flowMode == .paged {
+                        Picker("翻页方式", selection: $model.pageTransition) {
+                            ForEach(EPUBPageTransitionMode.allCases) { mode in
+                                Text(mode.label).tag(mode)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                    }
                 }
 
                 Section("文字") {

@@ -40,6 +40,20 @@ enum EPUBFlowMode: String, CaseIterable, Identifiable {
     var label: String { self == .paged ? "横向分页" : "上下滚动" }
 }
 
+/// 横向分页的过渡方式。动画层先独立保存，后续再接入具体的翻页实现。
+enum EPUBPageTransitionMode: String, CaseIterable, Identifiable {
+    case pageCurl, cover
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .pageCurl: return "仿真翻页"
+        case .cover: return "覆盖翻页"
+        }
+    }
+}
+
 enum EPUBFontFamily: String, CaseIterable, Identifiable {
     case systemSerif
     case systemSansSerif
@@ -97,6 +111,7 @@ final class EPUBReaderModel {
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
     var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
     var flowMode: EPUBFlowMode { didSet { preferencesDidChange() } }
+    var pageTransition: EPUBPageTransitionMode { didSet { persistPreferences() } }
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
 
@@ -115,6 +130,7 @@ final class EPUBReaderModel {
         static let paragraphIndent = "reader.epub.paragraphIndent"
         static let theme = "reader.epub.theme"
         static let flowMode = "reader.epub.flowMode"
+        static let pageTransition = "reader.epub.pageTransition"
         static let publisherStyles = "reader.epub.publisherStyles"
         static let showBookTitleInPageHeader = "reader.epub.showBookTitleInPageHeader"
     }
@@ -132,6 +148,7 @@ final class EPUBReaderModel {
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(EPUBReaderTheme.init) ?? .light
         flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(EPUBFlowMode.init) ?? .paged
+        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition).flatMap(EPUBPageTransitionMode.init) ?? .pageCurl
         publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
         showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
     }
@@ -250,6 +267,8 @@ final class EPUBReaderModel {
     }
 
     private func makePreferences() -> EPUBPreferences {
+        // Readium 当前只区分分页与滚动；两种分页过渡先共享分页引擎，
+        // pageTransition 作为独立偏好保留，后续接入具体动画。
         EPUBPreferences(
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
@@ -273,6 +292,7 @@ final class EPUBReaderModel {
         defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
         defaults.set(flowMode.rawValue, forKey: PreferenceKey.flowMode)
+        defaults.set(pageTransition.rawValue, forKey: PreferenceKey.pageTransition)
         defaults.set(publisherStyles, forKey: PreferenceKey.publisherStyles)
         defaults.set(showBookTitleInPageHeader, forKey: PreferenceKey.showBookTitleInPageHeader)
     }
