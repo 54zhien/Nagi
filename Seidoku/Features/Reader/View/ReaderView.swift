@@ -177,7 +177,7 @@ struct ReaderView: View {
             .regular.interactive(),
             in: ConcentricRectangle(
                 topLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                topTrailingCorner: .concentric(minimum: ReaderControlMetrics.minimumConcentricRadius),
+                topTrailingCorner: .concentric,
                 bottomLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
                 bottomTrailingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius)
             )
@@ -284,7 +284,7 @@ struct ReaderView: View {
                 topLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
                 topTrailingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
                 bottomLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
-                bottomTrailingCorner: .concentric(minimum: ReaderControlMetrics.minimumConcentricRadius)
+                bottomTrailingCorner: .concentric
             )
         )
         .accessibilityLabel("阅读选项")
@@ -297,7 +297,6 @@ struct ReaderView: View {
         static let minimumEdgeInset: CGFloat = 24
         static let menuIconPointSize: CGFloat = 21
         static let fixedCornerRadius: CGFloat = 12
-        static let minimumConcentricRadius: CGFloat = 12
         static let topInset: CGFloat = 8
         static let bottomInset: CGFloat = 16
         static let topReservedHeight = diameter + topInset
