@@ -24,6 +24,16 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable {
         }
     }
 
+    /// 与 Readium CSS 内置主题使用的正文色保持一致，供嵌入式页眉复用。
+    var contentUIColor: UIColor {
+        switch self {
+        case .light, .sepia:
+            return UIColor(red: 18 / 255, green: 18 / 255, blue: 18 / 255, alpha: 1)
+        case .dark:
+            return UIColor(red: 254 / 255, green: 254 / 255, blue: 254 / 255, alpha: 1)
+        }
+    }
+
     var readiumTheme: ReadiumNavigator.Theme {
         switch self {
         case .light: return .light
@@ -118,6 +128,8 @@ final class EPUBReaderModel {
     var lineHeight: Double { didSet { preferencesDidChange() } }
     var pageMargins: Double { didSet { preferencesDidChange() } }
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
+    var contentTopInset: Double { didSet { preferencesDidChange() } }
+    var contentBottomInset: Double { didSet { preferencesDidChange() } }
     var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
     var flowMode: EPUBFlowMode { didSet { preferencesDidChange() } }
     var pageTransition: EPUBPageTransitionMode { didSet { persistPreferences() } }
@@ -137,6 +149,8 @@ final class EPUBReaderModel {
         static let lineHeight = "reader.epub.lineHeight"
         static let pageMargins = "reader.epub.pageMargins"
         static let paragraphIndent = "reader.epub.paragraphIndent"
+        static let contentTopInset = "reader.epub.contentTopInset"
+        static let contentBottomInset = "reader.epub.contentBottomInset"
         static let theme = "reader.epub.theme"
         static let flowMode = "reader.epub.flowMode"
         static let pageTransition = "reader.epub.pageTransition"
@@ -155,6 +169,8 @@ final class EPUBReaderModel {
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
         pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
+        contentTopInset = defaults.object(forKey: PreferenceKey.contentTopInset) as? Double ?? 56
+        contentBottomInset = defaults.object(forKey: PreferenceKey.contentBottomInset) as? Double ?? 32
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(EPUBReaderTheme.init) ?? .light
         flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(EPUBFlowMode.init) ?? .paged
         pageTransition = defaults.string(forKey: PreferenceKey.pageTransition).flatMap(EPUBPageTransitionMode.init) ?? .pageCurl
@@ -247,6 +263,8 @@ final class EPUBReaderModel {
         lineHeight = 1.5
         pageMargins = 1.0
         paragraphIndent = 2.0
+        contentTopInset = 56
+        contentBottomInset = 32
         publisherStyles = false
     }
 
@@ -305,6 +323,8 @@ final class EPUBReaderModel {
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
         defaults.set(pageMargins, forKey: PreferenceKey.pageMargins)
         defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
+        defaults.set(contentTopInset, forKey: PreferenceKey.contentTopInset)
+        defaults.set(contentBottomInset, forKey: PreferenceKey.contentBottomInset)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
         defaults.set(flowMode.rawValue, forKey: PreferenceKey.flowMode)
         defaults.set(pageTransition.rawValue, forKey: PreferenceKey.pageTransition)
@@ -321,6 +341,20 @@ final class EPUBReaderModel {
         book.readerLocatorJSON = locator.jsonString
         book.progressPercent = progress
         book.lastReadAt = .now
+    }
+}
+
+extension EPUBReaderModel {
+    /// 让正文边距滑杆在不遮挡刘海、动态岛或 Home Indicator 的前提下生效。
+    /// Readium 会在分页重建及窗口尺寸变化时重新调用该代理方法。
+    func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
+        let safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
+        return UIEdgeInsets(
+            top: max(safeAreaInsets.top, CGFloat(contentTopInset)),
+            left: 0,
+            bottom: max(safeAreaInsets.bottom, CGFloat(contentBottomInset)),
+            right: 0
+        )
     }
 }
 

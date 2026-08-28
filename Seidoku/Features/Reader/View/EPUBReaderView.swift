@@ -99,63 +99,103 @@ struct EPUBReaderView: View {
     // 书名嵌入正文上方，独立于 showControls 的显隐状态。
     private var pageHeader: some View {
         Text(model.title)
-            .font(.caption.weight(.medium))
-            .foregroundStyle(.secondary)
+            .font(.system(size: 15, weight: .medium))
+            .foregroundStyle(Color(uiColor: model.theme.contentUIColor))
             .lineLimit(1)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.top, 10)
+            .padding(.top, 2)
             .padding(.horizontal, 72)
-            .padding(.bottom, 6)
+            .padding(.bottom, 8)
             .allowsHitTesting(false)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel("页眉书名：\(model.title)")
     }
 
     private var exitButton: some View {
-        controlButton("退出阅读器", systemImage: "xmark") {
+        controlButton(
+            "退出阅读器",
+            systemImage: "xmark",
+            diameter: ReaderControlMetrics.exitDiameter,
+            iconPointSize: ReaderControlMetrics.exitIconPointSize
+        ) {
             dismiss()
         }
     }
 
     private var topTrailingBar: some View {
         exitButton
-            .padding(.top, 8)
-            .padding(.trailing, 16)
+            .padding(.top, ReaderControlMetrics.exitTopInset)
+            .padding(.trailing, ReaderControlMetrics.exitTrailingInset)
     }
 
     // MARK: - Liquid Glass 阅读器 chrome
 
     private var bottomBar: some View {
-        GlassEffectContainer(spacing: 12) {
-            HStack(spacing: 12) {
-                controlButton("目录", systemImage: "list.bullet") {
-                    showTableOfContents = true
-                }
+        GeometryReader { geometry in
+            let cornerInsets = geometry.containerCornerInsets
+            let leadingCenter = bottomCornerCenter(
+                cornerInsets.bottomLeading,
+                in: geometry.size,
+                isLeading: true
+            )
+            let trailingCenter = bottomCornerCenter(
+                cornerInsets.bottomTrailing,
+                in: geometry.size,
+                isLeading: false
+            )
 
-                Spacer(minLength: 8)
+            GlassEffectContainer(spacing: 12) {
+                ZStack {
+                    controlButton("目录", systemImage: "list.bullet") {
+                        showTableOfContents = true
+                    }
+                    .position(leadingCenter)
 
-                controlButton("主题与排版", systemImage: "xmark.triangle.circle.square") {
-                    showSettings = true
+                    controlButton("主题与排版", systemImage: "xmark.triangle.circle.square") {
+                        showSettings = true
+                    }
+                    .position(trailingCenter)
                 }
+                .frame(width: geometry.size.width, height: geometry.size.height)
             }
-            .frame(maxWidth: .infinity)
         }
-        // 44pt 控件的半径为 22pt；边缘内缩 22pt 后，按钮圆心距屏幕边缘 44pt，
-        // 与底部左右圆角的圆心保持对齐。
-        .padding(.horizontal, ReaderControlMetrics.cornerCenterInset)
-        .padding(.bottom, ReaderControlMetrics.cornerCenterInset)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func bottomCornerCenter(
+        _ cornerInset: CGSize,
+        in size: CGSize,
+        isLeading: Bool
+    ) -> CGPoint {
+        let horizontalDistance = cornerCenterDistance(cornerInset.width)
+        let verticalDistance = cornerCenterDistance(cornerInset.height)
+        let x = isLeading
+            ? horizontalDistance
+            : size.width - horizontalDistance
+        let y = size.height - verticalDistance
+
+        return CGPoint(x: x, y: y)
+    }
+
+    private func cornerCenterDistance(_ measuredInset: CGFloat) -> CGFloat {
+        // containerCornerInsets 是 iOS 26 根据当前窗口形状和系统 UI
+        // 计算出的动态值；没有圆角的窗口（例如部分 iPad 场景）会返回 0，
+        // 此时退回到 44pt 的可用圆心距离，避免按钮贴到屏幕边缘。
+        max(ReaderControlMetrics.fallbackCornerCenterInset, measuredInset)
     }
 
     private func controlButton(
         _ label: String,
         systemImage: String,
+        diameter: CGFloat = ReaderControlMetrics.diameter,
+        iconPointSize: CGFloat = ReaderControlMetrics.iconPointSize,
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
             Image(systemName: systemImage)
-                .font(.system(size: 18, weight: .semibold))
+                .font(.system(size: iconPointSize, weight: .semibold))
                 .symbolRenderingMode(.hierarchical)
-                .frame(width: ReaderControlMetrics.diameter, height: ReaderControlMetrics.diameter)
+                .frame(width: diameter, height: diameter)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -221,6 +261,18 @@ struct EPUBReaderView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                }
+
+                Section("正文与屏幕边距") {
+                    LabeledContent("上边距", value: "\(Int(model.contentTopInset)) pt")
+                    Slider(value: $model.contentTopInset, in: 0 ... 160, step: 4)
+                        .accessibilityLabel("正文上边距")
+
+                    LabeledContent("下边距", value: "\(Int(model.contentBottomInset)) pt")
+                    Slider(value: $model.contentBottomInset, in: 0 ... 160, step: 4)
+                        .accessibilityLabel("正文下边距")
+                } footer: {
+                    Text("最小值仍会遵守设备安全区，避免正文被刘海、动态岛或 Home Indicator 遮挡。")
                 }
 
                 Section {
@@ -327,6 +379,11 @@ struct EPUBReaderView: View {
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        static let cornerCenterInset: CGFloat = 22
+        static let iconPointSize: CGFloat = 18
+        static let exitDiameter: CGFloat = 52
+        static let exitIconPointSize: CGFloat = 22
+        static let exitTopInset: CGFloat = 2
+        static let exitTrailingInset: CGFloat = 12
+        static let fallbackCornerCenterInset: CGFloat = 44
     }
 }
