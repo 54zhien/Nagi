@@ -48,9 +48,11 @@ struct EPUBReaderView: View {
         .task {
             model.onToggleControls = toggleControls
             await model.loadIfNeeded()
+            model.onPageTurn = hideControlsAfterPageTurn
         }
         .onDisappear {
             model.onToggleControls = nil
+            model.onPageTurn = nil
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showTableOfContents) { tableOfContentsSheet }
@@ -280,6 +282,18 @@ struct EPUBReaderView: View {
         } else {
             withAnimation(.easeInOut(duration: 0.18)) {
                 showControls.toggle()
+            }
+        }
+    }
+
+    private func hideControlsAfterPageTurn() {
+        guard showControls else { return }
+
+        if reduceMotion {
+            showControls = false
+        } else {
+            withAnimation(.easeOut(duration: 0.16)) {
+                showControls = false
             }
         }
     }
