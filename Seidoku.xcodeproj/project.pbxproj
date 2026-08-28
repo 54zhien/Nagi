@@ -52,6 +52,13 @@
 		4A000000000000000000002B /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002B /* DocumentPicker.swift */; };
 		4A000000000000000000002C /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002C /* ShareSheet.swift */; };
 		4A000000000000000000006F /* SwiftSoup in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000002 /* SwiftSoup */; };
+		4A0000000000000000000070 /* ReadiumService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000070 /* ReadiumService.swift */; };
+		4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000071 /* EPUBReaderModel.swift */; };
+		4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000072 /* ReadiumNavigatorView.swift */; };
+		4A0000000000000000000073 /* EPUBReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000073 /* EPUBReaderView.swift */; };
+		4A0000000000000000000074 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
+		4A0000000000000000000075 /* ReadiumStreamer in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000075 /* ReadiumStreamer */; };
+		4A0000000000000000000076 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -100,6 +107,10 @@
 		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		3A000000000000000000002B /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
 		3A000000000000000000002C /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
+		3A0000000000000000000070 /* ReadiumService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumService.swift; sourceTree = "<group>"; };
+		3A0000000000000000000071 /* EPUBReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderModel.swift; sourceTree = "<group>"; };
+		3A0000000000000000000072 /* ReadiumNavigatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorView.swift; sourceTree = "<group>"; };
+		3A0000000000000000000073 /* EPUBReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -108,6 +119,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A000000000000000000006F /* SwiftSoup in Frameworks */,
+				4A0000000000000000000074 /* ReadiumShared in Frameworks */,
+				4A0000000000000000000075 /* ReadiumStreamer in Frameworks */,
+				4A0000000000000000000076 /* ReadiumNavigator in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -199,6 +213,7 @@
 				3A0000000000000000000009 /* FileImportService.swift */,
 				3A000000000000000000000C /* TXTParser.swift */,
 				3A000000000000000000000D /* EPUBParser.swift */,
+				3A0000000000000000000070 /* ReadiumService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -259,6 +274,7 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000027 /* ReaderViewModel.swift */,
+				3A0000000000000000000071 /* EPUBReaderModel.swift */,
 			);
 			path = ViewModel;
 			sourceTree = "<group>";
@@ -269,6 +285,8 @@
 				3A0000000000000000000028 /* PageTextView.swift */,
 				3A0000000000000000000029 /* PageViewController.swift */,
 				3A000000000000000000002A /* ReaderView.swift */,
+				3A0000000000000000000072 /* ReadiumNavigatorView.swift */,
+				3A0000000000000000000073 /* EPUBReaderView.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -328,6 +346,9 @@
 			name = Seidoku;
 			packageProductDependencies = (
 				6B0000000000000000000002 /* SwiftSoup */,
+				6B0000000000000000000074 /* ReadiumShared */,
+				6B0000000000000000000075 /* ReadiumStreamer */,
+				6B0000000000000000000076 /* ReadiumNavigator */,
 			);
 			productName = Seidoku;
 			productReference = 3A0000000000000000000007 /* Seidoku.app */;
@@ -359,6 +380,7 @@
 			mainGroup = 2A0000000000000000000001;
 			packageReferences = (
 				6A0000000000000000000002 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
+				6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */,
 			);
 			productRefGroup = 2A0000000000000000000009 /* Products */;
 			projectDirPath = "";
@@ -378,6 +400,14 @@
 				minimumVersion = 2.6.0;
 			};
 		};
+		6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/readium/swift-toolkit.git";
+			requirement = {
+				kind = exactVersion;
+				version = 3.8.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -385,6 +415,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 6A0000000000000000000002 /* XCRemoteSwiftPackageReference "SwiftSoup" */;
 			productName = SwiftSoup;
+		};
+		6B0000000000000000000074 /* ReadiumShared */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
+			productName = ReadiumShared;
+		};
+		6B0000000000000000000075 /* ReadiumStreamer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
+			productName = ReadiumStreamer;
+		};
+		6B0000000000000000000076 /* ReadiumNavigator */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
+			productName = ReadiumNavigator;
 		};
 /* End XCSwiftPackageProductDependency section */
 
@@ -448,6 +493,10 @@
 				4A000000000000000000002A /* ReaderView.swift in Sources */,
 				4A000000000000000000002B /* DocumentPicker.swift in Sources */,
 				4A000000000000000000002C /* ShareSheet.swift in Sources */,
+				4A0000000000000000000070 /* ReadiumService.swift in Sources */,
+				4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */,
+				4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */,
+				4A0000000000000000000073 /* EPUBReaderView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -541,7 +590,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 21;
+			CURRENT_PROJECT_VERSION = 22;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Seidoku/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -550,7 +599,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.11.13;
+			MARKETING_VERSION = 0.12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -567,7 +616,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 21;
+			CURRENT_PROJECT_VERSION = 22;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Seidoku/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -576,7 +625,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.11.13;
+			MARKETING_VERSION = 0.12.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Seidoku;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

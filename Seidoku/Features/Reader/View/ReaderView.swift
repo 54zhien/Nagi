@@ -9,6 +9,19 @@ import SwiftUI
 import UIKit
 
 struct ReaderView: View {
+    let book: Book
+
+    var body: some View {
+        switch book.format {
+        case .epub:
+            EPUBReaderView(book: book)
+        case .txt:
+            LegacyReaderView(book: book)
+        }
+    }
+}
+
+private struct LegacyReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var viewModel: ReaderViewModel

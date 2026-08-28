@@ -27,6 +27,8 @@ final class Book {
     // 阅读进度
     var currentChapterIndex: Int
     var progressPercent: Double
+    /// Readium Locator JSON。相比页码，它能在字号、边距和方向变化后恢复到同一内容位置。
+    var readerLocatorJSON: String?
 
     init(title: String, author: String?, format: BookFormat, sourceURL: String, chapterCount: Int = 0) {
         self.id = UUID()
@@ -38,6 +40,7 @@ final class Book {
         self.chapterCount = chapterCount
         self.currentChapterIndex = 0
         self.progressPercent = 0
+        self.readerLocatorJSON = nil
     }
 
     var format: BookFormat {
