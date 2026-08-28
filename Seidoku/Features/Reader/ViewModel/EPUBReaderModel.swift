@@ -98,6 +98,7 @@ final class EPUBReaderModel {
     var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
     var flowMode: EPUBFlowMode { didSet { preferencesDidChange() } }
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
+    var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
 
     var onToggleControls: (() -> Void)?
 
@@ -114,6 +115,7 @@ final class EPUBReaderModel {
         static let theme = "reader.epub.theme"
         static let flowMode = "reader.epub.flowMode"
         static let publisherStyles = "reader.epub.publisherStyles"
+        static let showBookTitleInPageHeader = "reader.epub.showBookTitleInPageHeader"
     }
 
     init(book: Book) {
@@ -130,6 +132,7 @@ final class EPUBReaderModel {
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(EPUBReaderTheme.init) ?? .light
         flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(EPUBFlowMode.init) ?? .paged
         publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
+        showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
     }
 
     func loadIfNeeded() async {
@@ -266,6 +269,7 @@ final class EPUBReaderModel {
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
         defaults.set(flowMode.rawValue, forKey: PreferenceKey.flowMode)
         defaults.set(publisherStyles, forKey: PreferenceKey.publisherStyles)
+        defaults.set(showBookTitleInPageHeader, forKey: PreferenceKey.showBookTitleInPageHeader)
     }
 
     private func updateLocation(_ locator: Locator) {
