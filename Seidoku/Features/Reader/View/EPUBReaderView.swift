@@ -91,18 +91,29 @@ struct EPUBReaderView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(Color(.systemBackground))
         } else {
-            VStack(spacing: 12) {
+            VStack(spacing: 16) {
                 ContentUnavailableView(
                     "无法显示内容",
                     systemImage: "book.closed",
                     description: Text(model.errorMessage ?? "EPUB 没有可阅读内容")
                 )
 
-                Button("重试") {
+                Button {
                     Task { await model.loadIfNeeded() }
+                } label: {
+                    Label("重试", systemImage: "arrow.clockwise")
+                        .font(.body.weight(.semibold))
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 44)
                 }
-                .buttonStyle(.borderedProminent)
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .accessibilityLabel("重试打开 EPUB")
+                .accessibilityHint("重新加载当前电子书")
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+            .padding(.horizontal, 24)
+            .background(Color(.systemBackground))
         }
     }
 
