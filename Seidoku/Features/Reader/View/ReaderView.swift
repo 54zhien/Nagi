@@ -42,17 +42,39 @@ struct ReaderView: View {
                         )
                 }
             }
-            // 顶部退出控件与底部阅读选项使用同一套显式 Liquid Glass 控件。
+            // 让自定义 Liquid Glass 形状以设备/窗口边界作为容器，
+            // 这样 ConcentricRectangle 才能根据实际容器圆角计算对应圆角。
+            .ignoresSafeArea()
+            // 保留与阅读器 chrome 等高的透明安全区占位，避免正文被控件遮挡。
+            // 实际控件放在完整阅读器容器的 overlay 上，才能读取设备/窗口的圆角几何。
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showControls {
-                    topBar
+                    Color.clear
+                        .frame(height: ReaderControlMetrics.topReservedHeight)
+                        .allowsHitTesting(false)
                 }
             }
-            // 使用 safeAreaInset 将阅读器控件放在系统安全区内，正文不会被 Home
-            // Indicator 遮挡；控件本身仍保持漂浮在正文之上的阅读器 chrome 层。
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 if showControls {
+                    Color.clear
+                        .frame(height: ReaderControlMetrics.bottomReservedHeight)
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay(alignment: .topTrailing) {
+                if showControls {
+                    topBar
+                        .padding(.top, ReaderControlMetrics.topInset)
+                        .padding(.trailing, ReaderControlMetrics.minimumEdgeInset)
+                        .containerCornerOffset(Edge.Set.top.union(.trailing))
+                }
+            }
+            .overlay(alignment: .bottomTrailing) {
+                if showControls {
                     bottomBar
+                        .padding(.bottom, ReaderControlMetrics.bottomInset)
+                        .padding(.trailing, ReaderControlMetrics.minimumEdgeInset)
+                        .containerCornerOffset(Edge.Set.bottom.union(.trailing))
                 }
             }
             .navigationBarBackButtonHidden(true)
@@ -139,141 +161,147 @@ struct ReaderView: View {
     // MARK: - Liquid Glass 阅读器 chrome
 
     private var topBar: some View {
-        HStack(spacing: 12) {
-            Spacer(minLength: 0)
-
-            Button {
-                dismiss()
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 18, weight: .semibold))
-            }
-            .controlSize(.large)
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .frame(
-                width: ReaderControlMetrics.diameter,
-                height: ReaderControlMetrics.diameter
-            )
-            .accessibilityLabel("退出阅读器")
-            .accessibilityHint("返回上一个页面")
+        Button {
+            dismiss()
+        } label: {
+            Image(systemName: "xmark")
+                .font(.system(size: 18, weight: .semibold))
         }
-        .padding(.horizontal, ReaderControlMetrics.edgeInset)
-        .padding(.vertical, ReaderControlMetrics.topInset)
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .controlSize(.large)
+        .buttonStyle(.plain)
+        .frame(
+            width: ReaderControlMetrics.diameter,
+            height: ReaderControlMetrics.diameter
+        )
+        .glassEffect(
+            .regular.interactive(),
+            in: ConcentricRectangle(
+                topLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
+                topTrailingCorner: .concentric(minimum: ReaderControlMetrics.minimumConcentricRadius),
+                bottomLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
+                bottomTrailingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius)
+            )
+        )
+        .accessibilityLabel("退出阅读器")
+        .accessibilityHint("返回上一个页面")
     }
 
     private var bottomBar: some View {
-        HStack(spacing: 12) {
-            Spacer(minLength: 0)
-
-            Menu {
-                Section("阅读") {
-                    Menu("目录", systemImage: "xmark.triangle.circle.square") {
-                        if viewModel.chapters.isEmpty {
-                            Text("暂无目录")
-                        } else {
-                            ForEach(viewModel.chapters) { chapter in
-                                Button {
-                                    selectChapter(chapter)
-                                } label: {
-                                    menuOptionLabel(
-                                        chapter.title,
-                                        isSelected: chapter.index == viewModel.currentChapterIndex
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    Button {
-                        viewModel.goPrevious()
-                    } label: {
-                        Label("上一页", systemImage: "chevron.left")
-                    }
-                    .disabled(!viewModel.canGoPrevious)
-
-                    Button {
-                        viewModel.goNext()
-                    } label: {
-                        Label("下一页", systemImage: "chevron.right")
-                    }
-                    .disabled(!viewModel.canGoNext)
-                }
-
-                Section("排版") {
-                    Menu("字号", systemImage: "textformat.size") {
-                        ForEach(fontSizeOptions, id: \.self) { size in
+        Menu {
+            Section("阅读") {
+                Menu("目录", systemImage: "xmark.triangle.circle.square") {
+                    if viewModel.chapters.isEmpty {
+                        Text("暂无目录")
+                    } else {
+                        ForEach(viewModel.chapters) { chapter in
                             Button {
-                                viewModel.fontSize = size
+                                selectChapter(chapter)
                             } label: {
                                 menuOptionLabel(
-                                    "\(Int(size)) 磅",
-                                    isSelected: viewModel.fontSize == size
+                                    chapter.title,
+                                    isSelected: chapter.index == viewModel.currentChapterIndex
                                 )
                             }
                         }
                     }
-
-                    Menu("行距", systemImage: "arrow.up.and.down.text.horizontal") {
-                        ForEach(lineSpacingOptions, id: \.self) { spacing in
-                            Button {
-                                viewModel.lineSpacing = spacing
-                            } label: {
-                                menuOptionLabel(
-                                    spacing == 0 ? "默认" : "\(Int(spacing)) 磅",
-                                    isSelected: viewModel.lineSpacing == spacing
-                                )
-                            }
-                        }
-                    }
-
-                    Menu("主题", systemImage: "circle.lefthalf.filled") {
-                        ForEach(ReaderTheme.allCases) { theme in
-                            Button {
-                                viewModel.theme = theme
-                            } label: {
-                                menuOptionLabel(theme.label, isSelected: viewModel.theme == theme)
-                            }
-                        }
-                    }
-
-                    Menu("翻页方式", systemImage: "book.pages") {
-                        ForEach(PageTransitionMode.allCases) { mode in
-                            Button {
-                                viewModel.transition = mode
-                            } label: {
-                                menuOptionLabel(mode.label, isSelected: viewModel.transition == mode)
-                            }
-                        }
-                    }
                 }
-            } label: {
-                Image(systemName: "xmark.triangle.circle.square")
-                    .font(.system(size: ReaderControlMetrics.menuIconPointSize, weight: .semibold))
+
+                Button {
+                    viewModel.goPrevious()
+                } label: {
+                    Label("上一页", systemImage: "chevron.left")
+                }
+                .disabled(!viewModel.canGoPrevious)
+
+                Button {
+                    viewModel.goNext()
+                } label: {
+                    Label("下一页", systemImage: "chevron.right")
+                }
+                .disabled(!viewModel.canGoNext)
             }
-            .controlSize(.large)
-            .buttonStyle(.glass)
-            .buttonBorderShape(.circle)
-            .frame(
-                width: ReaderControlMetrics.diameter,
-                height: ReaderControlMetrics.diameter
-            )
-            .accessibilityLabel("阅读选项")
-            .accessibilityHint("打开目录、翻页和排版设置")
+
+            Section("排版") {
+                Menu("字号", systemImage: "textformat.size") {
+                    ForEach(fontSizeOptions, id: \.self) { size in
+                        Button {
+                            viewModel.fontSize = size
+                        } label: {
+                            menuOptionLabel(
+                                "\(Int(size)) 磅",
+                                isSelected: viewModel.fontSize == size
+                            )
+                        }
+                    }
+                }
+
+                Menu("行距", systemImage: "arrow.up.and.down.text.horizontal") {
+                    ForEach(lineSpacingOptions, id: \.self) { spacing in
+                        Button {
+                            viewModel.lineSpacing = spacing
+                        } label: {
+                            menuOptionLabel(
+                                spacing == 0 ? "默认" : "\(Int(spacing)) 磅",
+                                isSelected: viewModel.lineSpacing == spacing
+                            )
+                        }
+                    }
+                }
+
+                Menu("主题", systemImage: "circle.lefthalf.filled") {
+                    ForEach(ReaderTheme.allCases) { theme in
+                        Button {
+                            viewModel.theme = theme
+                        } label: {
+                            menuOptionLabel(theme.label, isSelected: viewModel.theme == theme)
+                        }
+                    }
+                }
+
+                Menu("翻页方式", systemImage: "book.pages") {
+                    ForEach(PageTransitionMode.allCases) { mode in
+                        Button {
+                            viewModel.transition = mode
+                        } label: {
+                            menuOptionLabel(mode.label, isSelected: viewModel.transition == mode)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "xmark.triangle.circle.square")
+                .font(.system(size: ReaderControlMetrics.menuIconPointSize, weight: .semibold))
         }
-        .padding(.horizontal, ReaderControlMetrics.edgeInset)
-        .padding(.top, ReaderControlMetrics.topInset)
-        .padding(.bottom, ReaderControlMetrics.bottomInset)
-        .frame(maxWidth: .infinity, alignment: .trailing)
+        .controlSize(.large)
+        .buttonStyle(.plain)
+        .frame(
+            width: ReaderControlMetrics.diameter,
+            height: ReaderControlMetrics.diameter
+        )
+        .glassEffect(
+            .regular.interactive(),
+            in: ConcentricRectangle(
+                topLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
+                topTrailingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
+                bottomLeadingCorner: .fixed(ReaderControlMetrics.fixedCornerRadius),
+                bottomTrailingCorner: .concentric(minimum: ReaderControlMetrics.minimumConcentricRadius)
+            )
+        )
+        .accessibilityLabel("阅读选项")
+        .accessibilityHint("打开目录、翻页和排版设置")
     }
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        static let edgeInset: CGFloat = 24
+        // 这是保证视觉间距的最小值；实际圆角避让由 containerCornerOffset 补充。
+        static let minimumEdgeInset: CGFloat = 24
         static let menuIconPointSize: CGFloat = 21
+        static let fixedCornerRadius: CGFloat = 12
+        static let minimumConcentricRadius: CGFloat = 12
         static let topInset: CGFloat = 8
         static let bottomInset: CGFloat = 16
+        static let topReservedHeight = diameter + topInset
+        static let bottomReservedHeight = diameter + bottomInset
     }
 }
 
