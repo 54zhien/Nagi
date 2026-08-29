@@ -11,7 +11,7 @@ import UIKit
 
 struct ReadiumNavigatorView: UIViewControllerRepresentable {
     let navigator: EPUBNavigatorViewController
-    let background: Color
+    let background: SwiftUI.Color
 
     func makeUIViewController(context: Context) -> EPUBNavigatorViewController {
         navigator.view.backgroundColor = UIColor(background)
