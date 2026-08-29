@@ -27,14 +27,14 @@ jobs:
         run: |
           xcodebuild \
             -resolvePackageDependencies \
-            -project Seidoku.xcodeproj \
-            -scheme Seidoku
+            -project Nagi.xcodeproj \
+            -scheme Nagi
 
       - name: Build (unsigned)
         run: |
           xcodebuild \
-            -project Seidoku.xcodeproj \
-            -scheme Seidoku \
+            -project Nagi.xcodeproj \
+            -scheme Nagi \
             -configuration Release \
             -destination "generic/platform=iOS" \
             -derivedDataPath build \
@@ -45,15 +45,15 @@ jobs:
 
       - name: Package IPA
         run: |
-          APP_PATH="build/Build/Products/Release-iphoneos/Seidoku.app"
+          APP_PATH="build/Build/Products/Release-iphoneos/Nagi.app"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
-          zip -r Seidoku-unsigned.ipa Payload/
-          ls -lh Seidoku-unsigned.ipa
+          zip -r Nagi-unsigned.ipa Payload/
+          ls -lh Nagi-unsigned.ipa
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Seidoku-unsigned-ipa
-          path: Seidoku-unsigned.ipa
+          name: Nagi-unsigned-ipa
+          path: Nagi-unsigned.ipa
           retention-days: 30
