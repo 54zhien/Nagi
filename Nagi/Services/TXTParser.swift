@@ -12,7 +12,21 @@ struct ParsedBook: Sendable {
     let author: String?
     let chapterCount: Int
     let content: String
-    let chapters: [TXTChapter]? = nil
+    let chapters: [TXTChapter]?
+
+    init(
+        title: String,
+        author: String?,
+        chapterCount: Int,
+        content: String,
+        chapters: [TXTChapter]? = nil
+    ) {
+        self.title = title
+        self.author = author
+        self.chapterCount = chapterCount
+        self.content = content
+        self.chapters = chapters
+    }
 }
 
 struct TXTChapter: Sendable {

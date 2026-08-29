@@ -31,7 +31,7 @@ enum TextPaginator {
         let layoutManager = NSLayoutManager()
         textStorage.addLayoutManager(layoutManager)
 
-        var pages: [NSAttributedString] = []
+        var pages: [Page] = []
         var location = 0
 
         while location < textStorage.length {
