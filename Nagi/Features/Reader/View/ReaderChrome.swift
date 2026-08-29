@@ -258,7 +258,8 @@ private enum ReaderControlMetrics {
     static let exitTopInset: CGFloat = 0
     static let exitTrailingInset: CGFloat = 24
     static let swipeMinimumDistance: CGFloat = 10
-    static let autoHideNanoseconds: UInt64 = 10_000_000_000
+    // 计时任务以 showControls 变为 true 的状态更新为起点，显示 7 秒后自动收起。
+    static let autoHideNanoseconds: UInt64 = 7_000_000_000
 }
 
 struct ReaderTOCItem: Identifiable, Hashable {
