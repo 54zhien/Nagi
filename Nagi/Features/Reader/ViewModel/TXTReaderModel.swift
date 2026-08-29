@@ -101,8 +101,8 @@ final class TXTReaderModel {
     private var nextPageOffset: Int?
     private var hasMorePreviousPages = false
 
-    private static let pageBatchSize = 8
-    private static let pageBatchCharacterLimit = 128_000
+    private nonisolated static let pageBatchSize = 8
+    private nonisolated static let pageBatchCharacterLimit = 128_000
 
     private enum PreferenceKey {
         static let fontScale = "reader.txt.fontScale"
@@ -568,7 +568,7 @@ final class TXTReaderModel {
                 for: NSRange(location: location, length: 0)
             )
 
-            var style = paragraphStyle.mutableCopy() as! NSMutableParagraphStyle
+            let style = paragraphStyle.mutableCopy() as! NSMutableParagraphStyle
             let hasBlankLineBefore = paragraphStart == 0 || (
                 paragraphStart >= 2
                     && string.substring(with: NSRange(location: paragraphStart - 2, length: 2)) == "\n\n"

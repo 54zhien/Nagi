@@ -164,11 +164,11 @@ struct TXTReaderView: View {
             } else {
                 PageViewController(
                     pages: model.pages,
-                    pageRanges: model.pageRanges,
                     transitionStyle: model.pageTransition.uiKitTransitionStyle,
                     insets: model.readerInsets,
                     background: model.theme.background,
                     currentPage: $model.currentPageIndex,
+                    pageRanges: model.pageRanges,
                     onSwipeStart: handleContentSwipeStart,
                     onNeedNextPages: { model.requestNextPageBatch() },
                     onNeedPreviousPages: { model.requestPreviousPageBatch() }
