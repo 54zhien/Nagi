@@ -209,7 +209,7 @@ final class ReadiumRenderer: ReaderRenderer {
                         )
 
                         Button("重试") {
-                            Task { await model.loadIfNeeded() }
+                            Task { await self.model.loadIfNeeded() }
                         }
                         .buttonStyle(.borderedProminent)
                     }

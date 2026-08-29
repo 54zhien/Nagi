@@ -425,6 +425,10 @@ final class EPUBReaderModel {
         book.lastReadAt = .now
     }
 
+    func saveProgress() {
+        flushReadingProgress()
+    }
+
     func goForward() {
         guard let navigator else { return }
         Task { await navigator.goForward(options: .animated) }

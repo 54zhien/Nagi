@@ -55,7 +55,6 @@
 		4A0000000000000000000070 /* ReadiumService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000070 /* ReadiumService.swift */; };
 		4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000071 /* EPUBReaderModel.swift */; };
 		4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000072 /* ReadiumNavigatorView.swift */; };
-		4A0000000000000000000073 /* EPUBReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000073 /* EPUBReaderView.swift */; };
 		4A0000000000000000000077 /* ReaderChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000077 /* ReaderChrome.swift */; };
 		4A0000000000000000000078 /* TXTReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000078 /* TXTReaderView.swift */; };
 		4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000079 /* ReaderArchitecture.swift */; };
@@ -117,7 +116,6 @@
 		3A0000000000000000000070 /* ReadiumService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumService.swift; sourceTree = "<group>"; };
 		3A0000000000000000000071 /* EPUBReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderModel.swift; sourceTree = "<group>"; };
 		3A0000000000000000000072 /* ReadiumNavigatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorView.swift; sourceTree = "<group>"; };
-		3A0000000000000000000073 /* EPUBReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000077 /* ReaderChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChrome.swift; sourceTree = "<group>"; };
 		3A0000000000000000000078 /* TXTReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000079 /* ReaderArchitecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderArchitecture.swift; sourceTree = "<group>"; };
@@ -307,7 +305,6 @@
 				3A0000000000000000000078 /* TXTReaderView.swift */,
 				3A000000000000000000007B /* ReaderSettingsView.swift */,
 				3A0000000000000000000072 /* ReadiumNavigatorView.swift */,
-				3A0000000000000000000073 /* EPUBReaderView.swift */,
 			);
 			path = View;
 			sourceTree = "<group>";
@@ -517,7 +514,6 @@
 				4A0000000000000000000070 /* ReadiumService.swift in Sources */,
 				4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */,
 				4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */,
-				4A0000000000000000000073 /* EPUBReaderView.swift in Sources */,
 				4A0000000000000000000077 /* ReaderChrome.swift in Sources */,
 				4A0000000000000000000078 /* TXTReaderView.swift in Sources */,
 				4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */,
@@ -618,7 +614,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 59;
+			CURRENT_PROJECT_VERSION = 60;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -644,7 +640,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 59;
+			CURRENT_PROJECT_VERSION = 60;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
