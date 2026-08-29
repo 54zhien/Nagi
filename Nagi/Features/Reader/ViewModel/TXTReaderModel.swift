@@ -80,7 +80,7 @@ final class TXTReaderModel {
     var errorMessage: String?
     private(set) var layoutGeneration = 0
 
-    private var chapterContents: [String] = []
+    private var chapterLengths: [Int] = []
     /// UTF-16 offsets of each chapter inside `currentContent`.  Keeping the
     /// source as one continuous string makes TXT pagination behave like the
     /// EPUB spine instead of stopping at every chapter boundary.
@@ -168,9 +168,10 @@ final class TXTReaderModel {
             }
             guard !parsedChapters.isEmpty else { throw ParseError.emptyContent }
 
-            chapterContents = parsedChapters.map { $0.content }
-            chapterStartOffsets = makeChapterStartOffsets(for: chapterContents)
-            currentContent = chapterContents.joined(separator: "\n\n")
+            let chapterTexts = parsedChapters.map { $0.content }
+            chapterLengths = chapterTexts.map { $0.utf16.count }
+            chapterStartOffsets = makeChapterStartOffsets(for: chapterTexts)
+            currentContent = chapterTexts.joined(separator: "\n\n")
             chapters = parsedChapters.enumerated().map { index, chapter in
                 BookChapter(
                     id: "txt-\(index)",
@@ -199,7 +200,7 @@ final class TXTReaderModel {
 
     func loadCurrentChapter(showLastPage: Bool = false, restorePosition: Bool = false) {
         guard chapters.indices.contains(currentChapterIndex),
-              chapterContents.indices.contains(currentChapterIndex) else { return }
+              chapterLengths.indices.contains(currentChapterIndex) else { return }
 
         let savedLocation = restorePosition ? decodedReadingLocation() : nil
         let targetOffset: Int
@@ -946,7 +947,7 @@ final class TXTReaderModel {
         pageRanges = []
         nextPageOffset = nil
         hasMorePreviousPages = false
-        chapterContents = []
+        chapterLengths = []
         chapterStartOffsets = []
         currentContent = ""
         chapters = []
@@ -1052,8 +1053,8 @@ final class TXTReaderModel {
             forGlobalOffset: offset,
             chapterIndex: currentChapterIndex
         )
-        let chapterLength = chapterContents.indices.contains(currentChapterIndex)
-            ? chapterContents[currentChapterIndex].utf16.count
+        let chapterLength = chapterLengths.indices.contains(currentChapterIndex)
+            ? chapterLengths[currentChapterIndex]
             : 0
         let chapterFraction = chapterLength > 0
             ? min(max(Double(chapterOffset) / Double(chapterLength), 0), 1)
@@ -1107,8 +1108,8 @@ final class TXTReaderModel {
     }
 
     private func chapterEndOffset(for index: Int) -> Int {
-        guard chapterContents.indices.contains(index) else { return chapterStartOffset(for: index) }
-        return chapterStartOffset(for: index) + chapterContents[index].utf16.count
+        guard chapterLengths.indices.contains(index) else { return chapterStartOffset(for: index) }
+        return chapterStartOffset(for: index) + chapterLengths[index]
     }
 
     private func clampCharacterOffset(_ offset: Int) -> Int {
@@ -1119,11 +1120,11 @@ final class TXTReaderModel {
     /// offset used by TextKit.  Invalid or legacy locations fall back to the
     /// book-level progress value instead of opening at an arbitrary chapter.
     private func globalOffset(for location: TXTReadingLocation) -> Int {
-        guard chapterContents.indices.contains(location.chapterIndex) else {
+        guard chapterLengths.indices.contains(location.chapterIndex) else {
             return globalOffset(forBookProgress: book.progressPercent)
         }
 
-        let length = chapterContents[location.chapterIndex].utf16.count
+        let length = chapterLengths[location.chapterIndex]
         // Early builds persisted only the chapter/page fraction for paged TXT
         // books.  Honour it when no usable character anchor was written.
         let localOffset: Int
@@ -1142,18 +1143,18 @@ final class TXTReaderModel {
     /// that have no locator yet, while all new writes use the continuous
     /// character coordinate below.
     private func globalOffsetForLegacyBookPosition() -> Int {
-        guard !chapterContents.isEmpty else { return 0 }
+        guard !chapterLengths.isEmpty else { return 0 }
         let chapterIndex = min(
             max(book.currentChapterIndex, 0),
-            chapterContents.count - 1
+            chapterLengths.count - 1
         )
-        let chapterCount = Double(max(chapterContents.count, 1))
+        let chapterCount = Double(max(chapterLengths.count, 1))
         let chapterPosition = min(max(book.progressPercent, 0), 1) * chapterCount
         let fraction = min(
             max(chapterPosition - Double(chapterIndex), 0),
             1
         )
-        let length = chapterContents[chapterIndex].utf16.count
+        let length = chapterLengths[chapterIndex]
         return clampCharacterOffset(
             chapterStartOffset(for: chapterIndex)
                 + Int((fraction * Double(length)).rounded())
@@ -1183,9 +1184,9 @@ final class TXTReaderModel {
     }
 
     private func localOffset(forGlobalOffset offset: Int, chapterIndex: Int) -> Int {
-        guard chapterContents.indices.contains(chapterIndex) else { return 0 }
+        guard chapterLengths.indices.contains(chapterIndex) else { return 0 }
         let local = clampCharacterOffset(offset) - chapterStartOffset(for: chapterIndex)
-        return min(max(local, 0), chapterContents[chapterIndex].utf16.count)
+        return min(max(local, 0), chapterLengths[chapterIndex])
     }
 
     private func globalProgress(forGlobalOffset offset: Int) -> Double {
