@@ -1,6 +1,6 @@
 {
   "fill" : {
-    "solid" : "srgb:1.00000,0.18431,0.32157,1.00000"
+    "solid" : "srgb:0.10196,0.52941,0.49412,1.00000"
   },
   "groups" : [
     {
@@ -8,8 +8,8 @@
         {
           "glass" : true,
           "hidden" : false,
-          "image-name" : "読.svg",
-          "name" : "読",
+          "image-name" : "凪.svg",
+          "name" : "凪",
           "position" : {
             "scale" : 1,
             "translation-in-points" : [
