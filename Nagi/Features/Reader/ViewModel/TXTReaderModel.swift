@@ -167,7 +167,8 @@ final class TXTReaderModel {
     var readerInsets: UIEdgeInsets {
         let horizontal = max(0, CGFloat(pageMargins) * 24)
         return UIEdgeInsets(
-            top: max(CGFloat(contentTopInset), safeAreaInsets.top),
+            // ReaderChrome 已经负责顶部系统安全区和页眉，TextKit 这里只应用用户边距。
+            top: max(0, CGFloat(contentTopInset)),
             left: horizontal,
             bottom: max(CGFloat(contentBottomInset), safeAreaInsets.bottom),
             right: horizontal
