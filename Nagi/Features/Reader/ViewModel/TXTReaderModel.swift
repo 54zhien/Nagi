@@ -217,12 +217,11 @@ final class TXTReaderModel {
         let baseFont = settings.fontFamily.uiFont(ofSize: fontSize)
         let font: UIFont = {
             guard settings.boldText,
-                  let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold),
-                  let boldFont = UIFont(descriptor: descriptor, size: baseFont.pointSize)
+                  let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold)
             else {
                 return baseFont
             }
-            return boldFont
+            return UIFont(descriptor: descriptor, size: baseFont.pointSize)
         }()
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = max(0, font.lineHeight * CGFloat(settings.lineHeight - 1))
