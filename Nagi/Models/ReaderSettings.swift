@@ -70,14 +70,91 @@ enum ReaderPageTransitionMode: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-enum ReaderFontFamily: String, CaseIterable, Identifiable, Hashable {
+/// A built-in or user-installed system font available to both reader engines.
+///
+/// The built-in cases keep the existing reader defaults stable, while the
+/// `installed` case stores the family name returned by UIKit.  Keeping the
+/// family name (instead of a font face name) lets each renderer choose the
+/// appropriate regular/bold face for the selected family.
+enum ReaderFontFamily: Hashable, Identifiable {
     case systemSerif
     case systemSansSerif
     case palatino
     case athelas
     case openDyslexic
+    case installed(String)
+
+    static let builtInCases: [ReaderFontFamily] = [
+        .systemSerif,
+        .systemSansSerif,
+        .palatino,
+        .athelas,
+        .openDyslexic,
+    ]
+
+    /// Kept as a compatibility alias for any callers that previously used
+    /// `CaseIterable.allCases`; the picker now renders the grouped options.
+    static var allCases: [ReaderFontFamily] { allOptions }
+
+    /// All fonts currently registered with UIKit, excluding families already
+    /// represented by a built-in option.  This is evaluated when the settings
+    /// view renders so fonts downloaded while the app is installed can appear
+    /// without shipping another app update.
+    static var installedFontFamilies: [ReaderFontFamily] {
+        let builtInNames = Set([
+            "new york",
+            "palatino",
+            "athelas",
+            "opendyslexic",
+        ])
+
+        return UIFont.familyNames
+            .filter { family in
+                !family.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    && !builtInNames.contains(family.lowercased())
+                    && !UIFont.fontNames(forFamilyName: family).isEmpty
+            }
+            .sorted {
+                $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
+            }
+            .map { .installed($0) }
+    }
+
+    static var allOptions: [ReaderFontFamily] {
+        builtInCases + installedFontFamilies
+    }
 
     var id: String { rawValue }
+
+    /// Stable UserDefaults representation. Legacy built-in values remain
+    /// unchanged so existing reader preferences migrate automatically.
+    var rawValue: String {
+        switch self {
+        case .systemSerif: return "systemSerif"
+        case .systemSansSerif: return "systemSansSerif"
+        case .palatino: return "palatino"
+        case .athelas: return "athelas"
+        case .openDyslexic: return "openDyslexic"
+        case .installed(let family): return "installed:\(family)"
+        }
+    }
+
+    init?(_ rawValue: String) {
+        switch rawValue {
+        case "systemSerif": self = .systemSerif
+        case "systemSansSerif": self = .systemSansSerif
+        case "palatino": self = .palatino
+        case "athelas": self = .athelas
+        case "openDyslexic": self = .openDyslexic
+        default:
+            let prefix = "installed:"
+            guard rawValue.hasPrefix(prefix) else { return nil }
+            let family = String(rawValue.dropFirst(prefix.count))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !family.isEmpty else { return nil }
+            self = .installed(family)
+        }
+    }
 
     var label: String {
         switch self {
@@ -86,26 +163,34 @@ enum ReaderFontFamily: String, CaseIterable, Identifiable, Hashable {
         case .palatino: return "Palatino"
         case .athelas: return "Athelas"
         case .openDyslexic: return "OpenDyslexic"
+        case .installed(let family): return family
         }
     }
 
     func uiFont(ofSize size: CGFloat) -> UIFont {
-        let name: String?
+        let baseFont: UIFont
         switch self {
         case .systemSerif:
-            name = "New York"
+            baseFont = UIFont(name: "New York", size: size)
+                ?? UIFont.systemFont(ofSize: size)
         case .systemSansSerif:
-            name = nil
+            baseFont = UIFont.systemFont(ofSize: size)
         case .palatino:
-            name = "Palatino"
+            baseFont = UIFont(name: "Palatino", size: size)
+                ?? UIFont.systemFont(ofSize: size)
         case .athelas:
-            name = "Athelas"
+            baseFont = UIFont(name: "Athelas", size: size)
+                ?? UIFont.systemFont(ofSize: size)
         case .openDyslexic:
-            name = "OpenDyslexic"
+            baseFont = UIFont(name: "OpenDyslexic", size: size)
+                ?? UIFont.systemFont(ofSize: size)
+        case .installed(let family):
+            let face = UIFont.fontNames(forFamilyName: family)
+                .compactMap { UIFont(name: $0, size: size) }
+                .first
+            baseFont = face ?? UIFont.systemFont(ofSize: size)
         }
 
-        let baseFont = name.flatMap { UIFont(name: $0, size: size) }
-            ?? UIFont.systemFont(ofSize: size)
         return UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
     }
 }

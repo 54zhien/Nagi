@@ -12,6 +12,7 @@ struct EPUBReaderView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model: EPUBReaderModel
     @State private var showControls = true
+    @State private var interactionRevision = 0
     @State private var showSettings = false
     @State private var showTableOfContents = false
 
@@ -26,6 +27,7 @@ struct EPUBReaderView: View {
             readerBackground: model.theme.background,
             showsTitle: model.showBookTitleInPageHeader,
             showControls: $showControls,
+            interactionRevision: $interactionRevision,
             onDismiss: { dismiss() },
             onTableOfContents: { showTableOfContents = true },
             onSettings: { showSettings = true },
@@ -35,11 +37,13 @@ struct EPUBReaderView: View {
         }
         .task {
             model.onToggleControls = toggleControls
-            model.onSwipeStart = hideControlsForSwipe
+            model.onReaderInteraction = registerInteraction
+            model.onSwipeStart = handleContentSwipeStart
             await model.loadIfNeeded()
         }
         .onDisappear {
             model.onToggleControls = nil
+            model.onReaderInteraction = nil
             model.onSwipeStart = nil
         }
         .sheet(isPresented: $showSettings) {
@@ -48,6 +52,7 @@ struct EPUBReaderView: View {
                 flowMode: $model.flowMode,
                 pageTransition: $model.pageTransition,
                 fontFamily: $model.fontFamily,
+                boldText: $model.boldText,
                 fontScale: $model.fontScale,
                 lineHeight: $model.lineHeight,
                 paragraphIndent: $model.paragraphIndent,
@@ -141,5 +146,14 @@ struct EPUBReaderView: View {
                 showControls = false
             }
         }
+    }
+
+    private func handleContentSwipeStart() {
+        registerInteraction()
+        hideControlsForSwipe()
+    }
+
+    private func registerInteraction() {
+        interactionRevision &+= 1
     }
 }

@@ -31,6 +31,7 @@ final class TXTReaderModel {
     // 与 EPUB 主题控件共用的排版值域
     var fontScale: Double { didSet { styleDidChange() } }
     var fontFamily: ReaderFontFamily { didSet { styleDidChange() } }
+    var boldText: Bool { didSet { styleDidChange() } }
     var lineHeight: Double { didSet { styleDidChange() } }
     var paragraphIndent: Double { didSet { styleDidChange() } }
     var pageMargins: Double { didSet { styleDidChange() } }
@@ -58,6 +59,7 @@ final class TXTReaderModel {
     private enum PreferenceKey {
         static let fontScale = "reader.txt.fontScale"
         static let fontFamily = "reader.txt.fontFamily"
+        static let boldText = "reader.txt.boldText"
         static let lineHeight = "reader.txt.lineHeight"
         static let paragraphIndent = "reader.txt.paragraphIndent"
         static let pageMargins = "reader.txt.pageMargins"
@@ -78,6 +80,7 @@ final class TXTReaderModel {
         fontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily)
             .flatMap(ReaderFontFamily.init) ?? .systemSerif
+        boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
         pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
@@ -211,7 +214,16 @@ final class TXTReaderModel {
 
     static func attributedText(from text: String, settings: TXTReaderModel) -> NSAttributedString {
         let fontSize = CGFloat(max(12, min(72, 17 * settings.fontScale)))
-        let font = settings.fontFamily.uiFont(ofSize: fontSize)
+        let baseFont = settings.fontFamily.uiFont(ofSize: fontSize)
+        let font: UIFont = {
+            guard settings.boldText,
+                  let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold),
+                  let boldFont = UIFont(descriptor: descriptor, size: baseFont.pointSize)
+            else {
+                return baseFont
+            }
+            return boldFont
+        }()
         let paragraphStyle = NSMutableParagraphStyle()
         paragraphStyle.lineSpacing = max(0, font.lineHeight * CGFloat(settings.lineHeight - 1))
         paragraphStyle.paragraphSpacing = font.lineHeight * 0.65
@@ -252,6 +264,7 @@ final class TXTReaderModel {
     func resetTypography() {
         fontScale = 1.0
         fontFamily = .systemSerif
+        boldText = false
         lineHeight = 1.5
         paragraphIndent = 2.0
         pageMargins = 1.0
@@ -269,6 +282,7 @@ final class TXTReaderModel {
         let defaults = UserDefaults.standard
         defaults.set(fontScale, forKey: PreferenceKey.fontScale)
         defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
+        defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
         defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
         defaults.set(pageMargins, forKey: PreferenceKey.pageMargins)

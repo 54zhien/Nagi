@@ -8,12 +8,15 @@
 import SwiftUI
 
 struct ReaderChrome<Content: View>: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     let content: Content
     let title: String
     let titleColor: Color
     let readerBackground: Color
     let showsTitle: Bool
     @Binding var showControls: Bool
+    @Binding var interactionRevision: Int
     let onDismiss: () -> Void
     let onTableOfContents: () -> Void
     let onSettings: () -> Void
@@ -25,6 +28,7 @@ struct ReaderChrome<Content: View>: View {
         readerBackground: Color,
         showsTitle: Bool,
         showControls: Binding<Bool>,
+        interactionRevision: Binding<Int>,
         onDismiss: @escaping () -> Void,
         onTableOfContents: @escaping () -> Void,
         onSettings: @escaping () -> Void,
@@ -37,6 +41,7 @@ struct ReaderChrome<Content: View>: View {
         self.readerBackground = readerBackground
         self.showsTitle = showsTitle
         self._showControls = showControls
+        self._interactionRevision = interactionRevision
         self.onDismiss = onDismiss
         self.onTableOfContents = onTableOfContents
         self.onSettings = onSettings
@@ -73,7 +78,10 @@ struct ReaderChrome<Content: View>: View {
             // UIKit 阅读器会自行处理分页手势；这个 simultaneous 手势只负责统一收起控件。
             .simultaneousGesture(
                 DragGesture(minimumDistance: ReaderControlMetrics.swipeMinimumDistance)
-                    .onChanged { _ in onSwipeStart?() }
+                    .onChanged { _ in
+                        noteInteraction()
+                        onSwipeStart?()
+                    }
             )
         }
         // 保留顶部安全区，同时让 GeometryReader 继续覆盖底部和横向区域；
@@ -87,6 +95,28 @@ struct ReaderChrome<Content: View>: View {
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
+        .onChange(of: showControls) { _, isVisible in
+            guard isVisible else { return }
+            interactionRevision &+= 1
+        }
+        .task(id: interactionRevision) {
+            guard showControls else { return }
+
+            do {
+                try await Task.sleep(nanoseconds: ReaderControlMetrics.autoHideNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled, showControls else { return }
+            if reduceMotion {
+                showControls = false
+            } else {
+                withAnimation(.easeOut(duration: 0.18)) {
+                    showControls = false
+                }
+            }
+        }
     }
 
     private var exitButton: some View {
@@ -95,7 +125,10 @@ struct ReaderChrome<Content: View>: View {
             systemImage: "xmark",
             diameter: ReaderControlMetrics.exitDiameter,
             iconPointSize: ReaderControlMetrics.exitIconPointSize,
-            action: onDismiss
+            action: {
+                noteInteraction()
+                onDismiss()
+            }
         )
     }
 
@@ -117,14 +150,20 @@ struct ReaderChrome<Content: View>: View {
                 controlButton(
                     "目录",
                     systemImage: "list.bullet",
-                    action: onTableOfContents
+                    action: {
+                        noteInteraction()
+                        onTableOfContents()
+                    }
                 )
                 .position(leadingCenter)
 
                 controlButton(
                     "主题与排版",
                     systemImage: "xmark.triangle.circle.square",
-                    action: onSettings
+                    action: {
+                        noteInteraction()
+                        onSettings()
+                    }
                 )
                 .position(trailingCenter)
             }
@@ -185,6 +224,10 @@ struct ReaderChrome<Content: View>: View {
         .glassEffect(.regular.interactive(), in: .circle)
         .accessibilityLabel(label)
     }
+
+    private func noteInteraction() {
+        interactionRevision &+= 1
+    }
 }
 
 private struct ReaderPageHeader: View {
@@ -196,10 +239,10 @@ private struct ReaderPageHeader: View {
             .font(.system(size: 15, weight: .medium))
             .foregroundStyle(color)
             .lineLimit(1)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.top, 2)
             .padding(.horizontal, 72)
-            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, alignment: .center)
+            // 与右上角退出按钮共用同一高度，使书名基线区域的中心线一致。
+            .frame(height: ReaderControlMetrics.exitDiameter, alignment: .center)
             .allowsHitTesting(false)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel("页眉书名：\(title)")
@@ -215,6 +258,7 @@ private enum ReaderControlMetrics {
     static let exitTopInset: CGFloat = 0
     static let exitTrailingInset: CGFloat = 24
     static let swipeMinimumDistance: CGFloat = 10
+    static let autoHideNanoseconds: UInt64 = 10_000_000_000
 }
 
 struct ReaderTOCItem: Identifiable, Hashable {
@@ -296,6 +340,7 @@ struct ReaderSettingsSheet: View {
     @Binding var flowMode: ReaderFlowMode
     @Binding var pageTransition: ReaderPageTransitionMode
     @Binding var fontFamily: ReaderFontFamily
+    @Binding var boldText: Bool
     @Binding var fontScale: Double
     @Binding var lineHeight: Double
     @Binding var paragraphIndent: Double
@@ -312,6 +357,7 @@ struct ReaderSettingsSheet: View {
         flowMode: Binding<ReaderFlowMode>,
         pageTransition: Binding<ReaderPageTransitionMode>,
         fontFamily: Binding<ReaderFontFamily>,
+        boldText: Binding<Bool>,
         fontScale: Binding<Double>,
         lineHeight: Binding<Double>,
         paragraphIndent: Binding<Double>,
@@ -326,6 +372,7 @@ struct ReaderSettingsSheet: View {
         self._flowMode = flowMode
         self._pageTransition = pageTransition
         self._fontFamily = fontFamily
+        self._boldText = boldText
         self._fontScale = fontScale
         self._lineHeight = lineHeight
         self._paragraphIndent = paragraphIndent
@@ -368,10 +415,20 @@ struct ReaderSettingsSheet: View {
 
                 Section("文字") {
                     Picker("字体", selection: $fontFamily) {
-                        ForEach(ReaderFontFamily.allCases) { family in
-                            Text(family.label).tag(family)
+                        Section("内置字体") {
+                            ForEach(ReaderFontFamily.builtInCases) { family in
+                                Text(family.label).tag(family)
+                            }
+                        }
+
+                        Section("已安装字体") {
+                            ForEach(ReaderFontFamily.installedFontFamilies) { family in
+                                Text(family.label).tag(family)
+                            }
                         }
                     }
+
+                    Toggle("粗体文字", isOn: $boldText)
 
                     LabeledContent("字号", value: "\(Int(fontScale * 100))%")
                     Slider(value: $fontScale, in: 0.8 ... 2.0, step: 0.05)
@@ -383,19 +440,10 @@ struct ReaderSettingsSheet: View {
                     Slider(value: $paragraphIndent, in: 0 ... 3.0, step: 0.5)
                 }
 
-                Section("页面") {
+                Section {
                     LabeledContent("页边距", value: pageMargins.formatted(.number.precision(.fractionLength(1))))
                     Slider(value: $pageMargins, in: 0.5 ... 2.0, step: 0.1)
 
-                    Picker("主题", selection: $theme) {
-                        ForEach(ReaderTheme.allCases) { theme in
-                            Text(theme.label).tag(theme)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                }
-
-                Section {
                     LabeledContent("上边距", value: "\(Int(contentTopInset)) pt")
                     Slider(value: $contentTopInset, in: 0 ... 160, step: 4)
                         .accessibilityLabel("正文上边距")
@@ -404,9 +452,18 @@ struct ReaderSettingsSheet: View {
                     Slider(value: $contentBottomInset, in: 0 ... 160, step: 4)
                         .accessibilityLabel("正文下边距")
                 } header: {
-                    Text("正文与屏幕边距")
+                    Text("页面与正文间距")
                 } footer: {
                     Text("最小值仍会遵守设备安全区，避免正文被刘海、动态岛或 Home Indicator 遮挡。")
+                }
+
+                Section("背景色") {
+                    Picker("背景色", selection: $theme) {
+                        ForEach(ReaderTheme.allCases) { theme in
+                            Text(theme.label).tag(theme)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
 
                 if let publisherStyles {

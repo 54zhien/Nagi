@@ -13,6 +13,7 @@ struct TXTReaderView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var model: TXTReaderModel
     @State private var showControls = true
+    @State private var interactionRevision = 0
     @State private var showSettings = false
     @State private var showTableOfContents = false
 
@@ -27,6 +28,7 @@ struct TXTReaderView: View {
             readerBackground: model.theme.background,
             showsTitle: model.showBookTitleInPageHeader,
             showControls: $showControls,
+            interactionRevision: $interactionRevision,
             onDismiss: { dismiss() },
             onTableOfContents: { showTableOfContents = true },
             onSettings: { showSettings = true },
@@ -36,12 +38,16 @@ struct TXTReaderView: View {
                 .contentShape(Rectangle())
                 .simultaneousGesture(
                     TapGesture().onEnded {
+                        registerInteraction()
                         toggleControls()
                     }
                 )
                 .accessibilityAction(
                     named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
-                    toggleControls
+                    {
+                        registerInteraction()
+                        toggleControls()
+                    }
                 )
         }
         .task {
@@ -53,6 +59,7 @@ struct TXTReaderView: View {
                 flowMode: $model.flowMode,
                 pageTransition: $model.pageTransition,
                 fontFamily: $model.fontFamily,
+                boldText: $model.boldText,
                 fontScale: $model.fontScale,
                 lineHeight: $model.lineHeight,
                 paragraphIndent: $model.paragraphIndent,
@@ -144,7 +151,7 @@ struct TXTReaderView: View {
                     insets: model.readerInsets,
                     background: model.theme.background,
                     currentPage: $model.currentPageIndex,
-                    onSwipeStart: hideControlsForSwipe
+                    onSwipeStart: handleContentSwipeStart
                 )
                 .id("\(model.layoutGeneration)-\(model.pageTransition.rawValue)")
             }
@@ -156,7 +163,7 @@ struct TXTReaderView: View {
                 background: model.theme.background,
                 revision: model.layoutGeneration,
                 positionID: model.currentChapterID ?? "txt-\(model.currentChapterIndex)",
-                onSwipeStart: hideControlsForSwipe,
+                onSwipeStart: handleContentSwipeStart,
                 onProgress: model.updateScrollProgress
             )
         }
@@ -182,6 +189,15 @@ struct TXTReaderView: View {
                 showControls = false
             }
         }
+    }
+
+    private func handleContentSwipeStart() {
+        registerInteraction()
+        hideControlsForSwipe()
+    }
+
+    private func registerInteraction() {
+        interactionRevision &+= 1
     }
 
     private static func uiEdgeInsets(from edgeInsets: EdgeInsets) -> UIEdgeInsets {

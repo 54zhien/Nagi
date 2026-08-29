@@ -36,6 +36,7 @@ extension ReaderFontFamily {
         case .palatino: return .palatino
         case .athelas: return .athelas
         case .openDyslexic: return .openDyslexic
+        case .installed(let family): return FontFamily(rawValue: family)
         }
     }
 }
@@ -71,6 +72,7 @@ final class EPUBReaderModel {
 
     var fontScale: Double { didSet { preferencesDidChange() } }
     var fontFamily: ReaderFontFamily { didSet { preferencesDidChange() } }
+    var boldText: Bool { didSet { preferencesDidChange() } }
     var lineHeight: Double { didSet { preferencesDidChange() } }
     var pageMargins: Double { didSet { preferencesDidChange() } }
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
@@ -83,6 +85,7 @@ final class EPUBReaderModel {
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
 
     var onToggleControls: (() -> Void)?
+    var onReaderInteraction: (() -> Void)?
     var onSwipeStart: (() -> Void)?
 
     private var publication: Publication?
@@ -92,6 +95,7 @@ final class EPUBReaderModel {
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
         static let fontFamily = "reader.epub.fontFamily"
+        static let boldText = "reader.epub.boldText"
         static let lineHeight = "reader.epub.lineHeight"
         static let pageMargins = "reader.epub.pageMargins"
         static let paragraphIndent = "reader.epub.paragraphIndent"
@@ -112,6 +116,7 @@ final class EPUBReaderModel {
         let defaults = UserDefaults.standard
         fontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(ReaderFontFamily.init) ?? .systemSerif
+        boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
         pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
@@ -206,6 +211,7 @@ final class EPUBReaderModel {
     func resetTypography() {
         fontScale = 1.0
         fontFamily = .systemSerif
+        boldText = false
         lineHeight = 1.5
         pageMargins = 1.0
         paragraphIndent = 2.0
@@ -252,6 +258,7 @@ final class EPUBReaderModel {
             backgroundColor: theme.readiumBackgroundColor,
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
+            fontWeight: boldText ? 1.5 : nil,
             lineHeight: lineHeight,
             pageMargins: pageMargins,
             paragraphIndent: paragraphIndent,
@@ -267,6 +274,7 @@ final class EPUBReaderModel {
         let defaults = UserDefaults.standard
         defaults.set(fontScale, forKey: PreferenceKey.fontScale)
         defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
+        defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
         defaults.set(pageMargins, forKey: PreferenceKey.pageMargins)
         defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
@@ -331,6 +339,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
     func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {
         let width = self.navigator?.view.bounds.width ?? 0
         guard width > 0 else { return }
+        onReaderInteraction?()
 
         switch point.x / width {
         case ..<0.25:
