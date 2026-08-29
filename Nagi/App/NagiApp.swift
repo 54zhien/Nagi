@@ -43,6 +43,7 @@ struct NagiApp: App {
 /// 底部 tab 栏：主页 / 书库 / 设置 / 搜索
 /// - 搜索 tab 通过 `role: .search` 与其它 tab 分离，独立分隔显示
 struct RootTabView: View {
+    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @State private var selection: AppTab = .home
     @State private var searchText = ""
     @State private var importState = AppImportState.shared
@@ -60,7 +61,7 @@ struct RootTabView: View {
     }
 
     private var tabView: some View {
-        TabView(selection: $selection) {
+        TabView(selection: $selection.animation(tabBarTransitionAnimation)) {
             Tab("主页", image: "homeIcon", value: .home) {
                 HomeView()
             }
@@ -77,9 +78,14 @@ struct RootTabView: View {
                 SearchView(searchText: $searchText)
             }
         }
-        .searchable(text: $searchText, prompt: "搜索书名")
-        .tabViewSearchActivation(.searchTabSelection)
         .tabViewStyle(.sidebarAdaptable)
+        .tabViewSearchActivation(.automatic)
+    }
+
+    private var tabBarTransitionAnimation: Animation? {
+        accessibilityReduceMotion
+            ? nil
+            : .smooth(duration: 0.35, extraBounce: 0)
     }
 }
 

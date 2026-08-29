@@ -42,6 +42,11 @@ struct SearchView: View {
             .scrollEdgeEffectStyle(.automatic, for: .all)
             .navigationTitle("搜索")
         }
+        .searchable(
+            text: $searchText,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: "搜索书名"
+        )
         .fullScreenCover(
             isPresented: Binding(
                 get: { selectedBook != nil },

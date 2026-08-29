@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import UIKit
 import UniformTypeIdentifiers
 
 struct LibraryView: View {
@@ -30,35 +31,49 @@ struct LibraryView: View {
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
-                    List {
-                        ForEach(books) { book in
-                            Button {
-                                selectedBook = book
-                            } label: {
-                                BookRow(book: book)
-                            }
-                            .buttonStyle(.plain)
-                            .contextMenu {
+                    ScrollView {
+                        LazyVGrid(
+                            columns: [
+                                GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 16)
+                            ],
+                            alignment: .leading,
+                            spacing: 20
+                        ) {
+                            ForEach(books) { book in
                                 Button {
-                                    bookToRename = book
-                                    renameText = book.title
+                                    selectedBook = book
                                 } label: {
-                                    Label("重命名", systemImage: "pencil")
+                                    BookCard(book: book, layout: .library)
                                 }
-                                Button {
-                                    SharePresenter.present(items: [URL(fileURLWithPath: book.sourceURL)])
-                                } label: {
-                                    Label("分享", systemImage: "square.and.arrow.up")
-                                }
-                                Button(role: .destructive) {
-                                    bookToDelete = book
-                                    showDeleteConfirm = true
-                                } label: {
-                                    Label("删除", systemImage: "trash")
+                                .buttonStyle(.glass)
+                                .accessibilityLabel(book.title)
+                                .accessibilityHint("打开阅读")
+                                .contextMenu {
+                                    Button {
+                                        bookToRename = book
+                                        renameText = book.title
+                                    } label: {
+                                        Label("重命名", systemImage: "pencil")
+                                    }
+                                    Button {
+                                        SharePresenter.present(items: [URL(fileURLWithPath: book.sourceURL)])
+                                    } label: {
+                                        Label("分享", systemImage: "square.and.arrow.up")
+                                    }
+                                    Button(role: .destructive) {
+                                        bookToDelete = book
+                                        showDeleteConfirm = true
+                                    } label: {
+                                        Label("删除", systemImage: "trash")
+                                    }
                                 }
                             }
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 8)
+                        .padding(.bottom, 24)
                     }
+                    .scrollIndicators(.automatic)
                     .scrollEdgeEffectStyle(.automatic, for: .all)
                 }
             }
@@ -113,6 +128,9 @@ struct LibraryView: View {
                 Text("确定删除「\(bookToDelete?.title ?? "")」吗？此操作不可撤销。")
             }
         }
+        .task(id: books.map(\.id)) {
+            viewModel.backfillMissingCovers(for: books, into: modelContext)
+        }
         .fullScreenCover(
             isPresented: Binding(
                 get: { selectedBook != nil },
@@ -126,27 +144,131 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - 书籍行
+// MARK: - 书籍控件
 
-struct BookRow: View {
-    let book: Book
+enum BookCardLayout {
+    case library
+    case home
+    case list
+}
+
+struct BookCoverView: View {
+    let data: Data?
 
     var body: some View {
+        Group {
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                ZStack {
+                    Color.secondary.opacity(0.12)
+                    Image(systemName: "book.closed")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .aspectRatio(2.0 / 3.0, contentMode: .fit)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(.quaternary, lineWidth: 0.5)
+        }
+        .accessibilityHidden(true)
+    }
+}
+
+struct BookCard: View {
+    let book: Book
+    let layout: BookCardLayout
+
+    var body: some View {
+        switch layout {
+        case .library:
+            libraryCard
+        case .home:
+            homeCard
+        case .list:
+            listCard
+        }
+    }
+
+    private var libraryCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            BookCoverView(data: book.coverData)
+                .frame(maxWidth: .infinity)
+
+            metadata
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var homeCard: some View {
+        HStack(alignment: .top, spacing: 12) {
+            BookCoverView(data: book.coverData)
+                .frame(width: 84)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(book.title)
+                    .font(.headline)
+                    .lineLimit(3)
+                    .multilineTextAlignment(.leading)
+
+                if let author = book.author, !author.isEmpty {
+                    Text(author)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                ProgressView(value: progress)
+                    .tint(.accentColor)
+                    .accessibilityValue(Text("阅读进度 \(Int(progress * 100))%"))
+            }
+            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+        }
+        .padding(12)
+        .frame(width: 280, alignment: .leading)
+    }
+
+    private var listCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            BookCoverView(data: book.coverData)
+                .frame(width: 52)
+
+            metadata
+        }
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var metadata: some View {
         VStack(alignment: .leading, spacing: 4) {
             Text(book.title)
                 .font(.headline)
-                .lineLimit(1)
+                .lineLimit(2)
+
             if let author = book.author, !author.isEmpty {
                 Text(author)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
+
             Text(formatLabel)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
         }
-        .padding(.vertical, 4)
+    }
+
+    private var progress: Double {
+        min(max(book.progressPercent, 0), 1)
     }
 
     private var formatLabel: String {
@@ -155,6 +277,16 @@ struct BookRow: View {
             return "\(formatName) · \(book.chapterCount) 章"
         }
         return formatName
+    }
+}
+
+// MARK: - 搜索结果行
+
+struct BookRow: View {
+    let book: Book
+
+    var body: some View {
+        BookCard(book: book, layout: .list)
     }
 }
 

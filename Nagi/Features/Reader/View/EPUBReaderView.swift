@@ -7,11 +7,13 @@
 
 import Foundation
 import SwiftUI
+import SwiftData
 
 struct EPUBReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.modelContext) private var modelContext
     @State private var model: EPUBReaderModel
     @State private var showControls = true
     @State private var showSettings = false
@@ -62,6 +64,8 @@ struct EPUBReaderView: View {
         .onDisappear {
             model.onToggleControls = nil
             model.onSwipeStart = nil
+            model.flushReadingProgress()
+            try? modelContext.save()
         }
         .sheet(isPresented: $showSettings) { settingsSheet }
         .sheet(isPresented: $showTableOfContents) { tableOfContentsSheet }

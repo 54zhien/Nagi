@@ -30,12 +30,20 @@ final class Book {
     /// Readium Locator JSON，TXT 也使用同一字段保存字符锚点。
     var readerLocatorJSON: String?
 
-    init(title: String, author: String?, format: BookFormat, sourceURL: String, chapterCount: Int = 0) {
+    init(
+        title: String,
+        author: String?,
+        format: BookFormat,
+        sourceURL: String,
+        chapterCount: Int = 0,
+        coverData: Data? = nil
+    ) {
         self.id = UUID()
         self.title = title
         self.author = author
         self.formatRaw = format.rawValue
         self.sourceURL = sourceURL
+        self.coverData = coverData
         self.addedAt = .now
         self.chapterCount = chapterCount
         self.currentChapterIndex = 0

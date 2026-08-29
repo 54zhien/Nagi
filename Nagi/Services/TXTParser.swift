@@ -13,19 +13,22 @@ struct ParsedBook: Sendable {
     let chapterCount: Int
     let content: String
     let chapters: [TXTChapter]?
+    let coverData: Data?
 
     init(
         title: String,
         author: String?,
         chapterCount: Int,
         content: String,
-        chapters: [TXTChapter]? = nil
+        chapters: [TXTChapter]? = nil,
+        coverData: Data? = nil
     ) {
         self.title = title
         self.author = author
         self.chapterCount = chapterCount
         self.content = content
         self.chapters = chapters
+        self.coverData = coverData
     }
 }
 

@@ -6,7 +6,9 @@
 //
 
 import Foundation
+import ImageIO
 import SwiftSoup
+import UniformTypeIdentifiers
 
 struct EPUBParser {
     func parse(url: URL) throws -> ParsedBook {
@@ -16,8 +18,30 @@ struct EPUBParser {
         let title = extractTag(opfXml, tag: "title") ?? url.deletingPathExtension().lastPathComponent
         let author = extractTag(opfXml, tag: "creator")
         let chapters = try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
+        let coverData: Data?
+        do {
+            coverData = try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
+        } catch {
+            // Cover extraction is optional; a malformed cover must not make
+            // an otherwise readable EPUB fail to import.
+            coverData = nil
+        }
 
-        return ParsedBook(title: title, author: author, chapterCount: chapters.count, content: "")
+        return ParsedBook(
+            title: title,
+            author: author,
+            chapterCount: chapters.count,
+            content: "",
+            coverData: coverData
+        )
+    }
+
+    /// Loads and downsamples an EPUB cover for books imported before the
+    /// cover was stored in SwiftData.
+    func loadCoverData(url: URL) throws -> Data? {
+        let archive = try openArchive(url)
+        let (opfXml, opfDir) = try opfDocument(archive)
+        return try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
     }
 
     /// 章节列表（spine 阅读顺序）。
@@ -91,15 +115,134 @@ struct EPUBParser {
         return chapters
     }
 
+    private struct ManifestItem {
+        let id: String
+        let href: String
+        let mediaType: String?
+        let properties: String?
+    }
+
     private func parseManifest(_ opfXml: String) -> [String: String] {
-        var result: [String: String] = [:]
+        parseManifestItems(opfXml).reduce(into: [:]) { result, item in
+            result[item.id] = item.href
+        }
+    }
+
+    private func parseManifestItems(_ opfXml: String) -> [ManifestItem] {
+        var result: [ManifestItem] = []
         for element in matches(of: #"<(?:[A-Za-z_][\w.-]*:)?item\b[^>]*>"#, in: opfXml) {
             if let id = extractAttr(element, name: "id"),
                let href = extractAttr(element, name: "href") {
-                result[id] = href
+                result.append(ManifestItem(
+                    id: id,
+                    href: href,
+                    mediaType: extractAttr(element, name: "media-type"),
+                    properties: extractAttr(element, name: "properties")
+                ))
             }
         }
         return result
+    }
+
+    /// Resolves the EPUB cover according to the OPF cover metadata, then
+    /// falls back to a cover-like image and finally the first raster image.
+    /// The result is a small JPEG thumbnail so SwiftData and scrolling do not
+    /// repeatedly carry full-resolution archive assets.
+    private func extractCoverData(
+        from archive: Archive,
+        opfXml: String,
+        opfDir: String
+    ) throws -> Data? {
+        let manifest = parseManifestItems(opfXml)
+        guard !manifest.isEmpty else { return nil }
+
+        let metaElements = matches(
+            of: #"<(?:[A-Za-z_][\w.-]*:)?meta\b[^>]*>"#,
+            in: opfXml
+        )
+        let coverID = metaElements
+            .first(where: { extractAttr($0, name: "name")?.lowercased() == "cover" })
+            .flatMap { extractAttr($0, name: "content") }
+
+        var candidates: [ManifestItem] = []
+        var seenIDs = Set<String>()
+
+        func append(_ item: ManifestItem?) {
+            guard let item, seenIDs.insert(item.id).inserted else { return }
+            candidates.append(item)
+        }
+
+        if let coverID {
+            append(manifest.first(where: { $0.id == coverID }))
+            append(manifest.first(where: {
+                $0.id.caseInsensitiveCompare(coverID) == .orderedSame
+            }))
+        }
+
+        let imageItems = manifest.filter {
+            $0.mediaType?.lowercased().hasPrefix("image/") == true
+        }
+        imageItems
+            .filter {
+                let id = $0.id.lowercased()
+                let href = $0.href.lowercased()
+                let properties = ($0.properties?.lowercased() ?? "")
+                    .split(whereSeparator: \.isWhitespace)
+                    .map(String.init)
+                return properties.contains("cover-image")
+                    || id.contains("cover")
+                    || href.contains("cover")
+            }
+            .forEach { append($0) }
+        imageItems.forEach { append($0) }
+
+        for item in candidates {
+            let path = resolve(href: item.href, relativeTo: opfDir)
+            guard let entry = entry(in: archive, path: path) else { continue }
+
+            var data = Data()
+            _ = try archive.extract(entry, consumer: { data.append($0) })
+            if let thumbnail = Self.makeCoverThumbnail(from: data) {
+                return thumbnail
+            }
+        }
+
+        return nil
+    }
+
+    private static func makeCoverThumbnail(from data: Data) -> Data? {
+        guard let source = CGImageSourceCreateWithData(data as CFData, nil) else {
+            return nil
+        }
+
+        let options: [CFString: Any] = [
+            kCGImageSourceCreateThumbnailFromImageAlways: true,
+            kCGImageSourceCreateThumbnailWithTransform: true,
+            kCGImageSourceThumbnailMaxPixelSize: 768,
+        ]
+        guard let image = CGImageSourceCreateThumbnailAtIndex(
+            source,
+            0,
+            options as CFDictionary
+        ) else {
+            return nil
+        }
+
+        let output = NSMutableData()
+        guard let destination = CGImageDestinationCreateWithData(
+            output,
+            UTType.jpeg.identifier as CFString,
+            1,
+            nil
+        ) else {
+            return nil
+        }
+
+        let properties: [CFString: Any] = [
+            kCGImageDestinationLossyCompressionQuality: 0.85,
+        ]
+        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        return CGImageDestinationFinalize(destination) ? output as Data : nil
     }
 
     private func parseSpine(_ opfXml: String) -> [String] {

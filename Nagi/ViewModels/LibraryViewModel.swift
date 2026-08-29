@@ -17,10 +17,23 @@ struct BookImportResult: Sendable {
     let format: BookFormat
     let sourceURL: String
     let chapterCount: Int
+    let coverData: Data?
 
     func makeBook() -> Book {
-        Book(title: title, author: author, format: format, sourceURL: sourceURL, chapterCount: chapterCount)
+        Book(
+            title: title,
+            author: author,
+            format: format,
+            sourceURL: sourceURL,
+            chapterCount: chapterCount,
+            coverData: coverData
+        )
     }
+}
+
+private struct BookCoverRequest: Sendable {
+    let id: UUID
+    let sourceURL: String
 }
 
 @MainActor
@@ -51,6 +64,57 @@ final class LibraryViewModel {
         }
     }
 
+    /// Backfills covers for EPUB records created before cover extraction was
+    /// wired into the import pipeline.  Only file paths and UUIDs cross the
+    /// detached task; SwiftData objects remain on the main actor.
+    func backfillMissingCovers(for books: [Book], into context: ModelContext) {
+        let requests = books.compactMap { book -> BookCoverRequest? in
+            guard book.format == .epub, book.coverData == nil else { return nil }
+            return BookCoverRequest(id: book.id, sourceURL: book.sourceURL)
+        }
+        guard !requests.isEmpty else { return }
+
+        Task {
+            let covers = await Self.loadMissingCoversInBackground(requests)
+            guard !covers.isEmpty else { return }
+
+            let currentBooks = (try? context.fetch(FetchDescriptor<Book>())) ?? []
+            var didUpdate = false
+            for book in currentBooks {
+                guard book.coverData == nil, let coverData = covers[book.id] else { continue }
+                book.coverData = coverData
+                didUpdate = true
+            }
+
+            if didUpdate {
+                try? context.save()
+            }
+        }
+    }
+
+    private static func loadMissingCoversInBackground(
+        _ requests: [BookCoverRequest]
+    ) async -> [UUID: Data] {
+        let task = Task.detached(priority: .utility) {
+            let parser = EPUBParser()
+            var covers: [UUID: Data] = [:]
+            for request in requests {
+                do {
+                    if let coverData = try parser.loadCoverData(
+                        url: URL(fileURLWithPath: request.sourceURL)
+                    ) {
+                        covers[request.id] = coverData
+                    }
+                } catch {
+                    // A missing or malformed cover must not prevent other
+                    // library records from being backfilled.
+                }
+            }
+            return covers
+        }
+        return await task.value
+    }
+
     /// 后台解析，返回纯值（不创建 @Model 对象）。
     nonisolated static func parseBooksInBackground(_ files: [URL]) async throws -> [BookImportResult] {
         let task = Task.detached(priority: .userInitiated) {
@@ -62,14 +126,16 @@ final class LibraryViewModel {
                     results.append(BookImportResult(
                         title: parsed.title, author: parsed.author,
                         format: .txt, sourceURL: fileURL.path,
-                        chapterCount: parsed.chapterCount
+                        chapterCount: parsed.chapterCount,
+                        coverData: parsed.coverData
                     ))
                 case "epub":
                     let parsed = try EPUBParser().parse(url: fileURL)
                     results.append(BookImportResult(
                         title: parsed.title, author: parsed.author,
                         format: .epub, sourceURL: fileURL.path,
-                        chapterCount: parsed.chapterCount
+                        chapterCount: parsed.chapterCount,
+                        coverData: parsed.coverData
                     ))
                 default:
                     throw ParseError.cannotRead("不支持的文件格式：\(fileURL.pathExtension)")
@@ -90,6 +156,7 @@ final class LibraryViewModel {
                 existing.author = result.author
                 existing.formatRaw = result.format.rawValue
                 existing.chapterCount = result.chapterCount
+                existing.coverData = result.coverData
             } else {
                 let book = result.makeBook()
                 context.insert(book)

@@ -413,6 +413,15 @@ final class EPUBReaderModel {
         }
     }
 
+    /// Commits the latest in-memory EPUB location before the reader is
+    /// dismissed.  The view owns the SwiftData save because this model also
+    /// handles Readium state and should not own a ModelContext.
+    func flushReadingProgress() {
+        guard hasLoaded else { return }
+        book.progressPercent = min(max(progress, 0), 1)
+        book.lastReadAt = .now
+    }
+
     func goForward() {
         guard let navigator else { return }
         Task { await navigator.goForward(options: .animated) }
