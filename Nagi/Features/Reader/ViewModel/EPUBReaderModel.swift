@@ -9,26 +9,205 @@ import Foundation
 import Observation
 import ReadiumNavigator
 import ReadiumShared
-import SwiftUI
 import UIKit
 
-extension ReaderTheme {
-    /// Readium 的主题映射只属于 EPUB 渲染层，主题值本身由所有阅读格式共享。
+enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
+    case light, quiet, sepia, dark
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .light: return "白色"
+        case .quiet: return "安静"
+        case .sepia: return "米黄"
+        case .dark: return "深色"
+        }
+    }
+
+    /// 与 Readium CSS 内置主题使用的正文色保持一致，供嵌入式页眉复用。
+    var contentUIColor: UIColor {
+        switch self {
+        case .light, .sepia:
+            return UIColor(red: 18 / 255, green: 18 / 255, blue: 18 / 255, alpha: 1)
+        case .quiet:
+            return UIColor(red: 38 / 255, green: 42 / 255, blue: 48 / 255, alpha: 1)
+        case .dark:
+            return UIColor(red: 254 / 255, green: 254 / 255, blue: 254 / 255, alpha: 1)
+        }
+    }
+
+    var backgroundUIColor: UIColor {
+        switch self {
+        case .light:
+            return UIColor.white
+        case .quiet:
+            return UIColor(red: 242 / 255, green: 243 / 255, blue: 245 / 255, alpha: 1)
+        case .sepia:
+            return UIColor(red: 250 / 255, green: 244 / 255, blue: 232 / 255, alpha: 1)
+        case .dark:
+            return UIColor.black
+        }
+    }
+
+    func adjustedBackgroundUIColor(brightness: Double) -> UIColor {
+        let level = CGFloat(min(max(brightness, 0.25), 1))
+        switch self {
+        case .dark:
+            return UIColor(white: 0.12 * level, alpha: 1)
+        case .light, .quiet, .sepia:
+            return applyingBrightness(
+                to: backgroundUIColor,
+                multiplier: 0.72 + 0.28 * level
+            )
+        }
+    }
+
+    func adjustedContentUIColor(brightness: Double) -> UIColor {
+        let level = CGFloat(min(max(brightness, 0.25), 1))
+        switch self {
+        case .dark:
+            return UIColor(white: 0.66 + 0.34 * level, alpha: 1)
+        case .light, .quiet, .sepia:
+            return applyingBrightness(
+                to: contentUIColor,
+                multiplier: 0.72 + 0.28 * level
+            )
+        }
+    }
+
     var readiumTheme: ReadiumNavigator.Theme {
         switch self {
         case .light: return .light
+        case .quiet: return .light
         case .sepia: return .sepia
         case .dark: return .dark
         }
     }
 
-    /// 将应用主题的正文背景传给 Readium，避免 Navigator 使用另一套默认颜色。
-    var readiumBackgroundColor: ReadiumNavigator.Color? {
-        ReadiumNavigator.Color(uiColor: UIColor(background))
+    private func applyingBrightness(to color: UIColor, multiplier: CGFloat) -> UIColor {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return color
+        }
+        return UIColor(
+            red: min(max(red * multiplier, 0), 1),
+            green: min(max(green * multiplier, 0), 1),
+            blue: min(max(blue * multiplier, 0), 1),
+            alpha: alpha
+        )
     }
 }
 
-extension ReaderFontFamily {
+enum EPUBAppearanceMode: String, CaseIterable, Identifiable, Equatable {
+    case light, dark, system
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .light: return "浅色"
+        case .dark: return "深色"
+        case .system: return "匹配设备"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .light: return "sun.max"
+        case .dark: return "moon.fill"
+        case .system: return "circle.lefthalf.filled"
+        }
+    }
+}
+
+enum EPUBReaderPreset: String, CaseIterable, Identifiable, Equatable {
+    case original, quiet, paper
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .original: return "原始"
+        case .quiet: return "安静"
+        case .paper: return "纸张"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .original: return "textformat"
+        case .quiet: return "moon.zzz"
+        case .paper: return "doc.text"
+        }
+    }
+}
+
+enum EPUBFlowMode: String, CaseIterable, Identifiable, Equatable {
+    case paged, scroll
+
+    var id: String { rawValue }
+    var label: String { self == .paged ? "横向分页" : "上下滚动" }
+}
+
+enum EPUBPageTransitionMode: String, CaseIterable, Identifiable, Equatable {
+    case slide, pageCurl, fade, scroll
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .slide: return "滑动"
+        case .pageCurl: return "卷页"
+        case .fade: return "快速淡入淡出"
+        case .scroll: return "滚动"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .slide: return "arrow.left.arrow.right"
+        case .pageCurl: return "book.pages"
+        case .fade: return "rectangle.on.rectangle"
+        case .scroll: return "arrow.up.and.down"
+        }
+    }
+
+    init?(rawValue: String) {
+        switch rawValue {
+        case "slide": self = .slide
+        case "pageCurl": self = .pageCurl
+        case "fade": self = .fade
+        case "scroll": self = .scroll
+        // Preserve values written by the earlier settings screen.
+        case "cover": self = .pageCurl
+        default: return nil
+        }
+    }
+}
+
+enum EPUBFontFamily: String, CaseIterable, Identifiable, Equatable {
+    case systemSerif
+    case systemSansSerif
+    case palatino
+    case athelas
+    case openDyslexic
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .systemSerif: return "系统衬线"
+        case .systemSansSerif: return "系统无衬线"
+        case .palatino: return "Palatino"
+        case .athelas: return "Athelas"
+        case .openDyslexic: return "OpenDyslexic"
+        }
+    }
+
     var readiumFontFamily: FontFamily {
         switch self {
         case .systemSerif: return .serif
@@ -36,7 +215,6 @@ extension ReaderFontFamily {
         case .palatino: return .palatino
         case .athelas: return .athelas
         case .openDyslexic: return .openDyslexic
-        case .installed(let family): return FontFamily(rawValue: family)
         }
     }
 }
@@ -46,6 +224,17 @@ struct EPUBTOCEntry: Identifiable {
     let title: String
     let depth: Int
     let link: ReadiumShared.Link
+}
+
+struct EPUBReaderDraft: Equatable {
+    var fontFamily: EPUBFontFamily
+    var boldText: Bool
+    var lineHeight: Double
+    var contentTopInset: Double
+    var contentBottomInset: Double
+    var pageMargins: Double
+    var paragraphIndent: Double
+    var publisherStyles: Bool
 }
 
 @MainActor
@@ -71,26 +260,46 @@ final class EPUBReaderModel {
     }
 
     var fontScale: Double { didSet { preferencesDidChange() } }
-    var fontFamily: ReaderFontFamily { didSet { preferencesDidChange() } }
+    var fontFamily: EPUBFontFamily { didSet { preferencesDidChange() } }
     var boldText: Bool { didSet { preferencesDidChange() } }
     var lineHeight: Double { didSet { preferencesDidChange() } }
     var pageMargins: Double { didSet { preferencesDidChange() } }
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
     var contentTopInset: Double { didSet { preferencesDidChange() } }
     var contentBottomInset: Double { didSet { preferencesDidChange() } }
-    var theme: ReaderTheme { didSet { preferencesDidChange() } }
-    var flowMode: ReaderFlowMode { didSet { preferencesDidChange() } }
-    var pageTransition: ReaderPageTransitionMode { didSet { persistPreferences() } }
+    var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
+    var appearanceMode: EPUBAppearanceMode { didSet { preferencesDidChange() } }
+    var brightness: Double { didSet { preferencesDidChange() } }
+    var flowMode: EPUBFlowMode { didSet { preferencesDidChange() } }
+    var pageTransition: EPUBPageTransitionMode { didSet { persistPreferencesIfNeeded() } }
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
-    var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
+    var showBookTitleInPageHeader: Bool { didSet { persistPreferencesIfNeeded() } }
+
+    /// Nil means the current settings are a custom combination rather than a preset.
+    var selectedPreset: EPUBReaderPreset? { didSet { persistPreferencesIfNeeded() } }
+
+    private(set) var previewText = ""
+    private(set) var previewChapterTitle = ""
+    private(set) var isLoadingPreview = false
+
+    var readerContentUIColor: UIColor {
+        resolvedTheme.adjustedContentUIColor(brightness: brightness)
+    }
+
+    var readerBackgroundUIColor: UIColor {
+        resolvedTheme.adjustedBackgroundUIColor(brightness: brightness)
+    }
 
     var onToggleControls: (() -> Void)?
-    var onReaderInteraction: (() -> Void)?
     var onSwipeStart: (() -> Void)?
 
     private var publication: Publication?
     private var preferenceUpdateTask: Task<Void, Never>?
+    private var previewTask: Task<Void, Never>?
+    private var previewResourceHref: String?
     private var hasLoaded = false
+    private var suppressPreferenceUpdates = false
+    private var systemIsDark = false
 
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
@@ -102,10 +311,13 @@ final class EPUBReaderModel {
         static let contentTopInset = "reader.epub.contentTopInset"
         static let contentBottomInset = "reader.epub.contentBottomInset"
         static let theme = "reader.epub.theme"
+        static let appearanceMode = "reader.epub.appearanceMode"
+        static let brightness = "reader.epub.brightness"
         static let flowMode = "reader.epub.flowMode"
         static let pageTransition = "reader.epub.pageTransition"
         static let publisherStyles = "reader.epub.publisherStyles"
         static let showBookTitleInPageHeader = "reader.epub.showBookTitleInPageHeader"
+        static let selectedPreset = "reader.epub.selectedPreset"
     }
 
     init(book: Book) {
@@ -115,18 +327,32 @@ final class EPUBReaderModel {
 
         let defaults = UserDefaults.standard
         fontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
-        fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(ReaderFontFamily.init) ?? .systemSerif
+        fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(EPUBFontFamily.init) ?? .systemSerif
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
         pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
         contentTopInset = defaults.object(forKey: PreferenceKey.contentTopInset) as? Double ?? 56
         contentBottomInset = defaults.object(forKey: PreferenceKey.contentBottomInset) as? Double ?? 32
-        theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
-        flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(ReaderFlowMode.init) ?? .paged
-        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition).flatMap(ReaderPageTransitionMode.init) ?? .pageCurl
+        theme = defaults.string(forKey: PreferenceKey.theme).flatMap(EPUBReaderTheme.init) ?? .light
+        appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
+            .flatMap(EPUBAppearanceMode.init) ?? .system
+        brightness = defaults.object(forKey: PreferenceKey.brightness) as? Double ?? 0.82
+        flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(EPUBFlowMode.init) ?? .paged
+        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
+            .flatMap(EPUBPageTransitionMode.init) ?? (flowMode == .scroll ? .scroll : .slide)
+        if pageTransition == .scroll || flowMode == .scroll {
+            pageTransition = .scroll
+            flowMode = .scroll
+        } else {
+            flowMode = .paged
+        }
         publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
         showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
+        selectedPreset = defaults.string(forKey: PreferenceKey.selectedPreset).flatMap(EPUBReaderPreset.init)
+        if selectedPreset == nil {
+            selectedPreset = theme == .sepia ? .paper : (theme == .quiet ? .quiet : (theme == .light ? .original : nil))
+        }
     }
 
     func loadIfNeeded() async {
@@ -151,11 +377,11 @@ final class EPUBReaderModel {
                 config: .init(
                     preferences: makePreferences(),
                     disablePageTurnsWhileScrolling: true,
-                    // 顶部系统安全区由 ReaderChrome 负责；这里保留零值作为
-                    // delegate 尚未挂接时的兜底，避免 Readium 再建立第二套顶部间距。
                     contentInset: [
-                        .compact: (top: 0, bottom: 0),
-                        .regular: (top: 0, bottom: 0),
+                        // 给正文顶部留出稳定的呼吸空间，避免贴近屏幕边缘；
+                        // 该 inset 也包含 Readium 要求的安全区预留。
+                        .compact: (top: 56, bottom: 32),
+                        .regular: (top: 64, bottom: 48),
                     ],
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6
@@ -168,6 +394,11 @@ final class EPUBReaderModel {
             }))
             self.navigator = navigator
             hasLoaded = true
+
+            if currentReadingHref == nil {
+                currentReadingHref = initialLocation?.href.path
+            }
+            loadPreviewIfNeeded()
 
             if let initialLocation {
                 updateLocation(initialLocation)
@@ -208,16 +439,123 @@ final class EPUBReaderModel {
         currentTOCEntryID == entry.id
     }
 
+    func updateSystemAppearance(isDark: Bool) {
+        guard systemIsDark != isDark else { return }
+        systemIsDark = isDark
+        guard appearanceMode == .system else { return }
+        submitPreferencesImmediately()
+    }
+
+    func selectPageTransition(_ transition: EPUBPageTransitionMode) {
+        withPreferenceUpdatesSuspended {
+            pageTransition = transition
+            flowMode = transition == .scroll ? .scroll : .paged
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
+    }
+
+    func selectAppearance(_ appearance: EPUBAppearanceMode) {
+        withPreferenceUpdatesSuspended {
+            appearanceMode = appearance
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
+    }
+
+    func setFontScale(_ scale: Double) {
+        withPreferenceUpdatesSuspended {
+            fontScale = min(max(scale, 0.8), 2.0)
+            selectedPreset = nil
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
+    }
+
+    func apply(preset: EPUBReaderPreset) {
+        withPreferenceUpdatesSuspended {
+            selectedPreset = preset
+            switch preset {
+            case .original:
+                theme = .light
+                brightness = 0.82
+                fontScale = 1.0
+                fontFamily = .systemSerif
+                boldText = false
+                lineHeight = 1.5
+                pageMargins = 1.0
+                paragraphIndent = 2.0
+                publisherStyles = false
+            case .quiet:
+                theme = .quiet
+                brightness = 0.72
+                fontScale = 1.0
+                fontFamily = .systemSerif
+                boldText = false
+                lineHeight = 1.65
+                pageMargins = 1.1
+                paragraphIndent = 2.0
+                publisherStyles = false
+            case .paper:
+                theme = .sepia
+                brightness = 0.84
+                fontScale = 1.0
+                fontFamily = .systemSerif
+                boldText = false
+                lineHeight = 1.55
+                pageMargins = 1.0
+                paragraphIndent = 2.0
+                publisherStyles = false
+            }
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
+    }
+
+    func makeDraft() -> EPUBReaderDraft {
+        EPUBReaderDraft(
+            fontFamily: fontFamily,
+            boldText: boldText,
+            lineHeight: lineHeight,
+            contentTopInset: contentTopInset,
+            contentBottomInset: contentBottomInset,
+            pageMargins: pageMargins,
+            paragraphIndent: paragraphIndent,
+            publisherStyles: publisherStyles
+        )
+    }
+
+    func apply(_ draft: EPUBReaderDraft) {
+        withPreferenceUpdatesSuspended {
+            fontFamily = draft.fontFamily
+            boldText = draft.boldText
+            lineHeight = draft.lineHeight
+            contentTopInset = draft.contentTopInset
+            contentBottomInset = draft.contentBottomInset
+            pageMargins = draft.pageMargins
+            paragraphIndent = draft.paragraphIndent
+            publisherStyles = draft.publisherStyles
+            selectedPreset = nil
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
+    }
+
     func resetTypography() {
-        fontScale = 1.0
-        fontFamily = .systemSerif
-        boldText = false
-        lineHeight = 1.5
-        pageMargins = 1.0
-        paragraphIndent = 2.0
-        contentTopInset = 56
-        contentBottomInset = 32
-        publisherStyles = false
+        withPreferenceUpdatesSuspended {
+            fontScale = 1.0
+            fontFamily = .systemSerif
+            boldText = false
+            lineHeight = 1.5
+            pageMargins = 1.0
+            paragraphIndent = 2.0
+            contentTopInset = 56
+            contentBottomInset = 32
+            publisherStyles = false
+            selectedPreset = nil
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
     }
 
     private func loadTableOfContents(from publication: Publication) async {
@@ -241,7 +579,25 @@ final class EPUBReaderModel {
         tableOfContents = entries
     }
 
+    private var resolvedTheme: EPUBReaderTheme {
+        switch appearanceMode {
+        case .light:
+            return theme == .dark ? .light : theme
+        case .dark:
+            return .dark
+        case .system:
+            return systemIsDark ? .dark : (theme == .dark ? .light : theme)
+        }
+    }
+
+    private func withPreferenceUpdatesSuspended(_ action: () -> Void) {
+        suppressPreferenceUpdates = true
+        action()
+        suppressPreferenceUpdates = false
+    }
+
     private func preferencesDidChange() {
+        guard !suppressPreferenceUpdates else { return }
         persistPreferences()
         preferenceUpdateTask?.cancel()
         preferenceUpdateTask = Task { [weak self] in
@@ -251,14 +607,23 @@ final class EPUBReaderModel {
         }
     }
 
+    private func persistPreferencesIfNeeded() {
+        guard !suppressPreferenceUpdates else { return }
+        persistPreferences()
+    }
+
+    private func submitPreferencesImmediately() {
+        preferenceUpdateTask?.cancel()
+        guard let navigator else { return }
+        navigator.submitPreferences(makePreferences())
+    }
+
     private func makePreferences() -> EPUBPreferences {
-        // Readium 当前只区分分页与滚动；两种分页过渡先共享分页引擎，
-        // pageTransition 作为独立偏好保留，后续接入具体动画。
+        let effectiveTheme = resolvedTheme
         EPUBPreferences(
-            backgroundColor: theme.readiumBackgroundColor,
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
-            fontWeight: boldText ? 1.5 : nil,
+            fontWeight: boldText ? 1.75 : 1.0,
             lineHeight: lineHeight,
             pageMargins: pageMargins,
             paragraphIndent: paragraphIndent,
@@ -266,8 +631,56 @@ final class EPUBReaderModel {
             scroll: flowMode == .scroll,
             spread: .auto,
             textNormalization: !publisherStyles,
-            theme: theme.readiumTheme
+            theme: effectiveTheme.readiumTheme,
+            backgroundColor: ReadiumNavigator.Color(
+                uiColor: effectiveTheme.adjustedBackgroundUIColor(brightness: brightness)
+            ),
+            textColor: ReadiumNavigator.Color(
+                uiColor: effectiveTheme.adjustedContentUIColor(brightness: brightness)
+            )
         )
+    }
+
+    private func loadPreviewIfNeeded() {
+        let fallbackHref = publication?.readingOrder.first?.href
+        guard let href = currentReadingHref ?? fallbackHref else {
+            previewText = "暂时无法载入正文预览"
+            return
+        }
+
+        let normalizedHref = normalizedResourceHref(href)
+        guard previewResourceHref != normalizedHref else { return }
+        previewResourceHref = normalizedHref
+        previewTask?.cancel()
+        isLoadingPreview = true
+
+        let sourceURL = URL(fileURLWithPath: book.sourceURL)
+        previewTask = Task { [weak self] in
+            let text = await Task.detached(priority: .userInitiated) {
+                try? EPUBParser().loadChapterContent(url: sourceURL, href: normalizedHref)
+            }.value
+
+            guard !Task.isCancelled, let self else { return }
+            self.isLoadingPreview = false
+            guard let text, !text.isEmpty else {
+                self.previewText = "暂时无法载入正文预览"
+                return
+            }
+            self.previewText = Self.previewExcerpt(from: text)
+            self.previewChapterTitle = self.chapterTitle.isEmpty ? "当前章节" : self.chapterTitle
+        }
+    }
+
+    private static func previewExcerpt(from text: String) -> String {
+        let paragraphs = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let cleaned = (paragraphs.isEmpty ? text : paragraphs.joined(separator: "\n\n"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard cleaned.count > 280 else { return cleaned }
+        return String(cleaned.prefix(280)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
     }
 
     private func persistPreferences() {
@@ -281,10 +694,13 @@ final class EPUBReaderModel {
         defaults.set(contentTopInset, forKey: PreferenceKey.contentTopInset)
         defaults.set(contentBottomInset, forKey: PreferenceKey.contentBottomInset)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
+        defaults.set(appearanceMode.rawValue, forKey: PreferenceKey.appearanceMode)
+        defaults.set(brightness, forKey: PreferenceKey.brightness)
         defaults.set(flowMode.rawValue, forKey: PreferenceKey.flowMode)
         defaults.set(pageTransition.rawValue, forKey: PreferenceKey.pageTransition)
         defaults.set(publisherStyles, forKey: PreferenceKey.publisherStyles)
         defaults.set(showBookTitleInPageHeader, forKey: PreferenceKey.showBookTitleInPageHeader)
+        defaults.set(selectedPreset?.rawValue, forKey: PreferenceKey.selectedPreset)
     }
 
     private func updateLocation(_ locator: Locator) {
@@ -293,6 +709,7 @@ final class EPUBReaderModel {
         if let totalProgression = locator.locations.totalProgression {
             progress = min(max(totalProgression, 0), 1)
         }
+        loadPreviewIfNeeded()
         book.readerLocatorJSON = locator.jsonString
         book.progressPercent = progress
         book.lastReadAt = .now
@@ -300,13 +717,12 @@ final class EPUBReaderModel {
 }
 
 extension EPUBReaderModel {
-    /// ReaderChrome 已经占用顶部系统安全区和页眉空间，因此 Readium 只接收
-    /// 用户调节的正文顶部边距；底部仍保留 Home Indicator 的安全区保护。
+    /// 让正文边距滑杆在不遮挡刘海、动态岛或 Home Indicator 的前提下生效。
     /// Readium 会在分页重建及窗口尺寸变化时重新调用该代理方法。
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
         let safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
         return UIEdgeInsets(
-            top: max(0, CGFloat(contentTopInset)),
+            top: max(safeAreaInsets.top, CGFloat(contentTopInset)),
             left: 0,
             bottom: max(safeAreaInsets.bottom, CGFloat(contentBottomInset)),
             right: 0
@@ -339,7 +755,6 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
     func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {
         let width = self.navigator?.view.bounds.width ?? 0
         guard width > 0 else { return }
-        onReaderInteraction?()
 
         switch point.x / width {
         case ..<0.25:
