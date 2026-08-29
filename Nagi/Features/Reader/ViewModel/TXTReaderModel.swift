@@ -1357,6 +1357,7 @@ final class TXTReaderModel {
         let bookProgress = globalProgress(forGlobalOffset: offset)
 
         book.currentChapterIndex = currentChapterIndex
+        book.currentChapterTitle = currentChapter?.title
         book.progressPercent = bookProgress
         book.lastReadAt = .now
 

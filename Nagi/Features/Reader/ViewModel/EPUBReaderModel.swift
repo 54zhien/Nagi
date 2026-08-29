@@ -325,6 +325,7 @@ final class EPUBReaderModel {
     init(book: Book) {
         self.book = book
         title = book.title
+        chapterTitle = book.currentChapterTitle ?? ""
         currentLocatorJSON = book.readerLocatorJSON
         progress = min(max(book.progressPercent, 0), 1)
 
@@ -401,8 +402,8 @@ final class EPUBReaderModel {
             self.navigator = navigator
             hasLoaded = true
 
-            if currentReadingHref == nil {
-                currentReadingHref = initialLocation?.href.path
+            if currentReadingHref == nil, initialLocation == nil {
+                currentReadingHref = publication.readingOrder.first?.href
             }
             loadPreviewIfNeeded()
 
@@ -421,6 +422,7 @@ final class EPUBReaderModel {
     /// handles Readium state and should not own a ModelContext.
     func flushReadingProgress() {
         guard hasLoaded else { return }
+        synchronizeStoredChapterMetadata()
         book.progressPercent = min(max(progress, 0), 1)
         book.lastReadAt = .now
     }
@@ -654,6 +656,7 @@ final class EPUBReaderModel {
 
         append(links.isEmpty ? publication.readingOrder : links, depth: 0)
         tableOfContents = entries
+        synchronizeStoredChapterMetadata()
     }
 
     private var resolvedTheme: EPUBReaderTheme {
@@ -818,17 +821,53 @@ final class EPUBReaderModel {
     }
 
     private func updateLocation(_ locator: Locator) {
-        chapterTitle = locator.title ?? chapterTitle
-        currentReadingHref = locator.href.path
+        let locatorTitle = locator.title?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty
+        let nextHref = locator.href.path
+        let chapterChanged = currentReadingHref.map {
+            normalizedResourceHref($0) != normalizedResourceHref(nextHref)
+        } ?? true
+        chapterTitle = locatorTitle ?? chapterTitle
+        if locatorTitle == nil, chapterChanged {
+            chapterTitle = ""
+        }
+        currentReadingHref = nextHref
         if let totalProgression = locator.locations.totalProgression {
             progress = min(max(totalProgression, 0), 1)
         }
         loadPreviewIfNeeded()
         currentLocatorJSON = locator.jsonString
         book.readerLocatorJSON = locator.jsonString
+        synchronizeStoredChapterMetadata(preferredTitle: locatorTitle)
         book.progressPercent = progress
         book.lastReadAt = .now
         onStateChange?()
+    }
+
+    private func synchronizeStoredChapterMetadata(preferredTitle: String? = nil) {
+        if let currentIndex = currentTOCIndex {
+            book.currentChapterIndex = currentIndex
+            let normalizedTitle = chapterTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let preferredTitle {
+                chapterTitle = preferredTitle
+            } else if normalizedTitle.isEmpty {
+                chapterTitle = tableOfContents[currentIndex].title
+            }
+        } else if let preferredTitle {
+            chapterTitle = preferredTitle
+        }
+
+        let normalizedTitle = chapterTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        book.currentChapterTitle = normalizedTitle.isEmpty ? nil : normalizedTitle
+    }
+
+    private var currentTOCIndex: Int? {
+        guard let currentReadingHref else { return nil }
+        let currentResource = normalizedResourceHref(currentReadingHref)
+        return tableOfContents.firstIndex {
+            normalizedResourceHref($0.link.href) == currentResource
+        }
     }
 }
 

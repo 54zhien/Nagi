@@ -23,27 +23,23 @@ struct HomeView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 16) {
+                        LazyVStack(alignment: .leading, spacing: 16) {
                             Text("继续阅读")
                                 .font(.title2.weight(.semibold))
 
-                            ScrollView(.horizontal, showsIndicators: false) {
-                                LazyHStack(spacing: 16) {
-                                    ForEach(readingBooks) { book in
-                                        Button {
-                                            selectedBook = book
-                                        } label: {
-                                            BookCard(book: book, layout: .home)
-                                        }
-                                        .buttonStyle(.glass)
-                                        .accessibilityLabel(book.title)
-                                        .accessibilityHint("打开阅读")
-                                    }
+                            ForEach(readingBooks) { book in
+                                Button {
+                                    selectedBook = book
+                                } label: {
+                                    BookCard(book: book, layout: .home)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .padding(.horizontal, 2)
+                                .buttonStyle(.glass)
+                                .accessibilityLabel(book.title)
+                                .accessibilityHint("打开阅读")
                             }
                         }
-                        .padding(.horizontal, 20)
+                        .padding(.horizontal, 16)
                         .padding(.top, 12)
                         .padding(.bottom, 24)
                     }

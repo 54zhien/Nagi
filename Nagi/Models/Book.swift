@@ -26,6 +26,7 @@ final class Book {
     var chapterCount: Int
     // 阅读进度
     var currentChapterIndex: Int
+    var currentChapterTitle: String?
     var progressPercent: Double
     /// Readium Locator JSON，TXT 也使用同一字段保存字符锚点。
     var readerLocatorJSON: String?
@@ -49,6 +50,7 @@ final class Book {
         self.addedAt = .now
         self.chapterCount = chapterCount
         self.currentChapterIndex = 0
+        self.currentChapterTitle = nil
         self.progressPercent = 0
         self.readerLocatorJSON = nil
         self.txtReadingLocationJSON = nil

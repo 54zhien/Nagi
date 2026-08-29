@@ -32,18 +32,13 @@ struct LibraryView: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     ScrollView {
-                        LazyVGrid(
-                            columns: [
-                                GridItem(.adaptive(minimum: 148, maximum: 220), spacing: 16)
-                            ],
-                            alignment: .leading,
-                            spacing: 20
-                        ) {
+                        LazyVStack(alignment: .leading, spacing: 16) {
                             ForEach(books) { book in
                                 Button {
                                     selectedBook = book
                                 } label: {
                                     BookCard(book: book, layout: .library)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 .buttonStyle(.glass)
                                 .accessibilityLabel(book.title)
@@ -186,54 +181,65 @@ struct BookCard: View {
 
     var body: some View {
         switch layout {
-        case .library:
-            libraryCard
-        case .home:
-            homeCard
+        case .library, .home:
+            readingCard
         case .list:
             listCard
         }
     }
 
-    private var libraryCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private var readingCard: some View {
+        HStack(alignment: .top, spacing: 16) {
             BookCoverView(data: book.coverData)
-                .frame(maxWidth: .infinity)
+                .frame(width: 108, height: 162)
 
-            metadata
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top, spacing: 10) {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(book.title)
+                            .font(.headline)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
 
-    private var homeCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            BookCoverView(data: book.coverData)
-                .frame(width: 84)
+                        Text(authorText)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                    }
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(book.title)
-                    .font(.headline)
-                    .lineLimit(3)
-                    .multilineTextAlignment(.leading)
+                    Spacer(minLength: 8)
 
-                if let author = book.author, !author.isEmpty {
-                    Text(author)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
+                    Text(progressText)
+                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 10)
+                        .frame(minWidth: 54, minHeight: 32)
+                        .glassEffect(.clear, in: .capsule)
+                        .accessibilityLabel("阅读进度")
+                        .accessibilityValue(Text(progressText))
                 }
+
+                Label(chapterText, systemImage: "bookmark.fill")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.top, 14)
 
                 Spacer(minLength: 0)
 
                 ProgressView(value: progress)
+                    .progressViewStyle(.linear)
                     .tint(.accentColor)
-                    .accessibilityValue(Text("阅读进度 \(Int(progress * 100))%"))
+                    .frame(maxWidth: .infinity)
+                    .padding(.top, 16)
+                    .accessibilityLabel("阅读进度")
+                    .accessibilityValue(Text(progressText))
             }
-            .frame(maxWidth: .infinity, minHeight: 112, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: 162, alignment: .topLeading)
         }
-        .padding(12)
-        .frame(width: 280, alignment: .leading)
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var listCard: some View {
@@ -269,6 +275,24 @@ struct BookCard: View {
 
     private var progress: Double {
         min(max(book.progressPercent, 0), 1)
+    }
+
+    private var progressText: String {
+        "\(Int((progress * 100).rounded()))%"
+    }
+
+    private var authorText: String {
+        let author = book.author?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return author.isEmpty ? "未知作者" : author
+    }
+
+    private var chapterText: String {
+        guard book.lastReadAt != nil else { return "尚未阅读" }
+
+        let chapterNumber = max(book.currentChapterIndex + 1, 1)
+        let title = book.currentChapterTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !title.isEmpty else { return "第\(chapterNumber)章" }
+        return "第\(chapterNumber)章 \(title)"
     }
 
     private var formatLabel: String {
