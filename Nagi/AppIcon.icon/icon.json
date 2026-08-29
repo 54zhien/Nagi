@@ -11,7 +11,7 @@
           "image-name" : "凪.svg",
           "name" : "凪",
           "position" : {
-            "scale" : 1,
+            "scale" : 0.625,
             "translation-in-points" : [
               0,
               0
