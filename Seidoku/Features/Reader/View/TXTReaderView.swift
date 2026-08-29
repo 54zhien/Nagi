@@ -24,7 +24,6 @@ struct TXTReaderView: View {
         ReaderChrome(
             title: model.title,
             titleColor: model.theme.foreground,
-            readerBackground: model.theme.background,
             showsTitle: model.showBookTitleInPageHeader,
             showControls: $showControls,
             onDismiss: { dismiss() },
@@ -33,6 +32,8 @@ struct TXTReaderView: View {
             onSwipeStart: hideControlsForSwipe
         ) {
             content
+                // 正文表面自己延伸到顶部安全区，与 EPUB 使用同一套主题背景。
+                .background(model.theme.background.ignoresSafeArea())
                 .contentShape(Rectangle())
                 .simultaneousGesture(
                     TapGesture().onEnded {

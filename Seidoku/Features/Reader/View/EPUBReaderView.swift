@@ -23,7 +23,6 @@ struct EPUBReaderView: View {
         ReaderChrome(
             title: model.title,
             titleColor: Color(uiColor: model.theme.contentUIColor),
-            readerBackground: model.theme.background,
             showsTitle: model.showBookTitleInPageHeader,
             showControls: $showControls,
             onDismiss: { dismiss() },
@@ -32,6 +31,8 @@ struct EPUBReaderView: View {
             onSwipeStart: hideControlsForSwipe
         ) {
             content
+                // 正文表面自己延伸到顶部安全区，页眉下方不再由 ReaderChrome 叠加独立背景。
+                .background(model.theme.background.ignoresSafeArea())
         }
         .task {
             model.onToggleControls = toggleControls
