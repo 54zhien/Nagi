@@ -37,10 +37,15 @@ struct PageViewController: UIViewControllerRepresentable {
     }
 
     func makeUIViewController(context: Context) -> UIPageViewController {
+        let options: [UIPageViewController.OptionsKey: Any]? = transitionStyle == .pageCurl
+            ? [.spineLocation: UIPageViewController.SpineLocation.min.rawValue]
+            : nil
         let pageVC = UIPageViewController(
             transitionStyle: transitionStyle,
             navigationOrientation: .horizontal,
-            options: [.spineLocation: UIPageViewController.SpineLocation.none.rawValue]
+            // `.none` is not valid for `.pageCurl`; a single-page reader uses
+            // the minimum spine and the scroll transition has no spine.
+            options: options
         )
         pageVC.dataSource = context.coordinator
         pageVC.delegate = context.coordinator

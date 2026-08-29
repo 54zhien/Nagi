@@ -54,19 +54,62 @@ enum TextPaginator {
                     length: textStorage.length - location
                 )
                 pages.append(Page(
-                    attributedText: textStorage.attributedSubstring(from: remaining),
+                    attributedText: pageText(from: textStorage, range: remaining),
                     characterRange: remaining
                 ))
                 break
             }
 
             pages.append(Page(
-                attributedText: textStorage.attributedSubstring(from: charRange),
+                attributedText: pageText(from: textStorage, range: charRange),
                 characterRange: charRange
             ))
             location = NSMaxRange(charRange)
         }
 
         return pages
+    }
+
+    /// A page is rendered in its own text view, so a page that starts in the
+    /// middle of a paragraph would otherwise be treated as that paragraph's
+    /// first line again.  Remove only the first-line indent for that leading
+    /// continuation; all other typography stays identical to the full layout
+    /// used for pagination.
+    private static func pageText(
+        from textStorage: NSTextStorage,
+        range: NSRange
+    ) -> NSAttributedString {
+        let page = NSMutableAttributedString(
+            attributedString: textStorage.attributedSubstring(from: range)
+        )
+        guard range.length > 0 else { return page }
+
+        let source = textStorage.string as NSString
+        var paragraphStart = 0
+        var paragraphEnd = 0
+        var contentsEnd = 0
+        source.getParagraphStart(
+            &paragraphStart,
+            end: &paragraphEnd,
+            contentsEnd: &contentsEnd,
+            for: NSRange(location: range.location, length: 0)
+        )
+
+        guard paragraphStart < range.location else { return page }
+        let firstParagraphLength = min(NSMaxRange(range), paragraphEnd) - range.location
+        guard firstParagraphLength > 0,
+              let style = page.attribute(.paragraphStyle, at: 0, effectiveRange: nil)
+                  as? NSParagraphStyle,
+              let continuationStyle = style.mutableCopy() as? NSMutableParagraphStyle else {
+            return page
+        }
+
+        continuationStyle.firstLineHeadIndent = 0
+        page.addAttribute(
+            .paragraphStyle,
+            value: continuationStyle,
+            range: NSRange(location: 0, length: firstParagraphLength)
+        )
+        return page
     }
 }
