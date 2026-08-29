@@ -178,7 +178,7 @@ struct TXTReaderView: View {
                 insets: model.readerInsets,
                 background: model.theme.background,
                 revision: model.layoutGeneration,
-                positionID: model.currentChapterID ?? "txt-\(model.currentChapterIndex)",
+                positionID: model.scrollPositionID,
                 initialCharacterOffset: model.initialScrollCharacterOffset,
                 initialProgress: model.initialScrollProgress,
                 onSwipeStart: handleContentSwipeStart,

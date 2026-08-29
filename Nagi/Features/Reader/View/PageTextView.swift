@@ -89,8 +89,14 @@ struct ScrollableTextView: UIViewRepresentable {
         context.coordinator.onCharacterOffset = onCharacterOffset
         context.coordinator.onProgress = onProgress
 
-        guard context.coordinator.revision != revision else { return }
-        let preservePosition = context.coordinator.positionID == positionID
+        let revisionChanged = context.coordinator.revision != revision
+        let positionChanged = context.coordinator.positionID != positionID
+        guard revisionChanged || positionChanged else { return }
+
+        // A chapter selection changes the anchor without changing the text
+        // layout generation.  Preserve the current viewport only while the
+        // same anchor is being re-rendered (for example after a style change).
+        let preservePosition = !positionChanged
         let previousCharacterOffset = preservePosition
             ? context.coordinator.characterOffset(in: textView)
             : nil

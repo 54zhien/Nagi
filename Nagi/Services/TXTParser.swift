@@ -62,7 +62,9 @@ struct TXTParser: Sendable {
             throw ParseError.cannotRead(error.localizedDescription)
         }
 
-        let text = Self.decode(data).replacingOccurrences(of: "\u{FEFF}", with: "")
+        let text = Self.normalizeLineEndings(
+            Self.decode(data).replacingOccurrences(of: "\u{FEFF}", with: "")
+        )
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             throw ParseError.emptyContent
@@ -178,9 +180,7 @@ struct TXTParser: Sendable {
         _ text: String,
         fallbackTitle: String
     ) -> [TXTChapter] {
-        let normalized = text
-            .replacingOccurrences(of: "\r\n", with: "\n")
-            .replacingOccurrences(of: "\r", with: "\n")
+        let normalized = normalizeLineEndings(text)
         let lines = normalized.components(separatedBy: "\n")
         let starts = lines.enumerated().compactMap { index, line -> (Int, String)? in
             guard let title = chapterTitle(from: line) else { return nil }
@@ -212,6 +212,19 @@ struct TXTParser: Sendable {
             return TXTChapter(title: start.1, content: content)
         })
         return chapters
+    }
+
+    /// Normalize all Unicode line separators before chapter detection and
+    /// pagination.  Files copied from rich-text editors can contain U+2028,
+    /// U+2029, or NEL instead of CR/LF; treating those as real paragraph
+    /// boundaries keeps the TXT renderer deterministic across encodings.
+    private static func normalizeLineEndings(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .replacingOccurrences(of: "\u{2028}", with: "\n")
+            .replacingOccurrences(of: "\u{2029}", with: "\n")
+            .replacingOccurrences(of: "\u{0085}", with: "\n")
     }
 
     private static func chapterTitle(from line: String) -> String? {
