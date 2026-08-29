@@ -41,10 +41,11 @@ struct ReaderChrome<Content: View>: View {
     }
 
     var body: some View {
+        // 阅读表面只延伸到左右和底部；顶部必须保留系统安全区，交给页眉和退出控件。
         GeometryReader { geometry in
             ZStack {
                 content
-                    .ignoresSafeArea()
+                    .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
             }
             // 页眉是正文的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -72,8 +73,10 @@ struct ReaderChrome<Content: View>: View {
                     .onChanged { _ in onSwipeStart?() }
             )
         }
-        .ignoresSafeArea()
-        .statusBarHidden(true)
+        // 保留顶部安全区，同时让 GeometryReader 继续覆盖底部和横向区域；
+        // 因此底栏仍使用同一套全屏圆角几何，不改变其位置计算。
+        .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
+        .toolbarVisibility(.hidden, for: .statusBar)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
     }
