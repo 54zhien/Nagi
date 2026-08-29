@@ -43,9 +43,7 @@ final class LibraryViewModel {
         Task {
             do {
                 let results = try await Self.parseBooksInBackground(files)
-                for result in results {
-                    context.insert(result.makeBook())
-                }
+                try Self.upsert(results, into: context)
                 try context.save()
             } catch {
                 errorMessage = error.localizedDescription
@@ -59,7 +57,7 @@ final class LibraryViewModel {
             var results: [BookImportResult] = []
             for fileURL in files {
                 switch fileURL.pathExtension.lowercased() {
-                case "txt":
+                case let fileExtension where TXTParser.supportedExtensions.contains(fileExtension):
                     let parsed = try TXTParser().parse(url: fileURL)
                     results.append(BookImportResult(
                         title: parsed.title, author: parsed.author,
@@ -80,6 +78,24 @@ final class LibraryViewModel {
             return results
         }
         return try await task.value
+    }
+
+    /// Keep one SwiftData record per imported sandbox path. Re-importing a
+    /// replaced file updates its metadata instead of creating a duplicate
+    /// Book that points to the same physical TXT.
+    static func upsert(_ results: [BookImportResult], into context: ModelContext) throws {
+        var existingBooks = try context.fetch(FetchDescriptor<Book>())
+        for result in results {
+            if let existing = existingBooks.first(where: { $0.sourceURL == result.sourceURL }) {
+                existing.author = result.author
+                existing.formatRaw = result.format.rawValue
+                existing.chapterCount = result.chapterCount
+            } else {
+                let book = result.makeBook()
+                context.insert(book)
+                existingBooks.append(book)
+            }
+        }
     }
 
     // MARK: - 书库操作

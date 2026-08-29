@@ -6,11 +6,13 @@
 //
 
 import SwiftUI
+import SwiftData
 import UIKit
 
 struct TXTReaderView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.modelContext) private var modelContext
     @State private var model: TXTReaderModel
     @State private var showControls = true
     @State private var interactionRevision = 0
@@ -53,6 +55,10 @@ struct TXTReaderView: View {
         .task {
             await model.load()
         }
+        .onDisappear {
+            model.flushReadingProgress()
+            try? modelContext.save()
+        }
         .sheet(isPresented: $showSettings) {
             ReaderSettingsSheet(
                 showBookTitleInPageHeader: $model.showBookTitleInPageHeader,
@@ -81,17 +87,6 @@ struct TXTReaderView: View {
                 model.selectChapter(chapter)
             }
         }
-        .alert(
-            "阅读失败",
-            isPresented: Binding(
-                get: { model.errorMessage != nil },
-                set: { if !$0 { model.errorMessage = nil } }
-            )
-        ) {
-            Button("好", role: .cancel) {}
-        } message: {
-            Text(model.errorMessage ?? "")
-        }
     }
 
     @ViewBuilder
@@ -101,17 +96,38 @@ struct TXTReaderView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(model.theme.background)
         } else if let error = model.errorMessage {
-            ContentUnavailableView(
-                "无法显示内容",
-                systemImage: "doc.text",
-                description: Text(error)
-            )
+            VStack(spacing: 16) {
+                ContentUnavailableView(
+                    "无法显示内容",
+                    systemImage: "doc.text",
+                    description: Text(error)
+                )
+
+                Button {
+                    Task { await model.retry() }
+                } label: {
+                    Label("重试", systemImage: "arrow.clockwise")
+                        .font(.body.weight(.semibold))
+                        .padding(.horizontal, 18)
+                        .frame(minHeight: 44)
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: .capsule)
+                .accessibilityLabel("重试打开 TXT")
+                .accessibilityHint("重新加载当前文本文件")
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(model.theme.background)
         } else if model.pages.isEmpty && model.fullText.length == 0 {
-            ContentUnavailableView("暂无内容", systemImage: "doc.text")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(model.theme.background)
+            if model.chapters.isEmpty {
+                ContentUnavailableView("暂无内容", systemImage: "doc.text")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(model.theme.background)
+            } else {
+                ProgressView("正在排版…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(model.theme.background)
+            }
         } else {
             GeometryReader { geometry in
                 let safeAreaInsets = Self.uiEdgeInsets(from: geometry.safeAreaInsets)
@@ -163,7 +179,10 @@ struct TXTReaderView: View {
                 background: model.theme.background,
                 revision: model.layoutGeneration,
                 positionID: model.currentChapterID ?? "txt-\(model.currentChapterIndex)",
+                initialCharacterOffset: model.initialScrollCharacterOffset,
+                initialProgress: model.initialScrollProgress,
                 onSwipeStart: handleContentSwipeStart,
+                onCharacterOffset: model.updateScrollCharacterOffset,
                 onProgress: model.updateScrollProgress
             )
         }

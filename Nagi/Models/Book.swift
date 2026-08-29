@@ -27,7 +27,7 @@ final class Book {
     // 阅读进度
     var currentChapterIndex: Int
     var progressPercent: Double
-    /// Readium Locator JSON。相比页码，它能在字号、边距和方向变化后恢复到同一内容位置。
+    /// Readium Locator JSON，TXT 也使用同一字段保存字符锚点。
     var readerLocatorJSON: String?
 
     init(title: String, author: String?, format: BookFormat, sourceURL: String, chapterCount: Int = 0) {

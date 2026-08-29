@@ -28,9 +28,7 @@ struct NagiApp: App {
                 let files = try FileImportService().importFiles([url])
                 let results = try await LibraryViewModel.parseBooksInBackground(files)
                 let context = Persistence.container.mainContext
-                for result in results {
-                    context.insert(result.makeBook())
-                }
+                try LibraryViewModel.upsert(results, into: context)
                 try context.save()
                 AppImportState.shared.message = "已导入「\(results.first?.title ?? "书")」"
             } catch {

@@ -49,13 +49,28 @@ struct FileImportService {
             // 注意：asCopy:true 返回的 URL 已在 app 沙盒内，startAccessing 会返回 false（属正常，无需 security-scoped 权限），仍可直接复制。
 
             let destination = importsDirectory.appendingPathComponent(url.lastPathComponent)
+            let temporary = importsDirectory.appendingPathComponent(
+                ".\(UUID().uuidString).import",
+                isDirectory: false
+            )
             do {
+                // Complete the copy before replacing an existing import.  A
+                // failed copy therefore cannot leave the existing Book
+                // pointing at a half-written or missing file.
+                try FileManager.default.copyItem(at: url, to: temporary)
                 if FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.removeItem(at: destination)
+                    _ = try FileManager.default.replaceItemAt(
+                        destination,
+                        withItemAt: temporary,
+                        backupItemName: nil,
+                        options: []
+                    )
+                } else {
+                    try FileManager.default.moveItem(at: temporary, to: destination)
                 }
-                try FileManager.default.copyItem(at: url, to: destination)
                 imported.append(destination)
             } catch {
+                try? FileManager.default.removeItem(at: temporary)
                 throw ImportError.copyFailed("导入「\(url.lastPathComponent)」失败：\(error.localizedDescription)")
             }
         }
