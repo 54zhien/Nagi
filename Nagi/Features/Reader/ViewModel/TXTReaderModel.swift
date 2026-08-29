@@ -31,6 +31,26 @@ private struct TXTLayoutResult: @unchecked Sendable {
     let pageBatch: TextPaginator.PageBatch?
 }
 
+enum TXTLayoutPhase: Equatable {
+    case idle
+    case loading
+    case waitingForViewport
+    case layingOut
+    case ready
+    case failed(String)
+
+    var progressTitle: String {
+        switch self {
+        case .idle: return "准备阅读…"
+        case .loading: return "正在打开 TXT…"
+        case .waitingForViewport: return "准备阅读区域…"
+        case .layingOut: return "正在排版…"
+        case .ready: return ""
+        case .failed: return "排版失败"
+        }
+    }
+}
+
 @MainActor
 @Observable
 final class TXTReaderModel {
@@ -78,6 +98,7 @@ final class TXTReaderModel {
 
     var isLoading = false
     var errorMessage: String?
+    private(set) var layoutPhase: TXTLayoutPhase = .idle
     private(set) var layoutGeneration = 0
 
     private var chapterLengths: [Int] = []
@@ -149,6 +170,7 @@ final class TXTReaderModel {
 
         isLoading = true
         errorMessage = nil
+        layoutPhase = .loading
         defer { isLoading = false }
 
         do {
@@ -184,11 +206,16 @@ final class TXTReaderModel {
             let savedChapter = savedLocation?.chapterIndex ?? book.currentChapterIndex
             currentChapterIndex = min(max(savedChapter, 0), chapters.count - 1)
             hasLoaded = true
+            layoutPhase = .waitingForViewport
             loadCurrentChapter(restorePosition: true)
+            if layoutPhase == .waitingForViewport {
+                tryStartLayoutIfReady()
+            }
         } catch is CancellationError {
             return
         } catch {
             errorMessage = error.localizedDescription
+            layoutPhase = .failed(error.localizedDescription)
         }
     }
 
@@ -200,7 +227,10 @@ final class TXTReaderModel {
 
     func loadCurrentChapter(showLastPage: Bool = false, restorePosition: Bool = false) {
         guard chapters.indices.contains(currentChapterIndex),
-              chapterLengths.indices.contains(currentChapterIndex) else { return }
+              chapterLengths.indices.contains(currentChapterIndex) else {
+            markLayoutFailure("排版失败：章节索引无效")
+            return
+        }
 
         let savedLocation = restorePosition ? decodedReadingLocation() : nil
         let targetOffset: Int
@@ -224,6 +254,7 @@ final class TXTReaderModel {
            fullText.length > 0,
            fullText.length == currentContent.utf16.count {
             currentChapterIndex = chapterIndex(forGlobalOffset: targetOffset)
+            layoutPhase = .ready
             persistReadingLocation()
             return
         }
@@ -239,6 +270,7 @@ final class TXTReaderModel {
             currentCharacterOffset = targetOffset
             currentChapterIndex = chapterIndex(forGlobalOffset: targetOffset)
             pendingCharacterOffset = nil
+            layoutPhase = .ready
             persistReadingLocation()
             return
         }
@@ -263,7 +295,7 @@ final class TXTReaderModel {
         let startOffset = showLastPage
             ? max(targetOffset - Self.pageBatchCharacterLimit, 0)
             : targetOffset
-        requestRepagination(startOffset: startOffset)
+        tryStartLayoutIfReady(startOffset: startOffset)
     }
 
     // MARK: - 分页与排版
@@ -273,13 +305,25 @@ final class TXTReaderModel {
         // reader surface is being inserted.  Starting a layout for that
         // value only creates an empty result and makes the real layout race
         // with it.
-        guard size.width > 1, size.height > 1 else { return }
+        guard size.width > 1, size.height > 1 else {
+            if hasLoaded, !currentContent.isEmpty, flowMode == .paged {
+                cancelLayoutTasks()
+                layoutRequestID &+= 1
+                layoutPhase = .waitingForViewport
+            }
+            return
+        }
         let sizeChanged = pageSize != size
         let insetsChanged = self.safeAreaInsets != safeAreaInsets
-        guard sizeChanged || insetsChanged else { return }
+        guard sizeChanged || insetsChanged else {
+            if layoutPhase == .waitingForViewport {
+                tryStartLayoutIfReady()
+            }
+            return
+        }
         pageSize = size
         self.safeAreaInsets = safeAreaInsets
-        requestRepagination()
+        tryStartLayoutIfReady()
     }
 
     var readerInsets: UIEdgeInsets {
@@ -293,7 +337,16 @@ final class TXTReaderModel {
         )
     }
 
-    private func requestRepagination(
+    private func cancelLayoutTasks() {
+        layoutTask?.cancel()
+        nextPageTask?.cancel()
+        previousPageTask?.cancel()
+        layoutTask = nil
+        nextPageTask = nil
+        previousPageTask = nil
+    }
+
+    private func tryStartLayoutIfReady(
         startOffset requestedStartOffset: Int? = nil,
         rebuildAttributedText: Bool = false
     ) {
@@ -305,11 +358,16 @@ final class TXTReaderModel {
         // paged reader in that transient state; wait for updateViewport and
         // generate the first bounded batch there.
         guard !shouldPaginate || (pageSize.width > 1 && pageSize.height > 1) else {
+            cancelLayoutTasks()
+            layoutRequestID &+= 1
+            layoutPhase = .waitingForViewport
             return
         }
 
         layoutRequestID &+= 1
         let requestID = layoutRequestID
+        layoutPhase = .layingOut
+        errorMessage = nil
         let requestedAnchor = clampCharacterOffset(
             requestedStartOffset
                 ?? pendingCharacterOffset
@@ -352,16 +410,15 @@ final class TXTReaderModel {
         )
         let restoreCharacterOffset = pendingCharacterOffset
 
-        layoutTask?.cancel()
-        nextPageTask?.cancel()
-        previousPageTask?.cancel()
-        nextPageTask = nil
-        previousPageTask = nil
+        cancelLayoutTasks()
         layoutTask = Task { [weak self] in
             do {
                 // Coalesce a slider's rapid updates into one layout request.
                 try await Task.sleep(nanoseconds: 50_000_000)
-            } catch {
+            } catch is CancellationError {
+                guard let self, self.layoutRequestID == requestID else { return }
+                self.layoutTask = nil
+                self.layoutPhase = .waitingForViewport
                 return
             }
 
@@ -399,14 +456,26 @@ final class TXTReaderModel {
                 }, onCancel: {
                     worker.cancel()
                 })
+            } catch is CancellationError {
+                worker.cancel()
+                guard let self, self.layoutRequestID == requestID else { return }
+                self.layoutTask = nil
+                self.layoutPhase = .waitingForViewport
+                return
             } catch {
                 worker.cancel()
+                guard let self, self.layoutRequestID == requestID else { return }
+                self.layoutTask = nil
+                let message = "排版失败：\(error.localizedDescription)"
+                self.errorMessage = message
+                self.layoutPhase = .failed(message)
                 return
             }
 
             guard !Task.isCancelled,
                   let self,
                   self.layoutRequestID == requestID else { return }
+            self.layoutTask = nil
             self.applyLayout(
                 result,
                 restoreCharacterOffset: restoreCharacterOffset
@@ -422,6 +491,10 @@ final class TXTReaderModel {
         layoutGeneration &+= 1
 
         guard flowMode == .paged else {
+            guard fullText.length > 0 else {
+                markLayoutFailure("排版失败：没有生成可显示的文本")
+                return
+            }
             pages = []
             pageRanges = []
             nextPageOffset = nil
@@ -432,11 +505,13 @@ final class TXTReaderModel {
             currentCharacterOffset = targetOffset
             currentChapterIndex = chapterIndex(forGlobalOffset: targetOffset)
             pendingCharacterOffset = targetOffset
+            layoutPhase = .ready
             return
         }
 
         guard let pageBatch = result.pageBatch else {
             pendingCharacterOffset = restoreCharacterOffset
+            markLayoutFailure("排版失败：没有生成分页结果")
             return
         }
 
@@ -452,6 +527,7 @@ final class TXTReaderModel {
 
         guard !pages.isEmpty else {
             pendingCharacterOffset = restoreCharacterOffset
+            markLayoutFailure("排版失败：没有生成可显示的页面")
             return
         }
 
@@ -479,6 +555,7 @@ final class TXTReaderModel {
                 updateReadingProgress()
             }
         }
+        layoutPhase = .ready
 
         // A restored location may start in the middle of the book.  Materialize
         // one preceding batch in the background so the first reverse swipe is
@@ -492,6 +569,11 @@ final class TXTReaderModel {
         if pages.count < 2, nextPageOffset != nil {
             requestNextPageBatch()
         }
+    }
+
+    private func markLayoutFailure(_ message: String) {
+        errorMessage = message
+        layoutPhase = .failed(message)
     }
 
     private var anchorOffset: Int {
@@ -930,12 +1012,7 @@ final class TXTReaderModel {
     /// Without this explicit cancellation a large TXT could continue laying
     /// out in the background after dismissal and keep the device busy.
     func cancelPendingLayout() {
-        layoutTask?.cancel()
-        nextPageTask?.cancel()
-        previousPageTask?.cancel()
-        layoutTask = nil
-        nextPageTask = nil
-        previousPageTask = nil
+        cancelLayoutTasks()
         layoutRequestID &+= 1
     }
 
@@ -952,6 +1029,7 @@ final class TXTReaderModel {
         currentContent = ""
         chapters = []
         hasLoaded = false
+        layoutPhase = .idle
         await load()
     }
 
@@ -981,13 +1059,13 @@ final class TXTReaderModel {
 
     private func styleDidChange() {
         persistPreferences()
-        requestRepagination(rebuildAttributedText: true)
+        tryStartLayoutIfReady(rebuildAttributedText: true)
     }
 
     private func flowModeDidChange() {
         persistPreferences()
         guard hasLoaded else { return }
-        requestRepagination()
+        tryStartLayoutIfReady()
     }
 
     private func persistPreferences() {

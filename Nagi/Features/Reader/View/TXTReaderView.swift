@@ -92,64 +92,58 @@ struct TXTReaderView: View {
 
     @ViewBuilder
     private var content: some View {
-        if model.isLoading {
-            ProgressView("正在打开 TXT…")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(model.theme.background)
-        } else if let error = model.errorMessage {
-            VStack(spacing: 16) {
-                ContentUnavailableView(
-                    "无法显示内容",
-                    systemImage: "doc.text",
-                    description: Text(error)
-                )
+        // GeometryReader must stay mounted while the file is opening and while
+        // the first page is being generated.  Otherwise the paged path can
+        // wait for a viewport that is hidden by its own progress placeholder.
+        GeometryReader { geometry in
+            let safeAreaInsets = Self.uiEdgeInsets(from: geometry.safeAreaInsets)
 
-                Button {
-                    Task { await model.retry() }
-                } label: {
-                    Label("重试", systemImage: "arrow.clockwise")
-                        .font(.body.weight(.semibold))
-                        .padding(.horizontal, 18)
-                        .frame(minHeight: 44)
+            ZStack {
+                if model.isLoading {
+                    ProgressView("正在打开 TXT…")
+                } else if let error = model.errorMessage {
+                    VStack(spacing: 16) {
+                        ContentUnavailableView(
+                            "无法显示内容",
+                            systemImage: "doc.text",
+                            description: Text(error)
+                        )
+
+                        Button {
+                            Task { await model.retry() }
+                        } label: {
+                            Label("重试", systemImage: "arrow.clockwise")
+                                .font(.body.weight(.semibold))
+                                .padding(.horizontal, 18)
+                                .frame(minHeight: 44)
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .accessibilityLabel("重试打开 TXT")
+                        .accessibilityHint("重新加载当前文本文件")
+                    }
+                } else if model.layoutPhase != .ready {
+                    ProgressView(model.layoutPhase.progressTitle)
+                } else {
+                    readerSurface
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: .capsule)
-                .accessibilityLabel("重试打开 TXT")
-                .accessibilityHint("重新加载当前文本文件")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(model.theme.background)
-        } else if model.pages.isEmpty && model.fullText.length == 0 {
-            if model.chapters.isEmpty {
-                ContentUnavailableView("暂无内容", systemImage: "doc.text")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(model.theme.background)
-            } else {
-                ProgressView("正在排版…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(model.theme.background)
+            .onAppear {
+                model.updateViewport(size: geometry.size, safeAreaInsets: safeAreaInsets)
             }
-        } else {
-            GeometryReader { geometry in
-                let safeAreaInsets = Self.uiEdgeInsets(from: geometry.safeAreaInsets)
-
-                readerSurface
-                    .background(model.theme.background)
-                    .onAppear {
-                        model.updateViewport(size: geometry.size, safeAreaInsets: safeAreaInsets)
-                    }
-                    .onChange(of: geometry.size) { _, newSize in
-                        model.updateViewport(
-                            size: newSize,
-                            safeAreaInsets: Self.uiEdgeInsets(from: geometry.safeAreaInsets)
-                        )
-                    }
-                    .onChange(of: geometry.safeAreaInsets) { _, newInsets in
-                        model.updateViewport(
-                            size: geometry.size,
-                            safeAreaInsets: Self.uiEdgeInsets(from: newInsets)
-                        )
-                    }
+            .onChange(of: geometry.size) { _, newSize in
+                model.updateViewport(
+                    size: newSize,
+                    safeAreaInsets: Self.uiEdgeInsets(from: geometry.safeAreaInsets)
+                )
+            }
+            .onChange(of: geometry.safeAreaInsets) { _, newInsets in
+                model.updateViewport(
+                    size: geometry.size,
+                    safeAreaInsets: Self.uiEdgeInsets(from: newInsets)
+                )
             }
         }
     }
@@ -158,23 +152,18 @@ struct TXTReaderView: View {
     private var readerSurface: some View {
         switch model.flowMode {
         case .paged:
-            if model.pages.isEmpty {
-                ProgressView("正在排版…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                PageViewController(
-                    pages: model.pages,
-                    transitionStyle: model.pageTransition.uiKitTransitionStyle,
-                    insets: model.readerInsets,
-                    background: model.theme.background,
-                    currentPage: $model.currentPageIndex,
-                    pageRanges: model.pageRanges,
-                    onSwipeStart: handleContentSwipeStart,
-                    onNeedNextPages: { model.requestNextPageBatch() },
-                    onNeedPreviousPages: { model.requestPreviousPageBatch() }
-                )
-                .id("\(model.layoutGeneration)-\(model.pageTransition.rawValue)")
-            }
+            PageViewController(
+                pages: model.pages,
+                transitionStyle: model.pageTransition.uiKitTransitionStyle,
+                insets: model.readerInsets,
+                background: model.theme.background,
+                currentPage: $model.currentPageIndex,
+                pageRanges: model.pageRanges,
+                onSwipeStart: handleContentSwipeStart,
+                onNeedNextPages: { model.requestNextPageBatch() },
+                onNeedPreviousPages: { model.requestPreviousPageBatch() }
+            )
+            .id("\(model.layoutGeneration)-\(model.pageTransition.rawValue)")
 
         case .scroll:
             ScrollableTextView(
