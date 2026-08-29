@@ -52,7 +52,10 @@ struct ScrollableTextView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
+        // TextKit 2 keeps layout work viewport-driven for long TXT books.
+        // PageTextView above remains a small TextKit 1-compatible surface;
+        // the continuous reader is the path that needs the modern engine.
+        let textView = UITextView(usingTextLayoutManager: true)
         textView.isScrollEnabled = true
         textView.isEditable = false
         textView.isSelectable = false
@@ -172,7 +175,11 @@ struct ScrollableTextView: UIViewRepresentable {
                 return
             }
 
-            textView.layoutManager.ensureLayout(for: textView.textContainer)
+            if let textLayoutManager = textView.textLayoutManager {
+                textLayoutManager.ensureLayout(for: textView.bounds)
+            } else {
+                textView.layoutManager.ensureLayout(for: textView.textContainer)
+            }
             let visibleHeight = textView.bounds.height - textView.adjustedContentInset.top
                 - textView.adjustedContentInset.bottom
             let maximumOffset = max(textView.contentSize.height - visibleHeight, 0)

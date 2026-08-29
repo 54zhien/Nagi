@@ -167,7 +167,9 @@ struct TXTReaderView: View {
                     insets: model.readerInsets,
                     background: model.theme.background,
                     currentPage: $model.currentPageIndex,
-                    onSwipeStart: handleContentSwipeStart
+                    onSwipeStart: handleContentSwipeStart,
+                    onNeedNextPages: { model.requestNextPageBatch() },
+                    onNeedPreviousPages: { model.requestPreviousPageBatch() }
                 )
                 .id("\(model.layoutGeneration)-\(model.pageTransition.rawValue)")
             }

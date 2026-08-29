@@ -8,66 +8,129 @@
 import UIKit
 
 enum TextPaginator {
-    struct Page {
+    struct Page: @unchecked Sendable {
         let attributedText: NSAttributedString
         let characterRange: NSRange
     }
 
-    /// 把带排版属性的文本按页面尺寸分页，并保留每页对应的字符范围。
-    /// 字符范围让排版变化时可以回到同一段文字，而不是只回到旧页码比例。
-    static func paginate(
+    struct PageBatch: @unchecked Sendable {
+        let pages: [Page]
+        let nextCharacterOffset: Int
+        let isComplete: Bool
+    }
+
+    /// 只排一段有限的字符，并返回下一段的起点。
+    ///
+    /// TXT 不应该在打开时把整本书复制成页面数组。调用方可以用这个批次
+    /// 接口先生成当前页附近的内容，用户继续翻页时再追加后续批次。
+    static func paginateBatch(
         _ text: NSAttributedString,
         pageSize: CGSize,
-        insets: UIEdgeInsets
-    ) -> [Page] {
-        guard text.length > 0 else { return [] }
+        insets: UIEdgeInsets,
+        range requestedRange: NSRange,
+        maximumPages: Int
+    ) throws -> PageBatch {
+        try Task.checkCancellation()
+        guard text.length > 0, maximumPages > 0 else {
+            return PageBatch(
+                pages: [],
+                nextCharacterOffset: requestedRange.location,
+                isComplete: true
+            )
+        }
 
+        let documentLength = text.length
+        let start = min(max(requestedRange.location, 0), documentLength)
+        let requestedEnd = min(max(NSMaxRange(requestedRange), start), documentLength)
+        guard start < requestedEnd else {
+            return PageBatch(
+                pages: [],
+                nextCharacterOffset: start,
+                isComplete: start >= documentLength
+            )
+        }
+
+        let sourceRange = NSRange(location: start, length: requestedEnd - start)
+        // Keep the temporary TextKit storage bounded.  This is the important
+        // difference from the old implementation, which copied every page of
+        // the whole novel before showing the first one.
+        let textStorage = NSTextStorage(
+            attributedString: text.attributedSubstring(from: sourceRange)
+        )
         let contentSize = CGSize(
             width: max(pageSize.width - insets.left - insets.right, 1),
             height: max(pageSize.height - insets.top - insets.bottom, 1)
         )
 
-        let textStorage = NSTextStorage(attributedString: text)
         let layoutManager = NSLayoutManager()
         textStorage.addLayoutManager(layoutManager)
 
         var pages: [Page] = []
-        var location = 0
+        pages.reserveCapacity(min(maximumPages, 8))
+        var localLocation = 0
 
-        while location < textStorage.length {
+        while localLocation < textStorage.length, pages.count < maximumPages {
+            try Task.checkCancellation()
+
             let textContainer = NSTextContainer(size: contentSize)
             textContainer.lineFragmentPadding = 0
             textContainer.maximumNumberOfLines = 0
             layoutManager.addTextContainer(textContainer)
 
             let glyphRange = layoutManager.glyphRange(for: textContainer)
-            let charRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+            let charRange = layoutManager.characterRange(
+                forGlyphRange: glyphRange,
+                actualGlyphRange: nil
+            )
 
             // A zero or backwards range means TextKit could not make forward
             // progress (usually because the available container is too small).
             // Preserve the remaining text instead of silently dropping it.
             guard charRange.length > 0,
-                  charRange.location >= location,
+                  charRange.location >= localLocation,
                   NSMaxRange(charRange) <= textStorage.length else {
                 let remaining = NSRange(
-                    location: location,
-                    length: textStorage.length - location
+                    location: localLocation,
+                    length: textStorage.length - localLocation
+                )
+                let globalRange = NSRange(
+                    location: start + remaining.location,
+                    length: remaining.length
                 )
                 pages.append(Page(
-                    attributedText: pageText(from: textStorage, range: remaining),
-                    characterRange: remaining
+                    attributedText: pageText(
+                        from: textStorage,
+                        range: remaining,
+                        isContinuation: start > 0 && pages.isEmpty
+                    ),
+                    characterRange: globalRange
                 ))
+                localLocation = textStorage.length
                 break
             }
 
+            let globalRange = NSRange(
+                location: start + charRange.location,
+                length: charRange.length
+            )
             pages.append(Page(
-                attributedText: pageText(from: textStorage, range: charRange),
-                characterRange: charRange
+                attributedText: pageText(
+                    from: textStorage,
+                    range: charRange,
+                    isContinuation: start > 0 && pages.isEmpty
+                ),
+                characterRange: globalRange
             ))
-            location = NSMaxRange(charRange)
+            localLocation = NSMaxRange(charRange)
         }
 
-        return pages
+        try Task.checkCancellation()
+        let nextOffset = start + localLocation
+        return PageBatch(
+            pages: pages,
+            nextCharacterOffset: nextOffset,
+            isComplete: nextOffset >= documentLength
+        )
     }
 
     /// A page is rendered in its own text view, so a page that starts in the
@@ -77,12 +140,18 @@ enum TextPaginator {
     /// used for pagination.
     private static func pageText(
         from textStorage: NSTextStorage,
-        range: NSRange
+        range: NSRange,
+        isContinuation: Bool
     ) -> NSAttributedString {
         let page = NSMutableAttributedString(
             attributedString: textStorage.attributedSubstring(from: range)
         )
         guard range.length > 0 else { return page }
+
+        if isContinuation {
+            removeFirstLineIndent(from: page)
+            return page
+        }
 
         let source = textStorage.string as NSString
         var paragraphStart = 0
@@ -111,5 +180,30 @@ enum TextPaginator {
             range: NSRange(location: 0, length: firstParagraphLength)
         )
         return page
+    }
+
+    private static func removeFirstLineIndent(from page: NSMutableAttributedString) {
+        guard let style = page.attribute(.paragraphStyle, at: 0, effectiveRange: nil)
+                as? NSParagraphStyle,
+              let continuationStyle = style.mutableCopy() as? NSMutableParagraphStyle else {
+            return
+        }
+
+        let string = page.string as NSString
+        var paragraphStart = 0
+        var paragraphEnd = 0
+        var contentsEnd = 0
+        string.getParagraphStart(
+            &paragraphStart,
+            end: &paragraphEnd,
+            contentsEnd: &contentsEnd,
+            for: NSRange(location: 0, length: 0)
+        )
+        continuationStyle.firstLineHeadIndent = 0
+        page.addAttribute(
+            .paragraphStyle,
+            value: continuationStyle,
+            range: NSRange(location: 0, length: max(paragraphEnd, 1))
+        )
     }
 }

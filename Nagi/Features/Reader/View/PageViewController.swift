@@ -15,6 +15,8 @@ struct PageViewController: UIViewControllerRepresentable {
     let background: Color
     @Binding var currentPage: Int
     let onSwipeStart: (() -> Void)?
+    let onNeedNextPages: (() -> Void)?
+    let onNeedPreviousPages: (() -> Void)?
 
     init(
         pages: [NSAttributedString],
@@ -22,7 +24,9 @@ struct PageViewController: UIViewControllerRepresentable {
         insets: UIEdgeInsets,
         background: Color,
         currentPage: Binding<Int>,
-        onSwipeStart: (() -> Void)? = nil
+        onSwipeStart: (() -> Void)? = nil,
+        onNeedNextPages: (() -> Void)? = nil,
+        onNeedPreviousPages: (() -> Void)? = nil
     ) {
         self.pages = pages
         self.transitionStyle = transitionStyle
@@ -30,6 +34,8 @@ struct PageViewController: UIViewControllerRepresentable {
         self.background = background
         self._currentPage = currentPage
         self.onSwipeStart = onSwipeStart
+        self.onNeedNextPages = onNeedNextPages
+        self.onNeedPreviousPages = onNeedPreviousPages
     }
 
     func makeCoordinator() -> Coordinator {
@@ -117,6 +123,12 @@ struct PageViewController: UIViewControllerRepresentable {
             guard completed, let current = pageViewController.viewControllers?.first,
                   let index = index(of: current) else { return }
             parent.currentPage = index
+            if index >= parent.pages.count - 2 {
+                parent.onNeedNextPages?()
+            }
+            if index <= 1 {
+                parent.onNeedPreviousPages?()
+            }
         }
     }
 }
