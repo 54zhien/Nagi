@@ -28,6 +28,7 @@ struct LibraryView: View {
                         "书库是空的",
                         systemImage: "books.vertical"
                     )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     List {
                         ForEach(books) { book in

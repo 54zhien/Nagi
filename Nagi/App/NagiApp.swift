@@ -45,16 +45,10 @@ struct NagiApp: App {
 struct RootTabView: View {
     @State private var selection: AppTab = .home
     @State private var searchText = ""
-    @State private var isSearchPresented = false
     @State private var importState = AppImportState.shared
 
     var body: some View {
-        tabViewContent
-            .onChange(of: selection) { _, newSelection in
-                // The searchable modifier is structurally present only for the
-                // dedicated search tab, so regular tabs cannot render a search drawer.
-                isSearchPresented = newSelection == .search
-            }
+        tabView
             .alert("导入", isPresented: Binding(
                 get: { importState.message != nil },
                 set: { if !$0 { importState.message = nil } }
@@ -63,20 +57,6 @@ struct RootTabView: View {
             } message: {
                 Text(importState.message ?? "")
             }
-    }
-
-    @ViewBuilder
-    private var tabViewContent: some View {
-        if selection == .search {
-            tabView
-                .searchable(
-                    text: $searchText,
-                    isPresented: $isSearchPresented,
-                    prompt: "搜索书名"
-                )
-        } else {
-            tabView
-        }
     }
 
     private var tabView: some View {
@@ -97,6 +77,7 @@ struct RootTabView: View {
                 SearchView(searchText: $searchText)
             }
         }
+        .searchable(text: $searchText, prompt: "搜索书名")
         .tabViewSearchActivation(.searchTabSelection)
         .tabViewStyle(.sidebarAdaptable)
     }
