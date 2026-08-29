@@ -76,7 +76,9 @@ struct ReaderChrome<Content: View>: View {
         // 保留顶部安全区，同时让 GeometryReader 继续覆盖底部和横向区域；
         // 因此底栏仍使用同一套全屏圆角几何，不改变其位置计算。
         .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
-        .toolbarVisibility(.hidden, for: .statusBar)
+        // The status-bar toolbar placement is not present in the Xcode 26.3 SDK
+        // used by CI. Keep the reader edge-to-edge with the compatible API.
+        .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
     }
