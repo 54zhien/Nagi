@@ -24,6 +24,7 @@ struct TXTReaderView: View {
         ReaderChrome(
             title: model.title,
             titleColor: model.theme.foreground,
+            readerBackground: model.theme.background,
             showsTitle: model.showBookTitleInPageHeader,
             showControls: $showControls,
             onDismiss: { dismiss() },

@@ -7,13 +7,21 @@
 
 import ReadiumNavigator
 import SwiftUI
+import UIKit
 
 struct ReadiumNavigatorView: UIViewControllerRepresentable {
     let navigator: EPUBNavigatorViewController
+    let background: Color
 
     func makeUIViewController(context: Context) -> EPUBNavigatorViewController {
-        navigator
+        navigator.view.backgroundColor = UIColor(background)
+        return navigator
     }
 
-    func updateUIViewController(_ uiViewController: EPUBNavigatorViewController, context: Context) {}
+    func updateUIViewController(
+        _ uiViewController: EPUBNavigatorViewController,
+        context: Context
+    ) {
+        uiViewController.view.backgroundColor = UIColor(background)
+    }
 }

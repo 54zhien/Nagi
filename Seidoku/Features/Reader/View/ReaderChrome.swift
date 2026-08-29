@@ -11,6 +11,7 @@ struct ReaderChrome<Content: View>: View {
     let content: Content
     let title: String
     let titleColor: Color
+    let readerBackground: Color
     let showsTitle: Bool
     @Binding var showControls: Bool
     let onDismiss: () -> Void
@@ -21,6 +22,7 @@ struct ReaderChrome<Content: View>: View {
     init(
         title: String,
         titleColor: Color,
+        readerBackground: Color,
         showsTitle: Bool,
         showControls: Binding<Bool>,
         onDismiss: @escaping () -> Void,
@@ -32,6 +34,7 @@ struct ReaderChrome<Content: View>: View {
         self.content = content()
         self.title = title
         self.titleColor = titleColor
+        self.readerBackground = readerBackground
         self.showsTitle = showsTitle
         self._showControls = showControls
         self.onDismiss = onDismiss
@@ -44,6 +47,11 @@ struct ReaderChrome<Content: View>: View {
         // 阅读表面只延伸到左右和底部；顶部必须保留系统安全区，交给页眉和退出控件。
         GeometryReader { geometry in
             ZStack {
+                // 主题背景覆盖顶部系统安全区和 Readium 外层空白，
+                // 但不参与正文或底栏的几何计算。
+                readerBackground
+                    .ignoresSafeArea()
+
                 content
                     .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
             }

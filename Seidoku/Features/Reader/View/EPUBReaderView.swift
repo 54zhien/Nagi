@@ -23,6 +23,7 @@ struct EPUBReaderView: View {
         ReaderChrome(
             title: model.title,
             titleColor: Color(uiColor: model.theme.contentUIColor),
+            readerBackground: model.theme.background,
             showsTitle: model.showBookTitleInPageHeader,
             showControls: $showControls,
             onDismiss: { dismiss() },
@@ -85,11 +86,14 @@ struct EPUBReaderView: View {
     @ViewBuilder
     private var content: some View {
         if let navigator = model.navigator {
-            ReadiumNavigatorView(navigator: navigator)
+            ReadiumNavigatorView(
+                navigator: navigator,
+                background: model.theme.background
+            )
         } else if model.isLoading {
             ProgressView("正在打开 EPUB…")
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color(.systemBackground))
+                .background(model.theme.background)
         } else {
             VStack(spacing: 16) {
                 ContentUnavailableView(
@@ -113,7 +117,7 @@ struct EPUBReaderView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             .padding(.horizontal, 24)
-            .background(Color(.systemBackground))
+            .background(model.theme.background)
         }
     }
 
