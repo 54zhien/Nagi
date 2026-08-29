@@ -34,7 +34,14 @@ struct HomeView: View {
                                     BookCard(book: book, layout: .home)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .buttonStyle(.glass)
+                                .buttonStyle(.plain)
+                                .glassEffect(
+                                    .regular.interactive(),
+                                    in: RoundedRectangle(
+                                        cornerRadius: BookCardMetrics.cornerRadius,
+                                        style: .continuous
+                                    )
+                                )
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")
                             }

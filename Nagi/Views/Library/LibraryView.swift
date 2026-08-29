@@ -40,7 +40,14 @@ struct LibraryView: View {
                                     BookCard(book: book, layout: .library)
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .buttonStyle(.glass)
+                                .buttonStyle(.plain)
+                                .glassEffect(
+                                    .regular.interactive(),
+                                    in: RoundedRectangle(
+                                        cornerRadius: BookCardMetrics.cornerRadius,
+                                        style: .continuous
+                                    )
+                                )
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")
                                 .contextMenu {
@@ -147,6 +154,14 @@ enum BookCardLayout {
     case list
 }
 
+enum BookCardMetrics {
+    static let cornerRadius: CGFloat = 14
+    static let coverWidth: CGFloat = 92
+    static let coverHeight: CGFloat = 138
+    static let contentSpacing: CGFloat = 12
+    static let cardPadding: CGFloat = 12
+}
+
 struct BookCoverView: View {
     let data: Data?
 
@@ -166,9 +181,9 @@ struct BookCoverView: View {
             }
         }
         .aspectRatio(2.0 / 3.0, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: BookCardMetrics.cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
+            RoundedRectangle(cornerRadius: BookCardMetrics.cornerRadius, style: .continuous)
                 .strokeBorder(.quaternary, lineWidth: 0.5)
         }
         .accessibilityHidden(true)
@@ -189,13 +204,13 @@ struct BookCard: View {
     }
 
     private var readingCard: some View {
-        HStack(alignment: .top, spacing: 16) {
+        HStack(alignment: .top, spacing: BookCardMetrics.contentSpacing) {
             BookCoverView(data: book.coverData)
-                .frame(width: 108, height: 162)
+                .frame(width: BookCardMetrics.coverWidth, height: BookCardMetrics.coverHeight)
 
             VStack(alignment: .leading, spacing: 0) {
-                HStack(alignment: .top, spacing: 10) {
-                    VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(book.title)
                             .font(.headline)
                             .lineLimit(1)
@@ -207,13 +222,13 @@ struct BookCard: View {
                             .lineLimit(1)
                     }
 
-                    Spacer(minLength: 8)
+                    Spacer(minLength: 6)
 
                     Text(progressText)
-                        .font(.caption.weight(.semibold).monospacedDigit())
+                        .font(.caption2.weight(.semibold).monospacedDigit())
                         .foregroundStyle(.primary)
-                        .padding(.horizontal, 10)
-                        .frame(minWidth: 54, minHeight: 32)
+                        .padding(.horizontal, 8)
+                        .frame(minWidth: 46, minHeight: 26)
                         .glassEffect(.clear, in: .capsule)
                         .accessibilityLabel("阅读进度")
                         .accessibilityValue(Text(progressText))
@@ -224,7 +239,7 @@ struct BookCard: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .padding(.top, 14)
+                    .padding(.top, 10)
 
                 Spacer(minLength: 0)
 
@@ -232,13 +247,13 @@ struct BookCard: View {
                     .progressViewStyle(.linear)
                     .tint(.accentColor)
                     .frame(maxWidth: .infinity)
-                    .padding(.top, 16)
+                    .padding(.top, 12)
                     .accessibilityLabel("阅读进度")
                     .accessibilityValue(Text(progressText))
             }
-            .frame(maxWidth: .infinity, minHeight: 162, alignment: .topLeading)
+            .frame(maxWidth: .infinity, minHeight: BookCardMetrics.coverHeight, alignment: .topLeading)
         }
-        .padding(16)
+        .padding(BookCardMetrics.cardPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
