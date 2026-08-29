@@ -338,14 +338,17 @@ final class EPUBReaderModel {
         appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
             .flatMap(EPUBAppearanceMode.init) ?? .system
         brightness = defaults.object(forKey: PreferenceKey.brightness) as? Double ?? 0.82
-        flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(EPUBFlowMode.init) ?? .paged
-        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
-            .flatMap(EPUBPageTransitionMode.init) ?? (flowMode == .scroll ? .scroll : .slide)
-        if pageTransition == .scroll || flowMode == .scroll {
-            pageTransition = .scroll
+        let storedFlowMode = defaults.string(forKey: PreferenceKey.flowMode)
+            .flatMap(EPUBFlowMode.init) ?? .paged
+        let storedPageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
+            .flatMap(EPUBPageTransitionMode.init)
+            ?? (storedFlowMode == .scroll ? .scroll : .slide)
+        if storedPageTransition == .scroll || storedFlowMode == .scroll {
             flowMode = .scroll
+            pageTransition = .scroll
         } else {
             flowMode = .paged
+            pageTransition = storedPageTransition
         }
         publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
         showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
@@ -620,7 +623,7 @@ final class EPUBReaderModel {
 
     private func makePreferences() -> EPUBPreferences {
         let effectiveTheme = resolvedTheme
-        EPUBPreferences(
+        return EPUBPreferences(
             backgroundColor: ReadiumNavigator.Color(
                 uiColor: effectiveTheme.adjustedBackgroundUIColor(brightness: brightness)
             ),
