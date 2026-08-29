@@ -2,7 +2,7 @@
 //  ReaderSettings.swift
 //  Seidoku
 //
-//  阅读排版设置（轻量偏好，用 @AppStorage 持久化）。
+//  阅读主题与翻页模式定义。TXT 排版偏好由 TXTReaderModel 持久化。
 //
 
 import SwiftUI
@@ -53,13 +53,4 @@ enum PageTransitionMode: String, CaseIterable, Identifiable {
         case .vertical: return "上下滚动"
         }
     }
-}
-
-struct ReaderSettings {
-    var fontSize: Double = 17
-    var lineSpacing: Double = 6
-    var paragraphSpacing: Double = 10
-    var horizontalInset: Double = 16
-    var theme: ReaderTheme = .white
-    var transition: PageTransitionMode = .pageCurl
 }

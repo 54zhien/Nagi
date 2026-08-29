@@ -2,67 +2,168 @@
 //  ReaderView.swift
 //  Seidoku
 //
-//  阅读器主视图：三种翻页模式 + 工具栏 + 排版设置 + 目录。
+//  阅读器入口。EPUB 使用 Readium，TXT 使用独立的原生分页链路。
 //
 
+import SwiftData
 import SwiftUI
 import UIKit
 
 struct ReaderView: View {
-    @Environment(\.dismiss) private var dismiss
+    let book: Book
+
+    var body: some View {
+        switch book.format {
+        case .epub:
+            EPUBReaderView(book: book)
+        case .txt:
+            TXTReaderView(book: book)
+        }
+    }
+}
+
+struct TXTReaderView: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @State private var viewModel: ReaderViewModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.displayScale) private var displayScale
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var model: TXTReaderModel
     @State private var showControls = true
 
     init(book: Book) {
-        _viewModel = State(initialValue: ReaderViewModel(book: book))
+        _model = State(initialValue: TXTReaderModel(book: book))
     }
 
     var body: some View {
         NavigationStack {
             ZStack {
-                viewModel.theme.background
+                model.theme.background
                     .ignoresSafeArea()
 
-                GeometryReader { geo in
+                GeometryReader { geometry in
                     content
                         .onAppear {
-                            viewModel.pageSize = geo.size
-                            Task { await viewModel.load() }
+                            updateViewport(geometry)
+                            Task { await model.loadIfNeeded() }
                         }
-                        .onChange(of: geo.size) { _, newSize in
-                            viewModel.pageSize = newSize
+                        .onChange(of: geometry.size) { _, _ in
+                            updateViewport(geometry)
                         }
-                        // 只让正文响应“显示/隐藏控件”手势，避免点击控件时误触发。
-                        .contentShape(Rectangle())
-                        .onTapGesture(perform: toggleControls)
+                        .onChange(of: geometry.safeAreaInsets.top) { _, _ in
+                            updateViewport(geometry)
+                        }
+                        .onChange(of: geometry.safeAreaInsets.bottom) { _, _ in
+                            updateViewport(geometry)
+                        }
+                        .simultaneousGesture(
+                            TapGesture().onEnded(toggleControls)
+                        )
                         .accessibilityAction(
                             named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件"),
                             toggleControls
                         )
                 }
+                .ignoresSafeArea()
             }
             .overlay(alignment: .topTrailing) {
                 if showControls {
-                    topBar
+                    exitButton
                         .padding(.top, ReaderControlMetrics.topInset)
-                        .padding(.trailing, ReaderControlMetrics.minimumEdgeInset)
-                        .containerCornerOffset(Edge.Set.top.union(.trailing))
+                        .padding(.trailing, ReaderControlMetrics.edgeInset)
                 }
             }
             .overlay(alignment: .bottomTrailing) {
                 if showControls {
-                    bottomBar
+                    optionsMenu
                         .padding(.bottom, ReaderControlMetrics.bottomInset)
-                        .padding(.trailing, ReaderControlMetrics.minimumEdgeInset)
-                        .containerCornerOffset(Edge.Set.bottom.union(.trailing))
+                        .padding(.trailing, ReaderControlMetrics.edgeInset)
                 }
             }
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
         }
-        .statusBarHidden(!showControls)
+        .statusBarHidden(true)
         .toolbar(.hidden, for: .tabBar)
+        .onDisappear {
+            saveProgress()
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if model.isLoading && model.layout == nil {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let error = model.errorMessage {
+            ContentUnavailableView(
+                "无法打开",
+                systemImage: "exclamationmark.triangle",
+                description: Text(error)
+            )
+        } else if let snapshot = model.layout, !snapshot.pages.isEmpty {
+            switch model.transition {
+            case .horizontal:
+                TXTPageCollectionView(
+                    snapshot: snapshot,
+                    background: UIColor(model.theme.background),
+                    currentPage: model.currentPageIndex,
+                    onPageChanged: handlePageChanged
+                )
+                .id(snapshot.key.identifier)
+            case .pageCurl:
+                TXTPageCurlView(
+                    snapshot: snapshot,
+                    background: UIColor(model.theme.background),
+                    currentPage: model.currentPageIndex,
+                    onPageChanged: handlePageChanged
+                )
+                .id(snapshot.key.identifier)
+            case .vertical:
+                TXTScrollableTextView(
+                    attributedText: snapshot.attributedText,
+                    layoutKey: snapshot.key,
+                    insets: model.readerInsets,
+                    background: UIColor(model.theme.background),
+                    restoreTextOffset: model.currentTextOffset,
+                    initialContentOffset: model.verticalOffset,
+                    onLocationChanged: handleVerticalLocation
+                )
+                .id(snapshot.key.identifier)
+            }
+        } else if model.isLoading {
+            ProgressView()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ContentUnavailableView("暂无内容", systemImage: "book")
+        }
+    }
+
+    private func updateViewport(_ geometry: GeometryProxy) {
+        model.updateViewport(
+            size: geometry.size,
+            safeAreaInsets: UIEdgeInsets(
+                top: geometry.safeAreaInsets.top,
+                left: geometry.safeAreaInsets.leading,
+                bottom: geometry.safeAreaInsets.bottom,
+                right: geometry.safeAreaInsets.trailing
+            ),
+            displayScale: displayScale
+        )
+    }
+
+    private func handlePageChanged(_ page: Int) {
+        model.setCurrentPage(page)
+        saveProgress()
+    }
+
+    private func handleVerticalLocation(_ offset: CGFloat, _ textOffset: Int) {
+        model.updateVerticalLocation(contentOffset: offset, textOffset: textOffset)
+    }
+
+    private func saveProgress() {
+        model.saveProgress()
+        try? modelContext.save()
     }
 
     private func toggleControls() {
@@ -75,73 +176,7 @@ struct ReaderView: View {
         }
     }
 
-    private func selectChapter(_ chapter: BookChapter) {
-        guard chapter.index != viewModel.currentChapterIndex else { return }
-        viewModel.currentChapterIndex = chapter.index
-        Task { await viewModel.loadCurrentChapter() }
-    }
-
-    @ViewBuilder
-    private func menuOptionLabel(_ title: String, isSelected: Bool) -> some View {
-        if isSelected {
-            Label(title, systemImage: "checkmark")
-        } else {
-            Text(title)
-        }
-    }
-
-    private let fontSizeOptions: [Double] = [12, 14, 17, 20, 24, 30]
-    private let lineSpacingOptions: [Double] = [0, 4, 6, 8, 12, 16]
-
-    // MARK: - 正文内容（三模式）
-
-    @ViewBuilder
-    private var content: some View {
-        if viewModel.isLoading {
-            ProgressView()
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else if let error = viewModel.errorMessage {
-            ContentUnavailableView(
-                "无法打开",
-                systemImage: "exclamationmark.triangle",
-                description: Text(error)
-            )
-        } else if viewModel.pages.isEmpty {
-            ContentUnavailableView("暂无内容", systemImage: "book")
-        } else {
-            switch viewModel.transition {
-            case .pageCurl:
-                PageViewController(
-                    pages: viewModel.pages,
-                    transitionStyle: .pageCurl,
-                    insets: readerInsets,
-                    background: viewModel.theme.background,
-                    currentPage: $viewModel.currentPageIndex
-                )
-                // 每个章节拥有独立分页控制器，避免复用上一章的 UIKit 页面缓存。
-                .id(viewModel.currentChapter?.id ?? "")
-            case .horizontal:
-                PageViewController(
-                    pages: viewModel.pages,
-                    transitionStyle: .scroll,
-                    insets: readerInsets,
-                    background: viewModel.theme.background,
-                    currentPage: $viewModel.currentPageIndex
-                )
-                .id(viewModel.currentChapter?.id ?? "")
-            case .vertical:
-                ScrollableTextView(attributedText: viewModel.fullText, insets: readerInsets)
-            }
-        }
-    }
-
-    private var readerInsets: UIEdgeInsets {
-        UIEdgeInsets(top: 24, left: viewModel.horizontalInset, bottom: 24, right: viewModel.horizontalInset)
-    }
-
-    // MARK: - Liquid Glass 阅读器 chrome
-
-    private var topBar: some View {
+    private var exitButton: some View {
         Button {
             dismiss()
         } label: {
@@ -156,23 +191,22 @@ struct ReaderView: View {
             height: ReaderControlMetrics.diameter
         )
         .accessibilityLabel("退出阅读器")
-        .accessibilityHint("返回上一个页面")
     }
 
-    private var bottomBar: some View {
+    private var optionsMenu: some View {
         Menu {
             Section("阅读") {
-                Menu("目录", systemImage: "xmark.triangle.circle.square") {
-                    if viewModel.chapters.isEmpty {
+                Menu("目录", systemImage: "list.bullet") {
+                    if model.chapters.isEmpty {
                         Text("暂无目录")
                     } else {
-                        ForEach(viewModel.chapters) { chapter in
+                        ForEach(model.chapters) { chapter in
                             Button {
-                                selectChapter(chapter)
+                                model.selectChapter(chapterIndex(chapter))
                             } label: {
                                 menuOptionLabel(
                                     chapter.title,
-                                    isSelected: chapter.index == viewModel.currentChapterIndex
+                                    isSelected: chapter.id == model.currentChapter?.id
                                 )
                             }
                         }
@@ -180,42 +214,44 @@ struct ReaderView: View {
                 }
 
                 Button {
-                    viewModel.goPrevious()
+                    model.goPrevious()
+                    saveProgress()
                 } label: {
                     Label("上一页", systemImage: "chevron.left")
                 }
-                .disabled(!viewModel.canGoPrevious)
+                .disabled(model.transition == .vertical || !model.canGoPrevious)
 
                 Button {
-                    viewModel.goNext()
+                    model.goNext()
+                    saveProgress()
                 } label: {
                     Label("下一页", systemImage: "chevron.right")
                 }
-                .disabled(!viewModel.canGoNext)
+                .disabled(model.transition == .vertical || !model.canGoNext)
             }
 
             Section("排版") {
                 Menu("字号", systemImage: "textformat.size") {
-                    ForEach(fontSizeOptions, id: \.self) { size in
+                    ForEach([12.0, 14.0, 17.0, 20.0, 24.0, 30.0], id: \.self) { size in
                         Button {
-                            viewModel.fontSize = size
+                            model.fontSize = size
                         } label: {
                             menuOptionLabel(
                                 "\(Int(size)) 磅",
-                                isSelected: viewModel.fontSize == size
+                                isSelected: model.fontSize == size
                             )
                         }
                     }
                 }
 
                 Menu("行距", systemImage: "arrow.up.and.down.text.horizontal") {
-                    ForEach(lineSpacingOptions, id: \.self) { spacing in
+                    ForEach([0.0, 4.0, 6.0, 8.0, 12.0, 16.0], id: \.self) { spacing in
                         Button {
-                            viewModel.lineSpacing = spacing
+                            model.lineSpacing = spacing
                         } label: {
                             menuOptionLabel(
                                 spacing == 0 ? "默认" : "\(Int(spacing)) 磅",
-                                isSelected: viewModel.lineSpacing == spacing
+                                isSelected: model.lineSpacing == spacing
                             )
                         }
                     }
@@ -224,9 +260,9 @@ struct ReaderView: View {
                 Menu("主题", systemImage: "circle.lefthalf.filled") {
                     ForEach(ReaderTheme.allCases) { theme in
                         Button {
-                            viewModel.theme = theme
+                            model.theme = theme
                         } label: {
-                            menuOptionLabel(theme.label, isSelected: viewModel.theme == theme)
+                            menuOptionLabel(theme.label, isSelected: model.theme == theme)
                         }
                     }
                 }
@@ -234,15 +270,15 @@ struct ReaderView: View {
                 Menu("翻页方式", systemImage: "book.pages") {
                     ForEach(PageTransitionMode.allCases) { mode in
                         Button {
-                            viewModel.transition = mode
+                            model.transition = mode
                         } label: {
-                            menuOptionLabel(mode.label, isSelected: viewModel.transition == mode)
+                            menuOptionLabel(mode.label, isSelected: model.transition == mode)
                         }
                     }
                 }
             }
         } label: {
-            Image(systemName: "xmark.triangle.circle.square")
+            Image(systemName: "slider.horizontal.3")
                 .font(.system(size: ReaderControlMetrics.menuIconPointSize, weight: .semibold))
         }
         .controlSize(.large)
@@ -253,37 +289,26 @@ struct ReaderView: View {
             height: ReaderControlMetrics.diameter
         )
         .accessibilityLabel("阅读选项")
-        .accessibilityHint("打开目录、翻页和排版设置")
+    }
+
+    private func chapterIndex(_ chapter: TXTChapter) -> Int {
+        model.chapters.firstIndex(of: chapter) ?? 0
+    }
+
+    @ViewBuilder
+    private func menuOptionLabel(_ title: String, isSelected: Bool) -> some View {
+        if isSelected {
+            Label(title, systemImage: "checkmark")
+        } else {
+            Text(title)
+        }
     }
 
     private enum ReaderControlMetrics {
         static let diameter: CGFloat = 44
-        // 这是保证视觉间距的最小值；实际圆角避让由 containerCornerOffset 补充。
-        static let minimumEdgeInset: CGFloat = 24
-        static let menuIconPointSize: CGFloat = 21
+        static let edgeInset: CGFloat = 24
         static let topInset: CGFloat = 8
         static let bottomInset: CGFloat = 16
+        static let menuIconPointSize: CGFloat = 21
     }
 }
-
-/// 上下滚动模式：整章文本可滚动。
-struct ScrollableTextView: UIViewRepresentable {
-    let attributedText: NSAttributedString
-    let insets: UIEdgeInsets
-
-    func makeUIView(context: Context) -> UITextView {
-        let textView = UITextView()
-        textView.isScrollEnabled = true
-        textView.isEditable = false
-        textView.isSelectable = false
-        textView.backgroundColor = .clear
-        textView.textContainer.lineFragmentPadding = 0
-        return textView
-    }
-
-    func updateUIView(_ textView: UITextView, context: Context) {
-        textView.textContainerInset = insets
-        textView.attributedText = attributedText
-    }
-}
-
