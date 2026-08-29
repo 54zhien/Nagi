@@ -31,14 +31,6 @@ private struct TXTLayoutResult: @unchecked Sendable {
     let pageBatch: TextPaginator.PageBatch?
 }
 
-private struct TXTPageExpansionSnapshot: @unchecked Sendable {
-    let attributedText: NSAttributedString
-    let pageSize: CGSize
-    let insets: UIEdgeInsets
-    let pageRange: NSRange
-    let maximumPages: Int
-}
-
 @MainActor
 @Observable
 final class TXTReaderModel {
@@ -101,7 +93,8 @@ final class TXTReaderModel {
     private var scrollPositionGeneration = 0
     private var suppressPageProgress = false
     private var layoutTask: Task<Void, Never>?
-    private var pageExpansionTask: Task<Void, Never>?
+    private var nextPageTask: Task<Void, Never>?
+    private var previousPageTask: Task<Void, Never>?
     private var layoutRequestID = 0
     private var persistenceTask: Task<Void, Never>?
 
@@ -226,7 +219,9 @@ final class TXTReaderModel {
         // Scrolling uses one continuous text view and does not need a page
         // rebuild for a chapter jump.  Changing the position ID in
         // `selectChapter` moves that view to the new anchor.
-        if flowMode == .scroll, fullText.length > 0 {
+        if flowMode == .scroll,
+           fullText.length > 0,
+           fullText.length == currentContent.utf16.count {
             currentChapterIndex = chapterIndex(forGlobalOffset: targetOffset)
             persistReadingLocation()
             return
@@ -303,9 +298,17 @@ final class TXTReaderModel {
     ) {
         guard !currentContent.isEmpty else { return }
 
+        let shouldPaginate = flowMode == .paged
+        // The initial load can finish before GeometryReader reports a usable
+        // viewport.  Never fall back to a full-book attributed layout for a
+        // paged reader in that transient state; wait for updateViewport and
+        // generate the first bounded batch there.
+        guard !shouldPaginate || (pageSize.width > 1 && pageSize.height > 1) else {
+            return
+        }
+
         layoutRequestID &+= 1
         let requestID = layoutRequestID
-        let shouldPaginate = flowMode == .paged
         let requestedAnchor = clampCharacterOffset(
             requestedStartOffset
                 ?? pendingCharacterOffset
@@ -326,9 +329,12 @@ final class TXTReaderModel {
             location: anchor,
             length: max(pageRangeEnd - anchor, 0)
         )
+        let hasCompleteAttributedText = fullText.length == documentLength
         let snapshot = TXTLayoutSnapshot(
             text: currentContent,
-            existingAttributedText: rebuildAttributedText || fullText.length == 0
+            existingAttributedText: shouldPaginate
+                || rebuildAttributedText
+                || !hasCompleteAttributedText
                 ? nil
                 : fullText,
             pageSize: pageSize,
@@ -346,8 +352,10 @@ final class TXTReaderModel {
         let restoreCharacterOffset = pendingCharacterOffset
 
         layoutTask?.cancel()
-        pageExpansionTask?.cancel()
-        pageExpansionTask = nil
+        nextPageTask?.cancel()
+        previousPageTask?.cancel()
+        nextPageTask = nil
+        previousPageTask = nil
         layoutTask = Task { [weak self] in
             do {
                 // Coalesce a slider's rapid updates into one layout request.
@@ -358,31 +366,29 @@ final class TXTReaderModel {
 
             let worker = Task.detached(priority: .utility) {
                 try Task.checkCancellation()
-                let attributed = snapshot.existingAttributedText ?? Self.attributedText(
-                    from: snapshot.text,
-                    snapshot: snapshot,
-                    shouldCancel: { Task.isCancelled }
-                )
-                try Task.checkCancellation()
-
-                let pageBatch: TextPaginator.PageBatch?
                 if snapshot.shouldPaginate,
                    snapshot.pageSize.width > 0,
                    snapshot.pageSize.height > 0 {
-                    pageBatch = try TextPaginator.paginateBatch(
-                        attributed,
-                        pageSize: snapshot.pageSize,
-                        insets: snapshot.insets,
-                        range: snapshot.pageRange,
-                        maximumPages: snapshot.maximumPages
+                    let paged = try Self.makePagedLayout(
+                        from: snapshot,
+                        shouldCancel: { Task.isCancelled }
+                    )
+                    return TXTLayoutResult(
+                        attributedText: paged.attributedText,
+                        pageBatch: paged.pageBatch
                     )
                 } else {
-                    pageBatch = nil
+                    let attributed = snapshot.existingAttributedText ?? Self.attributedText(
+                        from: snapshot.text,
+                        snapshot: snapshot,
+                        shouldCancel: { Task.isCancelled }
+                    )
+                    try Task.checkCancellation()
+                    return TXTLayoutResult(
+                        attributedText: attributed,
+                        pageBatch: nil
+                    )
                 }
-                return TXTLayoutResult(
-                    attributedText: attributed,
-                    pageBatch: pageBatch
-                )
             }
 
             let result: TXTLayoutResult
@@ -600,6 +606,65 @@ final class TXTReaderModel {
         return attributed
     }
 
+    /// Build attributes and pages for one bounded UTF-16 window.  Paged TXT
+    /// reading must never create an attributed string for the whole book just
+    /// to display the first screen; the source string remains cheap to share,
+    /// while TextKit only receives the requested window.
+    private nonisolated static func makePagedLayout(
+        from snapshot: TXTLayoutSnapshot,
+        shouldCancel: @Sendable () -> Bool
+    ) throws -> (
+        attributedText: NSAttributedString,
+        pageBatch: TextPaginator.PageBatch
+    ) {
+        try Task.checkCancellation()
+
+        let source = snapshot.text as NSString
+        let range = snapshot.pageRange
+        guard range.length > 0 else {
+            return (
+                NSAttributedString(string: ""),
+                TextPaginator.PageBatch(
+                    pages: [],
+                    nextCharacterOffset: range.location,
+                    isComplete: true
+                )
+            )
+        }
+
+        let localText = source.substring(with: range)
+        let attributed = attributedText(
+            from: localText,
+            snapshot: snapshot,
+            shouldCancel: shouldCancel
+        )
+        try Task.checkCancellation()
+
+        let localBatch = try TextPaginator.paginateBatch(
+            attributed,
+            pageSize: snapshot.pageSize,
+            insets: snapshot.insets,
+            range: NSRange(location: 0, length: attributed.length),
+            maximumPages: snapshot.maximumPages
+        )
+        let globalPages = localBatch.pages.map { page in
+            TextPaginator.Page(
+                attributedText: page.attributedText,
+                characterRange: NSRange(
+                    location: range.location + page.characterRange.location,
+                    length: page.characterRange.length
+                )
+            )
+        }
+        let globalNextOffset = range.location + localBatch.nextCharacterOffset
+        let globalBatch = TextPaginator.PageBatch(
+            pages: globalPages,
+            nextCharacterOffset: globalNextOffset,
+            isComplete: globalNextOffset >= snapshot.text.utf16.count
+        )
+        return (attributed, globalBatch)
+    }
+
     static func attributedText(from text: String, settings: TXTReaderModel) -> NSAttributedString {
         let snapshot = TXTLayoutSnapshot(
             text: text,
@@ -672,38 +737,34 @@ final class TXTReaderModel {
     /// and appended without rebuilding the already visible controller.
     func requestNextPageBatch() {
         guard flowMode == .paged,
-              pageExpansionTask == nil,
+              nextPageTask == nil,
               let nextPageOffset,
-              nextPageOffset < fullText.length,
+              nextPageOffset < currentContent.utf16.count,
               !pages.isEmpty,
               pageSize.width > 0,
               pageSize.height > 0 else { return }
 
         let requestID = layoutRequestID
+        let documentLength = currentContent.utf16.count
         let end = min(
-            fullText.length,
+            documentLength,
             nextPageOffset + Self.pageBatchCharacterLimit
         )
-        let snapshot = TXTPageExpansionSnapshot(
-            attributedText: fullText,
-            pageSize: pageSize,
-            insets: readerInsets,
-            pageRange: NSRange(location: nextPageOffset, length: end - nextPageOffset),
+        let snapshot = makePageLayoutSnapshot(
+            range: NSRange(location: nextPageOffset, length: end - nextPageOffset),
             maximumPages: Self.pageBatchSize
         )
 
         let worker = Task.detached(priority: .utility) {
             try Task.checkCancellation()
-            return try TextPaginator.paginateBatch(
-                snapshot.attributedText,
-                pageSize: snapshot.pageSize,
-                insets: snapshot.insets,
-                range: snapshot.pageRange,
-                maximumPages: snapshot.maximumPages
+            let paged = try Self.makePagedLayout(
+                from: snapshot,
+                shouldCancel: { Task.isCancelled }
             )
+            return paged.pageBatch
         }
 
-        pageExpansionTask = Task { [weak self] in
+        nextPageTask = Task { [weak self] in
             let batch: TextPaginator.PageBatch
             do {
                 batch = try await withTaskCancellationHandler(operation: {
@@ -713,18 +774,22 @@ final class TXTReaderModel {
                 })
             } catch {
                 worker.cancel()
-                self?.pageExpansionTask = nil
+                if self?.layoutRequestID == requestID {
+                    self?.nextPageTask = nil
+                }
                 return
             }
 
             guard !Task.isCancelled,
                   let self,
                   self.layoutRequestID == requestID else {
-                self?.pageExpansionTask = nil
+                if self?.layoutRequestID == requestID {
+                    self?.nextPageTask = nil
+                }
                 return
             }
             self.append(nextPageBatch: batch)
-            self.pageExpansionTask = nil
+            self.nextPageTask = nil
         }
     }
 
@@ -732,7 +797,7 @@ final class TXTReaderModel {
     /// window after a TOC jump or a restored location.
     func requestPreviousPageBatch() {
         guard flowMode == .paged,
-              pageExpansionTask == nil,
+              previousPageTask == nil,
               hasMorePreviousPages,
               let firstPageStart = pageRanges.first?.location,
               firstPageStart > 0,
@@ -742,31 +807,28 @@ final class TXTReaderModel {
 
         let requestID = layoutRequestID
         let start = max(firstPageStart - Self.pageBatchCharacterLimit, 0)
-        let snapshot = TXTPageExpansionSnapshot(
-            attributedText: fullText,
-            pageSize: pageSize,
-            insets: readerInsets,
-            pageRange: NSRange(location: start, length: firstPageStart - start),
-            maximumPages: Self.pageBatchSize
+        let snapshot = makePageLayoutSnapshot(
+            range: NSRange(location: start, length: firstPageStart - start),
+            // Generate the whole bounded prefix so that taking its suffix
+            // really produces pages adjacent to the current window.  The
+            // source is still capped at 128k UTF-16 units, never the book.
+            maximumPages: Int.max
         )
 
         let worker = Task.detached(priority: .utility) {
             try Task.checkCancellation()
-            let expanded = try TextPaginator.paginateBatch(
-                snapshot.attributedText,
-                pageSize: snapshot.pageSize,
-                insets: snapshot.insets,
-                range: snapshot.pageRange,
-                maximumPages: Int.max
+            let expanded = try Self.makePagedLayout(
+                from: snapshot,
+                shouldCancel: { Task.isCancelled }
             )
             return TextPaginator.PageBatch(
-                pages: Array(expanded.pages.suffix(snapshot.maximumPages)),
-                nextCharacterOffset: expanded.nextCharacterOffset,
-                isComplete: expanded.isComplete
+                pages: Array(expanded.pageBatch.pages.suffix(Self.pageBatchSize)),
+                nextCharacterOffset: expanded.pageBatch.nextCharacterOffset,
+                isComplete: expanded.pageBatch.isComplete
             )
         }
 
-        pageExpansionTask = Task { [weak self] in
+        previousPageTask = Task { [weak self] in
             let batch: TextPaginator.PageBatch
             do {
                 batch = try await withTaskCancellationHandler(operation: {
@@ -776,19 +838,44 @@ final class TXTReaderModel {
                 })
             } catch {
                 worker.cancel()
-                self?.pageExpansionTask = nil
+                if self?.layoutRequestID == requestID {
+                    self?.previousPageTask = nil
+                }
                 return
             }
 
             guard !Task.isCancelled,
                   let self,
                   self.layoutRequestID == requestID else {
-                self?.pageExpansionTask = nil
+                if self?.layoutRequestID == requestID {
+                    self?.previousPageTask = nil
+                }
                 return
             }
             self.prepend(previousPageBatch: batch)
-            self.pageExpansionTask = nil
+            self.previousPageTask = nil
         }
+    }
+
+    private func makePageLayoutSnapshot(
+        range: NSRange,
+        maximumPages: Int
+    ) -> TXTLayoutSnapshot {
+        TXTLayoutSnapshot(
+            text: currentContent,
+            existingAttributedText: nil,
+            pageSize: pageSize,
+            insets: readerInsets,
+            pageRange: range,
+            maximumPages: maximumPages,
+            shouldPaginate: true,
+            fontScale: fontScale,
+            fontFamily: fontFamily,
+            boldText: boldText,
+            lineHeight: lineHeight,
+            paragraphIndent: paragraphIndent,
+            foregroundColor: theme.foregroundUIColor
+        )
     }
 
     private func append(nextPageBatch batch: TextPaginator.PageBatch) {
@@ -802,7 +889,7 @@ final class TXTReaderModel {
             ? nil
             : max(
                 batch.nextCharacterOffset,
-                pageRanges.last.map { NSMaxRange($0) } ?? fullText.length
+                pageRanges.last.map { NSMaxRange($0) } ?? currentContent.utf16.count
             )
     }
 
@@ -838,13 +925,22 @@ final class TXTReaderModel {
         scheduleProgressPersistence()
     }
 
+    /// Stop detached parsing/layout work when the reader leaves the screen.
+    /// Without this explicit cancellation a large TXT could continue laying
+    /// out in the background after dismissal and keep the device busy.
+    func cancelPendingLayout() {
+        layoutTask?.cancel()
+        nextPageTask?.cancel()
+        previousPageTask?.cancel()
+        layoutTask = nil
+        nextPageTask = nil
+        previousPageTask = nil
+        layoutRequestID &+= 1
+    }
+
     func retry() async {
         guard !isLoading else { return }
-        layoutTask?.cancel()
-        pageExpansionTask?.cancel()
-        layoutTask = nil
-        pageExpansionTask = nil
-        layoutRequestID &+= 1
+        cancelPendingLayout()
         fullText = NSAttributedString(string: "")
         pages = []
         pageRanges = []

@@ -10,6 +10,7 @@ import UIKit
 
 struct PageViewController: UIViewControllerRepresentable {
     let pages: [NSAttributedString]
+    let pageRanges: [NSRange]
     let transitionStyle: UIPageViewController.TransitionStyle
     let insets: UIEdgeInsets
     let background: Color
@@ -24,11 +25,13 @@ struct PageViewController: UIViewControllerRepresentable {
         insets: UIEdgeInsets,
         background: Color,
         currentPage: Binding<Int>,
+        pageRanges: [NSRange] = [],
         onSwipeStart: (() -> Void)? = nil,
         onNeedNextPages: (() -> Void)? = nil,
         onNeedPreviousPages: (() -> Void)? = nil
     ) {
         self.pages = pages
+        self.pageRanges = pageRanges
         self.transitionStyle = transitionStyle
         self.insets = insets
         self.background = background
@@ -70,6 +73,21 @@ struct PageViewController: UIViewControllerRepresentable {
     func updateUIViewController(_ pageVC: UIPageViewController, context: Context) {
         context.coordinator.parent = self
         guard !pages.isEmpty else { return }
+
+        // Lazy TXT pagination can prepend a window.  Page indexes then shift,
+        // so cached hosting controllers must be discarded before UIKit asks
+        // the data source for a neighboring page; otherwise an old controller
+        // can be returned for the new index.
+        if context.coordinator.updatePageWindowIfNeeded() {
+            let target = max(0, min(currentPage, pages.count - 1))
+            pageVC.setViewControllers(
+                [context.coordinator.hostingController(at: target)],
+                direction: .forward,
+                animated: false
+            )
+            return
+        }
+
         // 外部 currentPage 变化（目录跳转等）时同步
         if let current = pageVC.viewControllers?.first as? UIHostingController<PageTextView>,
            let index = context.coordinator.index(of: current),
@@ -86,9 +104,18 @@ struct PageViewController: UIViewControllerRepresentable {
     final class Coordinator: NSObject, UIPageViewControllerDataSource, UIPageViewControllerDelegate {
         var parent: PageViewController
         private var controllers: [Int: UIHostingController<PageTextView>] = [:]
+        private var pageRangeSignature: [NSRange]
 
         init(_ parent: PageViewController) {
             self.parent = parent
+            pageRangeSignature = parent.pageRanges
+        }
+
+        func updatePageWindowIfNeeded() -> Bool {
+            guard pageRangeSignature != parent.pageRanges else { return false }
+            pageRangeSignature = parent.pageRanges
+            controllers.removeAll(keepingCapacity: true)
+            return true
         }
 
         func hostingController(at index: Int) -> UIHostingController<PageTextView> {

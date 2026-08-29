@@ -56,6 +56,7 @@ struct TXTReaderView: View {
             await model.load()
         }
         .onDisappear {
+            model.cancelPendingLayout()
             model.flushReadingProgress()
             try? modelContext.save()
         }
@@ -163,6 +164,7 @@ struct TXTReaderView: View {
             } else {
                 PageViewController(
                     pages: model.pages,
+                    pageRanges: model.pageRanges,
                     transitionStyle: model.pageTransition.uiKitTransitionStyle,
                     insets: model.readerInsets,
                     background: model.theme.background,
