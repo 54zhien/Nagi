@@ -420,6 +420,13 @@ final class TXTReaderModel {
                 self.layoutTask = nil
                 self.layoutPhase = .waitingForViewport
                 return
+            } catch {
+                guard let self, self.layoutRequestID == requestID else { return }
+                self.layoutTask = nil
+                let message = "排版任务启动失败：\(error.localizedDescription)"
+                self.errorMessage = message
+                self.layoutPhase = .failed(message)
+                return
             }
 
             let worker = Task.detached(priority: .utility) {
