@@ -624,9 +624,6 @@ final class EPUBReaderModel {
             backgroundColor: ReadiumNavigator.Color(
                 uiColor: effectiveTheme.adjustedBackgroundUIColor(brightness: brightness)
             ),
-            textColor: ReadiumNavigator.Color(
-                uiColor: effectiveTheme.adjustedContentUIColor(brightness: brightness)
-            ),
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
             fontWeight: boldText ? 1.75 : 1.0,
@@ -637,7 +634,10 @@ final class EPUBReaderModel {
             scroll: flowMode == .scroll,
             spread: .auto,
             textNormalization: !publisherStyles,
-            theme: effectiveTheme.readiumTheme
+            theme: effectiveTheme.readiumTheme,
+            textColor: ReadiumNavigator.Color(
+                uiColor: effectiveTheme.adjustedContentUIColor(brightness: brightness)
+            )
         )
     }
 
