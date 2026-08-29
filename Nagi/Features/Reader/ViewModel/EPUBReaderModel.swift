@@ -633,11 +633,11 @@ final class EPUBReaderModel {
             publisherStyles: publisherStyles,
             scroll: flowMode == .scroll,
             spread: .auto,
-            textNormalization: !publisherStyles,
-            theme: effectiveTheme.readiumTheme,
             textColor: ReadiumNavigator.Color(
                 uiColor: effectiveTheme.adjustedContentUIColor(brightness: brightness)
-            )
+            ),
+            textNormalization: !publisherStyles,
+            theme: effectiveTheme.readiumTheme
         )
     }
 
