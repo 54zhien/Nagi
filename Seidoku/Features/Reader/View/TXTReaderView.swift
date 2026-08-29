@@ -33,7 +33,7 @@ struct TXTReaderView: View {
         ) {
             content
                 // 正文表面自己延伸到顶部安全区，与 EPUB 使用同一套主题背景。
-                .background(model.theme.background.ignoresSafeArea())
+                .background(model.theme.background, ignoresSafeAreaEdges: .all)
                 .contentShape(Rectangle())
                 .simultaneousGesture(
                     TapGesture().onEnded {

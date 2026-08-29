@@ -9,6 +9,7 @@ import Foundation
 import Observation
 import ReadiumNavigator
 import ReadiumShared
+import SwiftUI
 import UIKit
 
 extension ReaderTheme {
@@ -19,6 +20,11 @@ extension ReaderTheme {
         case .sepia: return .sepia
         case .dark: return .dark
         }
+    }
+
+    /// 将应用主题的正文背景传给 Readium，避免 Navigator 使用另一套默认颜色。
+    var readiumBackgroundColor: ReadiumNavigator.Color? {
+        ReadiumNavigator.Color(uiColor: UIColor(background))
     }
 }
 
@@ -243,6 +249,7 @@ final class EPUBReaderModel {
         // Readium 当前只区分分页与滚动；两种分页过渡先共享分页引擎，
         // pageTransition 作为独立偏好保留，后续接入具体动画。
         EPUBPreferences(
+            backgroundColor: theme.readiumBackgroundColor,
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
             lineHeight: lineHeight,

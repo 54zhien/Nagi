@@ -32,7 +32,7 @@ struct EPUBReaderView: View {
         ) {
             content
                 // 正文表面自己延伸到顶部安全区，页眉下方不再由 ReaderChrome 叠加独立背景。
-                .background(model.theme.background.ignoresSafeArea())
+                .background(model.theme.background, ignoresSafeAreaEdges: .all)
         }
         .task {
             model.onToggleControls = toggleControls
