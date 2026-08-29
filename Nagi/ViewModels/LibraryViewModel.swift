@@ -119,27 +119,18 @@ final class LibraryViewModel {
     nonisolated static func parseBooksInBackground(_ files: [URL]) async throws -> [BookImportResult] {
         let task = Task.detached(priority: .userInitiated) {
             var results: [BookImportResult] = []
+            let parserFactory = BookImportParserFactory()
             for fileURL in files {
-                switch fileURL.pathExtension.lowercased() {
-                case let fileExtension where TXTParser.supportedExtensions.contains(fileExtension):
-                    let parsed = try TXTParser().parse(url: fileURL)
-                    results.append(BookImportResult(
-                        title: parsed.title, author: parsed.author,
-                        format: .txt, sourceURL: fileURL.path,
-                        chapterCount: parsed.chapterCount,
-                        coverData: parsed.coverData
-                    ))
-                case "epub":
-                    let parsed = try EPUBParser().parse(url: fileURL)
-                    results.append(BookImportResult(
-                        title: parsed.title, author: parsed.author,
-                        format: .epub, sourceURL: fileURL.path,
-                        chapterCount: parsed.chapterCount,
-                        coverData: parsed.coverData
-                    ))
-                default:
-                    throw ParseError.cannotRead("不支持的文件格式：\(fileURL.pathExtension)")
-                }
+                let parser = try parserFactory.parser(for: fileURL)
+                let parsed = try parser.parse(url: fileURL)
+                results.append(BookImportResult(
+                    title: parsed.title,
+                    author: parsed.author,
+                    format: try parserFactory.format(for: fileURL),
+                    sourceURL: fileURL.path,
+                    chapterCount: parsed.chapterCount,
+                    coverData: parsed.coverData
+                ))
             }
             return results
         }

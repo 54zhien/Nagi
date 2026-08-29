@@ -10,7 +10,7 @@ import ImageIO
 import SwiftSoup
 import UniformTypeIdentifiers
 
-struct EPUBParser {
+struct EPUBParser: Sendable {
     func parse(url: URL) throws -> ParsedBook {
         let archive = try openArchive(url)
         let (opfXml, opfDir) = try opfDocument(archive)

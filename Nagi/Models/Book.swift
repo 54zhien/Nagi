@@ -8,7 +8,7 @@
 import Foundation
 import SwiftData
 
-enum BookFormat: String, Codable {
+enum BookFormat: String, Codable, Sendable, Hashable {
     case epub
     case txt
 }
@@ -29,6 +29,8 @@ final class Book {
     var progressPercent: Double
     /// Readium Locator JSON，TXT 也使用同一字段保存字符锚点。
     var readerLocatorJSON: String?
+    /// TXT 的字符锚点；与 EPUB 的 Readium Locator 分开保存，避免两种格式互相覆盖。
+    var txtReadingLocationJSON: String?
 
     init(
         title: String,
@@ -49,6 +51,7 @@ final class Book {
         self.currentChapterIndex = 0
         self.progressPercent = 0
         self.readerLocatorJSON = nil
+        self.txtReadingLocationJSON = nil
     }
 
     var format: BookFormat {

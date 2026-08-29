@@ -7,7 +7,7 @@
 
 import Foundation
 
-struct BookChapter: Identifiable, Hashable {
+struct BookChapter: Identifiable, Hashable, Sendable {
     /// 章节标识：EPUB 用 archive 内路径；TXT 用索引。
     let id: String
     let title: String

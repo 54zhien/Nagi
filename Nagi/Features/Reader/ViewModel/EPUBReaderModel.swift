@@ -248,6 +248,7 @@ final class EPUBReaderModel {
     var title: String
     var chapterTitle = ""
     private(set) var currentReadingHref: String?
+    private(set) var currentLocatorJSON: String?
     var progress = 0.0
     var tableOfContents: [EPUBTOCEntry] = []
 
@@ -292,6 +293,7 @@ final class EPUBReaderModel {
 
     var onToggleControls: (() -> Void)?
     var onSwipeStart: (() -> Void)?
+    var onStateChange: (() -> Void)?
 
     private var publication: Publication?
     private var preferenceUpdateTask: Task<Void, Never>?
@@ -323,6 +325,7 @@ final class EPUBReaderModel {
     init(book: Book) {
         self.book = book
         title = book.title
+        currentLocatorJSON = book.readerLocatorJSON
         progress = min(max(book.progressPercent, 0), 1)
 
         let defaults = UserDefaults.standard
@@ -553,6 +556,64 @@ final class EPUBReaderModel {
         submitPreferencesImmediately()
     }
 
+    var readerPreferences: ReaderPreferences {
+        ReaderPreferences(
+            fontSize: 17 * fontScale,
+            fontFamily: ReaderFontFamily(fontFamily.rawValue) ?? .systemSerif,
+            boldText: boldText,
+            lineHeight: lineHeight,
+            paragraphSpacing: 10,
+            pageMargins: pageMargins,
+            contentTopInset: contentTopInset,
+            contentBottomInset: contentBottomInset,
+            paragraphIndent: paragraphIndent,
+            publisherStyles: publisherStyles,
+            themePreset: Self.themePreset(for: theme),
+            appearanceMode: ReaderAppearanceMode(rawValue: appearanceMode.rawValue) ?? .system,
+            brightness: brightness,
+            pageTransition: Self.pageTransition(for: pageTransition),
+            showBookTitleInPageHeader: showBookTitleInPageHeader
+        )
+    }
+
+    func apply(preferences: ReaderPreferences) {
+        withPreferenceUpdatesSuspended {
+            fontScale = min(max(preferences.fontSize / 17, 0.8), 2.0)
+            fontFamily = EPUBFontFamily(rawValue: preferences.fontFamily.rawValue) ?? .systemSerif
+            boldText = preferences.boldText
+            lineHeight = min(max(preferences.lineHeight, 1.0), 2.0)
+            pageMargins = min(max(preferences.pageMargins, 0.5), 2.0)
+            paragraphIndent = min(max(preferences.paragraphIndent, 0), 3.0)
+            contentTopInset = min(max(preferences.contentTopInset, 0), 160)
+            contentBottomInset = min(max(preferences.contentBottomInset, 0), 160)
+            publisherStyles = preferences.publisherStyles
+            appearanceMode = EPUBAppearanceMode(rawValue: preferences.appearanceMode.rawValue) ?? .system
+            brightness = min(max(preferences.brightness, 0.25), 1.0)
+            pageTransition = Self.pageTransition(for: preferences.pageTransition)
+            flowMode = pageTransition == .scroll ? .scroll : .paged
+            theme = Self.readerTheme(for: preferences.themePreset)
+            showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
+            selectedPreset = nil
+        }
+        persistPreferences()
+        submitPreferencesImmediately()
+        onStateChange?()
+    }
+
+    func clearError() {
+        errorMessage = nil
+    }
+
+    func tearDown() {
+        preferenceUpdateTask?.cancel()
+        preferenceUpdateTask = nil
+        previewTask?.cancel()
+        previewTask = nil
+        navigator?.delegate = nil
+        onToggleControls = nil
+        onSwipeStart = nil
+    }
+
     func resetTypography() {
         withPreferenceUpdatesSuspended {
             fontScale = 1.0
@@ -667,19 +728,22 @@ final class EPUBReaderModel {
         isLoadingPreview = true
 
         let sourceURL = URL(fileURLWithPath: book.sourceURL)
+        let contentProvider = EPUBReadingContentProvider()
         previewTask = Task { [weak self] in
             let text = await Task.detached(priority: .userInitiated) {
-                try? EPUBParser().loadChapterContent(url: sourceURL, href: normalizedHref)
+                try? contentProvider.loadChapterContent(url: sourceURL, href: normalizedHref)
             }.value
 
             guard !Task.isCancelled, let self else { return }
             self.isLoadingPreview = false
             guard let text, !text.isEmpty else {
                 self.previewText = "暂时无法载入正文预览"
+                self.onStateChange?()
                 return
             }
             self.previewText = Self.previewExcerpt(from: text)
             self.previewChapterTitle = self.chapterTitle.isEmpty ? "当前章节" : self.chapterTitle
+            self.onStateChange?()
         }
     }
 
@@ -715,6 +779,40 @@ final class EPUBReaderModel {
         defaults.set(selectedPreset?.rawValue, forKey: PreferenceKey.selectedPreset)
     }
 
+    private static func themePreset(for theme: EPUBReaderTheme) -> ReaderThemePreset {
+        switch theme {
+        case .quiet: return .quiet
+        case .sepia: return .paper
+        case .light, .dark: return .original
+        }
+    }
+
+    private static func readerTheme(for preset: ReaderThemePreset) -> EPUBReaderTheme {
+        switch preset {
+        case .original: return .light
+        case .quiet: return .quiet
+        case .paper: return .sepia
+        }
+    }
+
+    private static func pageTransition(for mode: EPUBPageTransitionMode) -> ReaderPageTransition {
+        switch mode {
+        case .slide: return .slide
+        case .pageCurl: return .pageCurl
+        case .fade: return .fade
+        case .scroll: return .scroll
+        }
+    }
+
+    private static func pageTransition(for mode: ReaderPageTransition) -> EPUBPageTransitionMode {
+        switch mode {
+        case .slide: return .slide
+        case .pageCurl: return .pageCurl
+        case .fade: return .fade
+        case .scroll: return .scroll
+        }
+    }
+
     private func updateLocation(_ locator: Locator) {
         chapterTitle = locator.title ?? chapterTitle
         currentReadingHref = locator.href.path
@@ -722,9 +820,11 @@ final class EPUBReaderModel {
             progress = min(max(totalProgression, 0), 1)
         }
         loadPreviewIfNeeded()
+        currentLocatorJSON = locator.jsonString
         book.readerLocatorJSON = locator.jsonString
         book.progressPercent = progress
         book.lastReadAt = .now
+        onStateChange?()
     }
 }
 
@@ -762,6 +862,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
 
     func navigator(_ navigator: Navigator, presentError error: NavigatorError) {
         errorMessage = "阅读器发生错误：\(error.localizedDescription)"
+        onStateChange?()
     }
 
     func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {

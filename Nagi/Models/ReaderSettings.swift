@@ -10,6 +10,7 @@ import UIKit
 
 enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
     case light
+    case quiet
     case sepia
     case dark
 
@@ -18,6 +19,7 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
     var label: String {
         switch self {
         case .light: return "白色"
+        case .quiet: return "安静"
         case .sepia: return "米黄"
         case .dark: return "深色"
         }
@@ -26,6 +28,7 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
     var background: Color {
         switch self {
         case .light: return Color(red: 1.0, green: 1.0, blue: 1.0)
+        case .quiet: return Color(red: 0.95, green: 0.96, blue: 0.97)
         case .sepia: return Color(red: 0.97, green: 0.94, blue: 0.86)
         case .dark: return Color(red: 0.12, green: 0.12, blue: 0.13)
         }
@@ -34,6 +37,7 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
     var foreground: Color {
         switch self {
         case .light: return Color(red: 0.1, green: 0.1, blue: 0.1)
+        case .quiet: return Color(red: 0.15, green: 0.16, blue: 0.18)
         case .sepia: return Color(red: 0.3, green: 0.25, blue: 0.18)
         case .dark: return Color(red: 0.85, green: 0.85, blue: 0.85)
         }
@@ -45,6 +49,38 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
 
     var contentUIColor: UIColor {
         foregroundUIColor
+    }
+
+    func adjustedBackgroundUIColor(brightness: Double) -> UIColor {
+        let level = CGFloat(min(max(brightness, 0.25), 1))
+        if self == .dark {
+            return UIColor(white: 0.12 * level, alpha: 1)
+        }
+        return applyingBrightness(to: UIColor(background), multiplier: 0.72 + 0.28 * level)
+    }
+
+    func adjustedForegroundUIColor(brightness: Double) -> UIColor {
+        let level = CGFloat(min(max(brightness, 0.25), 1))
+        if self == .dark {
+            return UIColor(white: 0.66 + 0.34 * level, alpha: 1)
+        }
+        return applyingBrightness(to: foregroundUIColor, multiplier: 0.72 + 0.28 * level)
+    }
+
+    private func applyingBrightness(to color: UIColor, multiplier: CGFloat) -> UIColor {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 0
+        guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return color
+        }
+        return UIColor(
+            red: min(max(red * multiplier, 0), 1),
+            green: min(max(green * multiplier, 0), 1),
+            blue: min(max(blue * multiplier, 0), 1),
+            alpha: alpha
+        )
     }
 }
 
@@ -76,7 +112,7 @@ enum ReaderPageTransitionMode: String, CaseIterable, Identifiable, Hashable {
 /// `installed` case stores the family name returned by UIKit.  Keeping the
 /// family name (instead of a font face name) lets each renderer choose the
 /// appropriate regular/bold face for the selected family.
-enum ReaderFontFamily: Hashable, Identifiable {
+enum ReaderFontFamily: Hashable, Identifiable, Codable, Sendable {
     case systemSerif
     case systemSansSerif
     case palatino
@@ -154,6 +190,23 @@ enum ReaderFontFamily: Hashable, Identifiable {
             guard !family.isEmpty else { return nil }
             self = .installed(family)
         }
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        let value = try container.decode(String.self)
+        guard let family = Self(value) else {
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "未知字体：\(value)"
+            )
+        }
+        self = family
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(rawValue)
     }
 
     var label: String {

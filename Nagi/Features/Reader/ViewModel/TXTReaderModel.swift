@@ -88,6 +88,8 @@ final class TXTReaderModel {
     var contentTopInset: Double { didSet { styleDidChange() } }
     var contentBottomInset: Double { didSet { styleDidChange() } }
     var theme: ReaderTheme { didSet { styleDidChange() } }
+    var appearanceMode: ReaderAppearanceMode { didSet { styleDidChange() } }
+    var brightness: Double { didSet { styleDidChange() } }
     var flowMode: ReaderFlowMode { didSet { flowModeDidChange() } }
     var pageTransition: ReaderPageTransitionMode { didSet { persistPreferences() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
@@ -98,6 +100,7 @@ final class TXTReaderModel {
 
     var isLoading = false
     var errorMessage: String?
+    var onStateChange: (() -> Void)?
     private(set) var layoutPhase: TXTLayoutPhase = .idle
     private(set) var layoutGeneration = 0
 
@@ -121,6 +124,7 @@ final class TXTReaderModel {
 
     private var nextPageOffset: Int?
     private var hasMorePreviousPages = false
+    private var systemIsDark = false
 
     private nonisolated static let pageBatchSize = 8
     private nonisolated static let pageBatchCharacterLimit = 128_000
@@ -135,6 +139,8 @@ final class TXTReaderModel {
         static let contentTopInset = "reader.txt.contentTopInset"
         static let contentBottomInset = "reader.txt.contentBottomInset"
         static let theme = "reader.txt.theme"
+        static let appearanceMode = "reader.txt.appearanceMode"
+        static let brightness = "reader.txt.brightness"
         static let flowMode = "reader.txt.flowMode"
         static let pageTransition = "reader.txt.pageTransition"
         static let showBookTitleInPageHeader = "reader.txt.showBookTitleInPageHeader"
@@ -156,6 +162,9 @@ final class TXTReaderModel {
         contentTopInset = defaults.object(forKey: PreferenceKey.contentTopInset) as? Double ?? 56
         contentBottomInset = defaults.object(forKey: PreferenceKey.contentBottomInset) as? Double ?? 32
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
+        appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
+            .flatMap(ReaderAppearanceMode.init) ?? .system
+        brightness = defaults.object(forKey: PreferenceKey.brightness) as? Double ?? 0.82
         flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(ReaderFlowMode.init) ?? .paged
         pageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
             .flatMap(ReaderPageTransitionMode.init) ?? .pageCurl
@@ -211,6 +220,7 @@ final class TXTReaderModel {
             if layoutPhase == .waitingForViewport {
                 tryStartLayoutIfReady()
             }
+            onStateChange?()
         } catch is CancellationError {
             return
         } catch {
@@ -256,6 +266,7 @@ final class TXTReaderModel {
             currentChapterIndex = chapterIndex(forGlobalOffset: targetOffset)
             layoutPhase = .ready
             persistReadingLocation()
+            onStateChange?()
             return
         }
 
@@ -272,6 +283,7 @@ final class TXTReaderModel {
             pendingCharacterOffset = nil
             layoutPhase = .ready
             persistReadingLocation()
+            onStateChange?()
             return
         }
 
@@ -335,6 +347,44 @@ final class TXTReaderModel {
             bottom: max(CGFloat(contentBottomInset), safeAreaInsets.bottom),
             right: max(horizontal, safeAreaInsets.right)
         )
+    }
+
+    var readerBackgroundUIColor: UIColor {
+        resolvedTheme.adjustedBackgroundUIColor(brightness: brightness)
+    }
+
+    var readerContentUIColor: UIColor {
+        resolvedTheme.adjustedForegroundUIColor(brightness: brightness)
+    }
+
+    var resolvedTheme: ReaderTheme {
+        switch appearanceMode {
+        case .light:
+            return theme == .dark ? .light : theme
+        case .dark:
+            return .dark
+        case .system:
+            return systemIsDark ? .dark : (theme == .dark ? .light : theme)
+        }
+    }
+
+    var progress: Double {
+        guard !currentContent.isEmpty else { return min(max(book.progressPercent, 0), 1) }
+        return globalProgress(forGlobalOffset: currentCharacterOffset)
+    }
+
+    var canGoNext: Bool {
+        guard flowMode == .paged else { return false }
+        return currentPageIndex < pages.count - 1
+            || nextPageOffset != nil
+            || currentChapterIndex < chapters.count - 1
+    }
+
+    var canGoPrevious: Bool {
+        guard flowMode == .paged else { return false }
+        return currentPageIndex > 0
+            || hasMorePreviousPages
+            || currentChapterIndex > 0
     }
 
     private func cancelLayoutTasks() {
@@ -406,7 +456,7 @@ final class TXTReaderModel {
             boldText: boldText,
             lineHeight: lineHeight,
             paragraphIndent: paragraphIndent,
-            foregroundColor: theme.foregroundUIColor
+            foregroundColor: readerContentUIColor
         )
         let restoreCharacterOffset = pendingCharacterOffset
 
@@ -513,6 +563,7 @@ final class TXTReaderModel {
             currentChapterIndex = chapterIndex(forGlobalOffset: targetOffset)
             pendingCharacterOffset = targetOffset
             layoutPhase = .ready
+            onStateChange?()
             return
         }
 
@@ -563,6 +614,7 @@ final class TXTReaderModel {
             }
         }
         layoutPhase = .ready
+        onStateChange?()
 
         // A restored location may start in the middle of the book.  Materialize
         // one preceding batch in the background so the first reverse swipe is
@@ -581,6 +633,7 @@ final class TXTReaderModel {
     private func markLayoutFailure(_ message: String) {
         errorMessage = message
         layoutPhase = .failed(message)
+        onStateChange?()
     }
 
     private var anchorOffset: Int {
@@ -769,7 +822,7 @@ final class TXTReaderModel {
             boldText: settings.boldText,
             lineHeight: settings.lineHeight,
             paragraphIndent: settings.paragraphIndent,
-            foregroundColor: settings.theme.foregroundUIColor
+            foregroundColor: settings.readerContentUIColor
         )
         return attributedText(from: text, snapshot: snapshot)
     }
@@ -820,6 +873,161 @@ final class TXTReaderModel {
         currentChapterIndex = chapter.index
         scrollPositionGeneration &+= 1
         loadCurrentChapter()
+    }
+
+    func goForward() {
+        guard flowMode == .paged else { return }
+
+        if currentPageIndex < pages.count - 1 {
+            currentPageIndex += 1
+            return
+        }
+
+        if let nextPageOffset {
+            pages = []
+            pageRanges = []
+            hasMorePreviousPages = true
+            pendingCharacterOffset = nextPageOffset
+            currentCharacterOffset = nextPageOffset
+            tryStartLayoutIfReady(startOffset: nextPageOffset)
+            return
+        }
+
+        guard chapters.indices.contains(currentChapterIndex + 1) else { return }
+        selectChapter(chapters[currentChapterIndex + 1])
+    }
+
+    func goBackward() {
+        guard flowMode == .paged else { return }
+
+        if currentPageIndex > 0 {
+            currentPageIndex -= 1
+            return
+        }
+
+        if hasMorePreviousPages, let firstRange = pageRanges.first {
+            let targetOffset = max(firstRange.location - Self.pageBatchCharacterLimit, 0)
+            pages = []
+            pageRanges = []
+            nextPageOffset = nil
+            pendingCharacterOffset = targetOffset
+            currentCharacterOffset = targetOffset
+            tryStartLayoutIfReady(startOffset: targetOffset)
+            return
+        }
+
+        guard chapters.indices.contains(currentChapterIndex - 1) else { return }
+        currentChapterIndex -= 1
+        scrollPositionGeneration &+= 1
+        loadCurrentChapter(showLastPage: true)
+    }
+
+    func updateSystemAppearance(isDark: Bool) {
+        guard systemIsDark != isDark else { return }
+        systemIsDark = isDark
+        guard appearanceMode == .system else { return }
+        styleDidChange()
+    }
+
+    func apply(preferences: ReaderPreferences) {
+        fontScale = min(max(preferences.fontSize / 17, 0.8), 2.0)
+        fontFamily = preferences.fontFamily
+        boldText = preferences.boldText
+        lineHeight = min(max(preferences.lineHeight, 1.0), 2.0)
+        paragraphIndent = min(max(preferences.paragraphIndent, 0), 3.0)
+        pageMargins = min(max(preferences.pageMargins, 0.5), 2.0)
+        contentTopInset = min(max(preferences.contentTopInset, 0), 160)
+        contentBottomInset = min(max(preferences.contentBottomInset, 0), 160)
+        appearanceMode = preferences.appearanceMode
+        brightness = min(max(preferences.brightness, 0.25), 1)
+        showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
+        theme = Self.theme(for: preferences.themePreset)
+
+        switch preferences.pageTransition {
+        case .scroll:
+            flowMode = .scroll
+        case .pageCurl:
+            flowMode = .paged
+            pageTransition = .pageCurl
+        case .slide, .fade:
+            flowMode = .paged
+            pageTransition = .cover
+        }
+    }
+
+    func apply(preset: ReaderThemePreset) {
+        var preferences = readerPreferences
+        preferences.themePreset = preset
+        switch preset {
+        case .original:
+            preferences.fontSize = 17
+            preferences.lineHeight = 1.5
+            preferences.pageMargins = 1
+            preferences.paragraphIndent = 2
+            preferences.contentTopInset = 56
+            preferences.contentBottomInset = 32
+        case .quiet:
+            preferences.fontSize = 17
+            preferences.lineHeight = 1.65
+            preferences.pageMargins = 1.1
+            preferences.paragraphIndent = 2
+            preferences.contentTopInset = 56
+            preferences.contentBottomInset = 32
+        case .paper:
+            preferences.fontSize = 17
+            preferences.lineHeight = 1.55
+            preferences.pageMargins = 1
+            preferences.paragraphIndent = 2
+            preferences.contentTopInset = 56
+            preferences.contentBottomInset = 32
+        }
+        apply(preferences: preferences)
+    }
+
+    var readerPreferences: ReaderPreferences {
+        ReaderPreferences(
+            fontSize: 17 * fontScale,
+            fontFamily: fontFamily,
+            boldText: boldText,
+            lineHeight: lineHeight,
+            paragraphSpacing: 10,
+            pageMargins: pageMargins,
+            contentTopInset: contentTopInset,
+            contentBottomInset: contentBottomInset,
+            paragraphIndent: paragraphIndent,
+            publisherStyles: false,
+            themePreset: Self.preset(for: theme),
+            appearanceMode: appearanceMode,
+            brightness: brightness,
+            pageTransition: Self.pageTransition(for: flowMode, mode: pageTransition),
+            showBookTitleInPageHeader: showBookTitleInPageHeader
+        )
+    }
+
+    private static func theme(for preset: ReaderThemePreset) -> ReaderTheme {
+        switch preset {
+        case .original: return .light
+        case .quiet: return .quiet
+        case .paper: return .sepia
+        }
+    }
+
+    private static func preset(for theme: ReaderTheme) -> ReaderThemePreset {
+        switch theme {
+        case .quiet: return .quiet
+        case .sepia: return .paper
+        case .light, .dark: return .original
+        }
+    }
+
+    private static func pageTransition(
+        for flowMode: ReaderFlowMode,
+        mode: ReaderPageTransitionMode
+    ) -> ReaderPageTransition {
+        guard flowMode == .scroll else {
+            return mode == .pageCurl ? .pageCurl : .slide
+        }
+        return .scroll
     }
 
     /// Called by the page controller when the reader is close to the end of
@@ -964,7 +1172,7 @@ final class TXTReaderModel {
             boldText: boldText,
             lineHeight: lineHeight,
             paragraphIndent: paragraphIndent,
-            foregroundColor: theme.foregroundUIColor
+            foregroundColor: readerContentUIColor
         )
     }
 
@@ -1086,6 +1294,8 @@ final class TXTReaderModel {
         defaults.set(contentTopInset, forKey: PreferenceKey.contentTopInset)
         defaults.set(contentBottomInset, forKey: PreferenceKey.contentBottomInset)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
+        defaults.set(appearanceMode.rawValue, forKey: PreferenceKey.appearanceMode)
+        defaults.set(brightness, forKey: PreferenceKey.brightness)
         defaults.set(flowMode.rawValue, forKey: PreferenceKey.flowMode)
         defaults.set(pageTransition.rawValue, forKey: PreferenceKey.pageTransition)
         defaults.set(showBookTitleInPageHeader, forKey: PreferenceKey.showBookTitleInPageHeader)
@@ -1161,6 +1371,9 @@ final class TXTReaderModel {
         )
         if let data = try? JSONEncoder().encode(location),
            let json = String(data: data, encoding: .utf8) {
+            // Keep the legacy field readable for existing installations while
+            // storing TXT anchors separately from EPUB locators going forward.
+            book.txtReadingLocationJSON = json
             book.readerLocatorJSON = json
         }
         pendingScrollProgress = nil
@@ -1281,7 +1494,7 @@ final class TXTReaderModel {
     }
 
     private func decodedReadingLocation() -> TXTReadingLocation? {
-        guard let json = book.readerLocatorJSON,
+        guard let json = book.txtReadingLocationJSON ?? book.readerLocatorJSON,
               let data = json.data(using: .utf8),
               let location = try? JSONDecoder().decode(TXTReadingLocation.self, from: data),
               location.format == "txt",
