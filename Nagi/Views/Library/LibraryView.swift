@@ -10,9 +10,23 @@ import SwiftData
 import UIKit
 import UniformTypeIdentifiers
 
+private enum LibraryHeaderMetrics {
+    static let horizontalPadding: CGFloat = 16
+    static let verticalPadding: CGFloat = 8
+    static let controlSize: CGFloat = 48
+    static let hideThreshold: CGFloat = 8
+    static let revealTolerance: CGFloat = 0.5
+    static let transitionDuration: Double = 0.25
+    static let iconBlurRadius: CGFloat = 6
+    static let buttonBlurRadius: CGFloat = 8
+}
+
 struct LibraryView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
+    @ScaledMetric(relativeTo: .largeTitle) private var libraryTitleFontSize: CGFloat = 38
     @State private var viewModel = LibraryViewModel()
     @State private var pickerCoordinator: DocumentPickerCoordinator?
     @State private var bookToRename: Book?
@@ -20,6 +34,8 @@ struct LibraryView: View {
     @State private var bookToDelete: Book?
     @State private var showDeleteConfirm = false
     @State private var selectedBook: Book?
+    @State private var isHeaderHidden = false
+    @State private var headerTransitionProgress: CGFloat = 0
 
     var body: some View {
         NavigationStack {
@@ -77,6 +93,11 @@ struct LibraryView: View {
                     }
                     .scrollIndicators(.automatic)
                     .scrollEdgeEffectStyle(.automatic, for: .all)
+                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                        max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
+                    } action: { _, scrollOffset in
+                        updateHeaderVisibility(for: scrollOffset)
+                    }
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
@@ -135,9 +156,12 @@ struct LibraryView: View {
     private var libraryHeader: some View {
         HStack(alignment: .center, spacing: 16) {
             Text("书库")
-                .font(.largeTitle.weight(.bold))
+                .font(.system(size: libraryTitleFontSize, weight: .bold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
+                .frame(minHeight: LibraryHeaderMetrics.controlSize, alignment: .leading)
+                .opacity(titleOpacity)
+                .accessibilityHidden(isHeaderHidden)
                 .accessibilityAddTraits(.isHeader)
 
             Spacer(minLength: 12)
@@ -145,15 +169,84 @@ struct LibraryView: View {
             Button(action: presentImportPicker) {
                 Image(systemName: "plus")
                     .font(.title2.weight(.medium))
-                    .frame(width: 48, height: 48)
+                    .blur(radius: iconBlurRadius)
+                    .frame(width: LibraryHeaderMetrics.controlSize, height: LibraryHeaderMetrics.controlSize)
             }
             .buttonStyle(.plain)
             .glassEffect(.regular.interactive(), in: Circle())
+            .blur(radius: buttonBlurRadius)
+            .opacity(buttonOpacity)
+            .allowsHitTesting(!isHeaderHidden)
+            .accessibilityHidden(isHeaderHidden)
             .accessibilityLabel("导入小说")
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
+        .padding(.horizontal, LibraryHeaderMetrics.horizontalPadding)
+        .padding(.vertical, LibraryHeaderMetrics.verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            statusBarBlurLayer
+        }
+    }
+
+    private var statusBarBlurLayer: some View {
+        GeometryReader { geometry in
+            let topInset = max(geometry.frame(in: .global).minY, 0)
+
+            Group {
+                if reduceTransparency {
+                    Color(uiColor: .systemBackground)
+                } else {
+                    Rectangle()
+                        .fill(.ultraThinMaterial)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: topInset)
+            .offset(y: -topInset)
+            .ignoresSafeArea(.container, edges: .top)
+            .allowsHitTesting(false)
+        }
+    }
+
+    private var titleOpacity: Double {
+        Double(1 - headerTransitionProgress)
+    }
+
+    private var iconBlurRadius: CGFloat {
+        guard !reduceMotion else { return 0 }
+        return min(headerTransitionProgress * 2, 1) * LibraryHeaderMetrics.iconBlurRadius
+    }
+
+    private var buttonTransitionProgress: CGFloat {
+        min(max((headerTransitionProgress - 0.5) * 2, 0), 1)
+    }
+
+    private var buttonBlurRadius: CGFloat {
+        guard !reduceMotion else { return 0 }
+        return buttonTransitionProgress * LibraryHeaderMetrics.buttonBlurRadius
+    }
+
+    private var buttonOpacity: Double {
+        Double(1 - buttonTransitionProgress)
+    }
+
+    private func updateHeaderVisibility(for rawScrollOffset: CGFloat) {
+        let scrollOffset = max(rawScrollOffset, 0)
+        let shouldHide = isHeaderHidden
+            ? scrollOffset > LibraryHeaderMetrics.revealTolerance
+            : scrollOffset > LibraryHeaderMetrics.hideThreshold
+
+        guard shouldHide != isHeaderHidden else { return }
+        isHeaderHidden = shouldHide
+
+        let targetProgress: CGFloat = shouldHide ? 1 : 0
+        if reduceMotion {
+            headerTransitionProgress = targetProgress
+        } else {
+            withAnimation(.easeInOut(duration: LibraryHeaderMetrics.transitionDuration)) {
+                headerTransitionProgress = targetProgress
+            }
+        }
     }
 
     private func presentImportPicker() {
