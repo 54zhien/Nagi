@@ -393,7 +393,7 @@ final class EPUBReaderModel {
             } else if book.format == .txt, progress > 0 {
                 // 兼容切换架构前已经读过的 TXT：旧版本只有总进度，没有 Readium Locator。
                 currentLocatorJSON = nil
-                initialLocation = try? await publication.locate(progression: progress).get()
+                initialLocation = await publication.locate(progression: progress)
             } else {
                 currentLocatorJSON = nil
                 initialLocation = nil
