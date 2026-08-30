@@ -49,6 +49,10 @@ struct NagiApp: App {
 struct RootTabView: View {
     @State private var selection: AppTab = .home
     @State private var searchText = ""
+    // Keep search presentation independent from tab selection. The binding is
+    // observed by SwiftUI, but we do not set it when selecting the search tab,
+    // which preserves the existing no-auto-keyboard behavior.
+    @State private var isSearchPresented = false
     @State private var importState = AppImportState.shared
 
     var body: some View {
@@ -81,7 +85,11 @@ struct RootTabView: View {
                 SearchView(searchText: $searchText)
             }
         }
-        .searchable(text: $searchText, prompt: "搜索书名")
+        .searchable(
+            text: $searchText,
+            isPresented: $isSearchPresented,
+            prompt: "搜索书名"
+        )
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSearchActivation(.automatic)
     }

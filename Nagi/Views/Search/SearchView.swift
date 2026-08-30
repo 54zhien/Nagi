@@ -32,38 +32,45 @@ struct SearchView: View {
 
     @ViewBuilder
     private var searchContent: some View {
-        if searchTerms.isEmpty {
-            ContentUnavailableView {
-                searchUnavailableLabel("搜索书库")
-            }
-            .safeAreaBar(edge: .top, spacing: 0) {
-                searchHeader
-            }
-        } else if matchingBooks.isEmpty {
-            ContentUnavailableView {
-                searchUnavailableLabel("未找到书籍")
-            } description: {
-                Text("没有找到书名中包含“\(searchText)”的书籍")
-            }
-            .safeAreaBar(edge: .top, spacing: 0) {
-                searchHeader
-            }
-        } else {
-            List {
-                ForEach(matchingBooks) { book in
-                    Button {
-                        selectedBook = book
-                    } label: {
-                        BookRow(book: book)
+        Group {
+            if searchTerms.isEmpty {
+                ContentUnavailableView {
+                    searchUnavailableLabel("搜索书库")
+                }
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    searchHeader
+                }
+            } else if matchingBooks.isEmpty {
+                ContentUnavailableView {
+                    searchUnavailableLabel("未找到书籍")
+                } description: {
+                    Text("没有找到书名中包含“\(searchText)”的书籍")
+                }
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    searchHeader
+                }
+            } else {
+                List {
+                    ForEach(matchingBooks) { book in
+                        Button {
+                            selectedBook = book
+                        } label: {
+                            BookRow(book: book)
+                        }
+                        .buttonStyle(.plain)
                     }
-                    .buttonStyle(.plain)
+                }
+                .listStyle(.plain)
+                .scrollEdgeEffectStyle(.automatic, for: .top)
+                .safeAreaBar(edge: .top, spacing: 0) {
+                    searchHeader
                 }
             }
-            .listStyle(.plain)
-            .scrollEdgeEffectStyle(.automatic, for: .top)
-            .safeAreaBar(edge: .top, spacing: 0) {
-                searchHeader
-            }
+        }
+        // Do not add a second implicit animation when the system search or
+        // keyboard transition updates this page.
+        .transaction { transaction in
+            transaction.animation = nil
         }
     }
 
