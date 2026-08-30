@@ -60,8 +60,7 @@ struct SearchView: View {
                 }
             }
             .listStyle(.plain)
-            .scrollContentBackground(.hidden)
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .scrollEdgeEffectStyle(.automatic, for: .top)
             .safeAreaBar(edge: .top, spacing: 0) {
                 searchHeader
             }

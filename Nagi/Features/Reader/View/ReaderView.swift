@@ -163,6 +163,7 @@ private struct ReaderSessionView: View {
                     .glassEffect(.regular.interactive(), in: Circle())
                     .accessibilityLabel("关闭主题与排版")
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
         .presentationDetents([.medium])
