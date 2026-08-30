@@ -38,7 +38,6 @@ struct SettingsView: View {
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
-            .ignoresSafeArea(.container, edges: .top)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
             } action: { _, scrollOffset in

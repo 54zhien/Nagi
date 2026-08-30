@@ -35,7 +35,6 @@ struct SearchView: View {
                         }
                         .buttonStyle(.plain)
                     }
-                    .ignoresSafeArea(.container, edges: .top)
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)

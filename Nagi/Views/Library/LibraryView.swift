@@ -237,7 +237,6 @@ struct LibraryView: View {
                     }
                     .scrollIndicators(.automatic)
                     .scrollEdgeEffectStyle(.automatic, for: .all)
-                    .ignoresSafeArea(.container, edges: .top)
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -355,14 +354,19 @@ enum BookCardLayout {
 }
 
 enum BookCardMetrics {
-    static let cornerRadius: CGFloat = 14
+    static let cardCornerRadius: CGFloat = 20
+    static let coverCornerRadius: CGFloat = 12
     static let coverWidth: CGFloat = 84
     static let coverHeight: CGFloat = 126
     static let contentSpacing: CGFloat = 12
-    static let cardPadding: CGFloat = 8
+    static let cardPadding: CGFloat = 10
 
     static var cardShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
+    }
+
+    static var coverShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: coverCornerRadius, style: .continuous)
     }
 
     static var contentHeight: CGFloat {
@@ -407,9 +411,9 @@ struct BookCoverView: View {
             }
         }
         .aspectRatio(2.0 / 3.0, contentMode: .fit)
-        .clipShape(BookCardMetrics.cardShape)
+        .clipShape(BookCardMetrics.coverShape)
         .overlay {
-            BookCardMetrics.cardShape
+            BookCardMetrics.coverShape
                 .strokeBorder(.quaternary, lineWidth: 0.5)
         }
         .accessibilityHidden(true)
