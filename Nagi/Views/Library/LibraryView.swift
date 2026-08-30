@@ -25,15 +25,9 @@ enum NagiPageHeaderMetrics {
     }
 }
 
-enum NagiPageHeaderBlurScope: Equatable {
-    case none
-    case throughTitle
-}
-
 /// 页面级大标题，保持标题和右侧操作控件的视觉与动效一致。
 struct NagiPageHeader: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ScaledMetric(relativeTo: .largeTitle) private var titleFontSize: CGFloat = 38
 
     let title: String
@@ -42,7 +36,6 @@ struct NagiPageHeader: View {
     let actionIcon: String?
     let actionAccessibilityLabel: String?
     let action: (() -> Void)?
-    let blurScope: NagiPageHeaderBlurScope
 
     init(
         title: String,
@@ -50,8 +43,7 @@ struct NagiPageHeader: View {
         isHeaderHidden: Bool = false,
         actionIcon: String? = nil,
         actionAccessibilityLabel: String? = nil,
-        action: (() -> Void)? = nil,
-        blurScope: NagiPageHeaderBlurScope = .none
+        action: (() -> Void)? = nil
     ) {
         self.title = title
         self.transitionProgress = transitionProgress
@@ -59,7 +51,6 @@ struct NagiPageHeader: View {
         self.actionIcon = actionIcon
         self.actionAccessibilityLabel = actionAccessibilityLabel
         self.action = action
-        self.blurScope = blurScope
     }
 
     var body: some View {
@@ -97,16 +88,6 @@ struct NagiPageHeader: View {
         .padding(.horizontal, NagiPageHeaderMetrics.horizontalPadding)
         .padding(.vertical, NagiPageHeaderMetrics.verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            if blurScope == .throughTitle {
-                if reduceTransparency {
-                    Color(uiColor: .systemBackground)
-                } else {
-                    Rectangle()
-                        .fill(.regularMaterial)
-                }
-            }
-        }
     }
 
     private var normalizedProgress: CGFloat {
@@ -133,53 +114,6 @@ struct NagiPageHeader: View {
 
     private var buttonOpacity: Double {
         Double(1 - buttonTransitionProgress)
-    }
-}
-
-/// 固定覆盖在系统状态栏区域下方的 Material 层。
-/// 独立于 safeAreaInset，避免将层向上偏移后被 inset 的布局边界裁掉。
-struct NagiStatusBarBlurLayer: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
-
-    var body: some View {
-        GeometryReader { geometry in
-            let topInset = Self.windowTopSafeAreaInset ?? geometry.safeAreaInsets.top
-            let globalTop = max(geometry.frame(in: .global).minY, 0)
-
-            Group {
-                if reduceTransparency {
-                    Color(uiColor: .systemBackground)
-                } else {
-                    Rectangle()
-                        .fill(.regularMaterial)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: max(topInset, 0), alignment: .top)
-            // 页面内容可能从安全区起点开始布局；将层校正到窗口顶部，
-            // 这样滚动内容进入系统栏区域时才会经过 Material。
-            .offset(y: -globalTop)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .ignoresSafeArea(.container, edges: .top)
-        .allowsHitTesting(false)
-        .accessibilityHidden(true)
-    }
-
-    /// 页面可能位于 TabView 的局部安全区内，GeometryProxy 读到的 inset
-    /// 不一定是窗口真实的顶部安全区；窗口值只用于确定模糊层高度，
-    /// 不改变任何页面内容布局。
-    private static var windowTopSafeAreaInset: CGFloat? {
-        let windows = UIApplication.shared.connectedScenes
-            .compactMap { $0 as? UIWindowScene }
-            .flatMap { $0.windows }
-
-        guard let window = windows.first(where: { $0.isKeyWindow }) else {
-            return nil
-        }
-
-        let inset = window.safeAreaInsets.top
-        return inset > 0 ? inset : nil
     }
 }
 
@@ -258,7 +192,7 @@ struct LibraryView: View {
                         .padding(.bottom, 24)
                     }
                     .scrollIndicators(.automatic)
-                    .scrollEdgeEffectStyle(.automatic, for: .all)
+                    .scrollEdgeEffectStyle(.soft, for: .top)
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -267,11 +201,7 @@ struct LibraryView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear
-                    .frame(height: NagiPageHeaderMetrics.contentHeight)
-            }
-            .overlay(alignment: .top) {
+            .safeAreaBar(edge: .top, spacing: 0) {
                 libraryHeader
             }
             .alert(
@@ -307,9 +237,6 @@ struct LibraryView: View {
             } message: {
                 Text("确定删除「\(bookToDelete?.title ?? "")」吗？此操作不可撤销。")
             }
-        }
-        .overlay(alignment: .top) {
-            NagiStatusBarBlurLayer()
         }
         .task(id: books.map(\.id)) {
             viewModel.backfillMissingCovers(for: books, into: modelContext)

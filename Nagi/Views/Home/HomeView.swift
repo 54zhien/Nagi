@@ -59,7 +59,7 @@ struct HomeView: View {
                         .padding(.bottom, 24)
                     }
                     .scrollIndicators(.automatic)
-                    .scrollEdgeEffectStyle(.automatic, for: .all)
+                    .scrollEdgeEffectStyle(.soft, for: .top)
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -68,20 +68,13 @@ struct HomeView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear
-                    .frame(height: NagiPageHeaderMetrics.contentHeight)
-            }
-            .overlay(alignment: .top) {
+            .safeAreaBar(edge: .top, spacing: 0) {
                 NagiPageHeader(
                     title: "主页",
                     transitionProgress: headerTransitionProgress,
                     isHeaderHidden: isHeaderHidden
                 )
             }
-        }
-        .overlay(alignment: .top) {
-            NagiStatusBarBlurLayer()
         }
         .fullScreenCover(
             isPresented: Binding(

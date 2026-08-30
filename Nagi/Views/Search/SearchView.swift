@@ -20,30 +20,14 @@ struct SearchView: View {
                     ContentUnavailableView {
                         searchUnavailableLabel("搜索书库")
                     }
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        Color.clear
-                            .frame(height: NagiPageHeaderMetrics.contentHeight)
-                    }
                 } else if matchingBooks.isEmpty {
                     ContentUnavailableView {
                         searchUnavailableLabel("未找到书籍")
                     } description: {
                         Text("没有找到书名中包含“\(searchText)”的书籍")
                     }
-                    .safeAreaInset(edge: .top, spacing: 0) {
-                        Color.clear
-                            .frame(height: NagiPageHeaderMetrics.contentHeight)
-                    }
                 } else {
                     List {
-                        Color.clear
-                            .frame(height: NagiPageHeaderMetrics.contentHeight)
-                            .frame(maxWidth: .infinity)
-                            .listRowInsets(EdgeInsets())
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .accessibilityHidden(true)
-
                         ForEach(matchingBooks) { book in
                             Button {
                                 selectedBook = book
@@ -57,17 +41,13 @@ struct SearchView: View {
                     .scrollContentBackground(.hidden)
                 }
             }
-            .scrollEdgeEffectStyle(.automatic, for: .all)
+            .scrollEdgeEffectStyle(.soft, for: .top)
             .toolbar(.hidden, for: .navigationBar)
-            .overlay(alignment: .top) {
+            .safeAreaBar(edge: .top, spacing: 0) {
                 NagiPageHeader(
-                    title: "搜索",
-                    blurScope: .throughTitle
+                    title: "搜索"
                 )
             }
-        }
-        .overlay(alignment: .top) {
-            NagiStatusBarBlurLayer()
         }
         .fullScreenCover(
             isPresented: Binding(
