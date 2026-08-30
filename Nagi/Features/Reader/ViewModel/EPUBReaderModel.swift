@@ -550,7 +550,7 @@ final class EPUBReaderModel {
             selectedPreset = preset
             // Theme cards only select the reading palette. Typography and
             // layout remain the user's current choices.
-            theme = Self.readerTheme(for: preset)
+            theme = Self.readerTheme(for: ReaderThemePreset(rawValue: preset.rawValue) ?? .original)
             brightness = 1
         }
         persistPreferences()
