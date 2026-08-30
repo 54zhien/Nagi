@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftData
 
 struct SearchView: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Query(sort: \Book.title) private var books: [Book]
     @Binding var searchText: String
     @State private var selectedBook: Book?
@@ -17,17 +18,15 @@ struct SearchView: View {
         NavigationStack {
             Group {
                 if searchTerms.isEmpty {
-                    ContentUnavailableView(
-                        "搜索书库",
-                        systemImage: "magnifyingglass",
-                        description: Text("输入书名关键词查找书籍")
-                    )
+                    ContentUnavailableView {
+                        searchUnavailableLabel("搜索书库")
+                    }
                 } else if matchingBooks.isEmpty {
-                    ContentUnavailableView(
-                        "未找到书籍",
-                        systemImage: "magnifyingglass",
-                        description: Text("没有找到书名中包含“\(searchText)”的书籍")
-                    )
+                    ContentUnavailableView {
+                        searchUnavailableLabel("未找到书籍")
+                    } description: {
+                        Text("没有找到书名中包含“\(searchText)”的书籍")
+                    }
                 } else {
                     List(matchingBooks) { book in
                         Button {
@@ -41,6 +40,17 @@ struct SearchView: View {
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
             .navigationTitle("搜索")
+            .toolbarTitleDisplayMode(.large)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarBackground(
+                reduceTransparency
+                    ? AnyShapeStyle(Color(uiColor: .systemBackground))
+                    : AnyShapeStyle(.bar),
+                for: .navigationBar
+            )
+        }
+        .overlay(alignment: .top) {
+            NagiStatusBarBlurLayer()
         }
         .searchable(
             text: $searchText,
@@ -56,6 +66,16 @@ struct SearchView: View {
             if let selectedBook {
                 ReaderView(book: selectedBook)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func searchUnavailableLabel(_ title: String) -> some View {
+        Label {
+            Text(title)
+        } icon: {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 40, weight: .semibold))
         }
     }
 

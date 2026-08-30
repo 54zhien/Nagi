@@ -9,8 +9,11 @@ import SwiftUI
 import SwiftData
 
 struct HomeView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @State private var selectedBook: Book?
+    @State private var isHeaderHidden = false
+    @State private var headerTransitionProgress: CGFloat = 0
 
     var body: some View {
         NavigationStack {
@@ -35,13 +38,12 @@ struct HomeView: View {
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 .buttonStyle(.plain)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .glassEffect(
                                     .regular.interactive(),
-                                    in: RoundedRectangle(
-                                        cornerRadius: BookCardMetrics.cornerRadius,
-                                        style: .continuous
-                                    )
+                                    in: BookCardMetrics.cardShape
                                 )
+                                .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")
                             }
@@ -52,9 +54,24 @@ struct HomeView: View {
                     }
                     .scrollIndicators(.automatic)
                     .scrollEdgeEffectStyle(.automatic, for: .all)
+                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                        max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
+                    } action: { _, scrollOffset in
+                        updateHeaderVisibility(for: scrollOffset)
+                    }
                 }
             }
-            .navigationTitle("主页")
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                NagiPageHeader(
+                    title: "主页",
+                    transitionProgress: headerTransitionProgress,
+                    isHeaderHidden: isHeaderHidden
+                )
+            }
+        }
+        .overlay(alignment: .top) {
+            NagiStatusBarBlurLayer()
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -64,6 +81,25 @@ struct HomeView: View {
         ) {
             if let selectedBook {
                 ReaderView(book: selectedBook)
+            }
+        }
+    }
+
+    private func updateHeaderVisibility(for rawScrollOffset: CGFloat) {
+        let scrollOffset = max(rawScrollOffset, 0)
+        let shouldHide = isHeaderHidden
+            ? scrollOffset > NagiPageHeaderMetrics.revealTolerance
+            : scrollOffset > NagiPageHeaderMetrics.hideThreshold
+
+        guard shouldHide != isHeaderHidden else { return }
+        isHeaderHidden = shouldHide
+
+        let targetProgress: CGFloat = shouldHide ? 1 : 0
+        if reduceMotion {
+            headerTransitionProgress = targetProgress
+        } else {
+            withAnimation(.easeInOut(duration: NagiPageHeaderMetrics.transitionDuration)) {
+                headerTransitionProgress = targetProgress
             }
         }
     }

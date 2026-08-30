@@ -10,7 +10,7 @@ import SwiftData
 import UIKit
 import UniformTypeIdentifiers
 
-private enum LibraryHeaderMetrics {
+enum NagiPageHeaderMetrics {
     static let horizontalPadding: CGFloat = 16
     static let verticalPadding: CGFloat = 8
     static let controlSize: CGFloat = 48
@@ -21,12 +21,127 @@ private enum LibraryHeaderMetrics {
     static let buttonBlurRadius: CGFloat = 8
 }
 
+/// 页面级大标题，保持标题和右侧操作控件的视觉与动效一致。
+struct NagiPageHeader: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @ScaledMetric(relativeTo: .largeTitle) private var titleFontSize: CGFloat = 38
+
+    let title: String
+    let transitionProgress: CGFloat
+    let isHeaderHidden: Bool
+    let actionIcon: String?
+    let actionAccessibilityLabel: String?
+    let action: (() -> Void)?
+
+    init(
+        title: String,
+        transitionProgress: CGFloat = 0,
+        isHeaderHidden: Bool = false,
+        actionIcon: String? = nil,
+        actionAccessibilityLabel: String? = nil,
+        action: (() -> Void)? = nil
+    ) {
+        self.title = title
+        self.transitionProgress = transitionProgress
+        self.isHeaderHidden = isHeaderHidden
+        self.actionIcon = actionIcon
+        self.actionAccessibilityLabel = actionAccessibilityLabel
+        self.action = action
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Text(title)
+                .font(.system(size: titleFontSize, weight: .bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .frame(minHeight: NagiPageHeaderMetrics.controlSize, alignment: .leading)
+                .opacity(titleOpacity)
+                .accessibilityHidden(isHeaderHidden)
+                .accessibilityAddTraits(.isHeader)
+
+            Spacer(minLength: 12)
+
+            if let action, let actionIcon {
+                Button(action: action) {
+                    Image(systemName: actionIcon)
+                        .font(.title2.weight(.medium))
+                        .blur(radius: iconBlurRadius)
+                        .frame(
+                            width: NagiPageHeaderMetrics.controlSize,
+                            height: NagiPageHeaderMetrics.controlSize
+                        )
+                }
+                .buttonStyle(.plain)
+                .glassEffect(.regular.interactive(), in: Circle())
+                .blur(radius: buttonBlurRadius)
+                .opacity(buttonOpacity)
+                .allowsHitTesting(!isHeaderHidden)
+                .accessibilityHidden(isHeaderHidden)
+                .accessibilityLabel(actionAccessibilityLabel ?? actionIcon)
+            }
+        }
+        .padding(.horizontal, NagiPageHeaderMetrics.horizontalPadding)
+        .padding(.vertical, NagiPageHeaderMetrics.verticalPadding)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var normalizedProgress: CGFloat {
+        min(max(transitionProgress, 0), 1)
+    }
+
+    private var titleOpacity: Double {
+        Double(1 - normalizedProgress)
+    }
+
+    private var iconBlurRadius: CGFloat {
+        guard !reduceMotion else { return 0 }
+        return min(normalizedProgress * 2, 1) * NagiPageHeaderMetrics.iconBlurRadius
+    }
+
+    private var buttonTransitionProgress: CGFloat {
+        min(max((normalizedProgress - 0.5) * 2, 0), 1)
+    }
+
+    private var buttonBlurRadius: CGFloat {
+        guard !reduceMotion else { return 0 }
+        return buttonTransitionProgress * NagiPageHeaderMetrics.buttonBlurRadius
+    }
+
+    private var buttonOpacity: Double {
+        Double(1 - buttonTransitionProgress)
+    }
+}
+
+/// 固定覆盖在系统状态栏区域下方的 Material 层。
+/// 独立于 safeAreaInset，避免将层向上偏移后被 inset 的布局边界裁掉。
+struct NagiStatusBarBlurLayer: View {
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        GeometryReader { geometry in
+            Group {
+                if reduceTransparency {
+                    Color(uiColor: .systemBackground)
+                } else {
+                    Rectangle()
+                        .fill(.bar)
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: max(geometry.safeAreaInsets.top, 0), alignment: .top)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .ignoresSafeArea(.container, edges: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 struct LibraryView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
-    @ScaledMetric(relativeTo: .largeTitle) private var libraryTitleFontSize: CGFloat = 38
     @State private var viewModel = LibraryViewModel()
     @State private var pickerCoordinator: DocumentPickerCoordinator?
     @State private var bookToRename: Book?
@@ -57,13 +172,13 @@ struct LibraryView: View {
                                         .frame(maxWidth: .infinity, alignment: .leading)
                                 }
                                 .buttonStyle(.plain)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .glassEffect(
                                     .regular.interactive(),
-                                    in: RoundedRectangle(
-                                        cornerRadius: BookCardMetrics.cornerRadius,
-                                        style: .continuous
-                                    )
+                                    in: BookCardMetrics.cardShape
                                 )
+                                .contentShape(.interaction, BookCardMetrics.cardShape)
+                                .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")
                                 .contextMenu {
@@ -138,6 +253,9 @@ struct LibraryView: View {
                 Text("确定删除「\(bookToDelete?.title ?? "")」吗？此操作不可撤销。")
             }
         }
+        .overlay(alignment: .top) {
+            NagiStatusBarBlurLayer()
+        }
         .task(id: books.map(\.id)) {
             viewModel.backfillMissingCovers(for: books, into: modelContext)
         }
@@ -154,87 +272,21 @@ struct LibraryView: View {
     }
 
     private var libraryHeader: some View {
-        HStack(alignment: .center, spacing: 16) {
-            Text("书库")
-                .font(.system(size: libraryTitleFontSize, weight: .bold))
-                .foregroundStyle(.primary)
-                .lineLimit(1)
-                .frame(minHeight: LibraryHeaderMetrics.controlSize, alignment: .leading)
-                .opacity(titleOpacity)
-                .accessibilityHidden(isHeaderHidden)
-                .accessibilityAddTraits(.isHeader)
-
-            Spacer(minLength: 12)
-
-            Button(action: presentImportPicker) {
-                Image(systemName: "plus")
-                    .font(.title2.weight(.medium))
-                    .blur(radius: iconBlurRadius)
-                    .frame(width: LibraryHeaderMetrics.controlSize, height: LibraryHeaderMetrics.controlSize)
-            }
-            .buttonStyle(.plain)
-            .glassEffect(.regular.interactive(), in: Circle())
-            .blur(radius: buttonBlurRadius)
-            .opacity(buttonOpacity)
-            .allowsHitTesting(!isHeaderHidden)
-            .accessibilityHidden(isHeaderHidden)
-            .accessibilityLabel("导入小说")
-        }
-        .padding(.horizontal, LibraryHeaderMetrics.horizontalPadding)
-        .padding(.vertical, LibraryHeaderMetrics.verticalPadding)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            statusBarBlurLayer
-        }
-    }
-
-    private var statusBarBlurLayer: some View {
-        GeometryReader { geometry in
-            let topInset = max(geometry.frame(in: .global).minY, 0)
-
-            Group {
-                if reduceTransparency {
-                    Color(uiColor: .systemBackground)
-                } else {
-                    Rectangle()
-                        .fill(.ultraThinMaterial)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .frame(height: topInset)
-            .offset(y: -topInset)
-            .ignoresSafeArea(.container, edges: .top)
-            .allowsHitTesting(false)
-        }
-    }
-
-    private var titleOpacity: Double {
-        Double(1 - headerTransitionProgress)
-    }
-
-    private var iconBlurRadius: CGFloat {
-        guard !reduceMotion else { return 0 }
-        return min(headerTransitionProgress * 2, 1) * LibraryHeaderMetrics.iconBlurRadius
-    }
-
-    private var buttonTransitionProgress: CGFloat {
-        min(max((headerTransitionProgress - 0.5) * 2, 0), 1)
-    }
-
-    private var buttonBlurRadius: CGFloat {
-        guard !reduceMotion else { return 0 }
-        return buttonTransitionProgress * LibraryHeaderMetrics.buttonBlurRadius
-    }
-
-    private var buttonOpacity: Double {
-        Double(1 - buttonTransitionProgress)
+        NagiPageHeader(
+            title: "书库",
+            transitionProgress: headerTransitionProgress,
+            isHeaderHidden: isHeaderHidden,
+            actionIcon: "plus",
+            actionAccessibilityLabel: "导入小说",
+            action: presentImportPicker
+        )
     }
 
     private func updateHeaderVisibility(for rawScrollOffset: CGFloat) {
         let scrollOffset = max(rawScrollOffset, 0)
         let shouldHide = isHeaderHidden
-            ? scrollOffset > LibraryHeaderMetrics.revealTolerance
-            : scrollOffset > LibraryHeaderMetrics.hideThreshold
+            ? scrollOffset > NagiPageHeaderMetrics.revealTolerance
+            : scrollOffset > NagiPageHeaderMetrics.hideThreshold
 
         guard shouldHide != isHeaderHidden else { return }
         isHeaderHidden = shouldHide
@@ -243,7 +295,7 @@ struct LibraryView: View {
         if reduceMotion {
             headerTransitionProgress = targetProgress
         } else {
-            withAnimation(.easeInOut(duration: LibraryHeaderMetrics.transitionDuration)) {
+            withAnimation(.easeInOut(duration: NagiPageHeaderMetrics.transitionDuration)) {
                 headerTransitionProgress = targetProgress
             }
         }
@@ -270,10 +322,14 @@ enum BookCardLayout {
 
 enum BookCardMetrics {
     static let cornerRadius: CGFloat = 14
-    static let coverWidth: CGFloat = 92
-    static let coverHeight: CGFloat = 138
+    static let coverWidth: CGFloat = 84
+    static let coverHeight: CGFloat = 126
     static let contentSpacing: CGFloat = 12
-    static let cardPadding: CGFloat = 12
+    static let cardPadding: CGFloat = 8
+
+    static var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+    }
 }
 
 struct BookCoverView: View {
@@ -295,9 +351,9 @@ struct BookCoverView: View {
             }
         }
         .aspectRatio(2.0 / 3.0, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: BookCardMetrics.cornerRadius, style: .continuous))
+        .clipShape(BookCardMetrics.cardShape)
         .overlay {
-            RoundedRectangle(cornerRadius: BookCardMetrics.cornerRadius, style: .continuous)
+            BookCardMetrics.cardShape
                 .strokeBorder(.quaternary, lineWidth: 0.5)
         }
         .accessibilityHidden(true)

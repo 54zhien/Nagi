@@ -9,6 +9,10 @@ import SwiftUI
 import UIKit
 
 struct SettingsView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isHeaderHidden = false
+    @State private var headerTransitionProgress: CGFloat = 0
+
     var body: some View {
         NavigationStack {
             List {
@@ -21,7 +25,41 @@ struct SettingsView: View {
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
-            .navigationTitle("设置")
+            .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
+            } action: { _, scrollOffset in
+                updateHeaderVisibility(for: scrollOffset)
+            }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                NagiPageHeader(
+                    title: "设置",
+                    transitionProgress: headerTransitionProgress,
+                    isHeaderHidden: isHeaderHidden
+                )
+            }
+        }
+        .overlay(alignment: .top) {
+            NagiStatusBarBlurLayer()
+        }
+    }
+
+    private func updateHeaderVisibility(for rawScrollOffset: CGFloat) {
+        let scrollOffset = max(rawScrollOffset, 0)
+        let shouldHide = isHeaderHidden
+            ? scrollOffset > NagiPageHeaderMetrics.revealTolerance
+            : scrollOffset > NagiPageHeaderMetrics.hideThreshold
+
+        guard shouldHide != isHeaderHidden else { return }
+        isHeaderHidden = shouldHide
+
+        let targetProgress: CGFloat = shouldHide ? 1 : 0
+        if reduceMotion {
+            headerTransitionProgress = targetProgress
+        } else {
+            withAnimation(.easeInOut(duration: NagiPageHeaderMetrics.transitionDuration)) {
+                headerTransitionProgress = targetProgress
+            }
         }
     }
 }
