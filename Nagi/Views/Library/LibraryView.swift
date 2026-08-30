@@ -19,11 +19,21 @@ enum NagiPageHeaderMetrics {
     static let transitionDuration: Double = 0.25
     static let iconBlurRadius: CGFloat = 6
     static let buttonBlurRadius: CGFloat = 8
+
+    static var contentHeight: CGFloat {
+        controlSize + verticalPadding * 2
+    }
+}
+
+enum NagiPageHeaderBlurScope: Equatable {
+    case none
+    case throughTitle
 }
 
 /// 页面级大标题，保持标题和右侧操作控件的视觉与动效一致。
 struct NagiPageHeader: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @ScaledMetric(relativeTo: .largeTitle) private var titleFontSize: CGFloat = 38
 
     let title: String
@@ -32,6 +42,7 @@ struct NagiPageHeader: View {
     let actionIcon: String?
     let actionAccessibilityLabel: String?
     let action: (() -> Void)?
+    let blurScope: NagiPageHeaderBlurScope
 
     init(
         title: String,
@@ -39,7 +50,8 @@ struct NagiPageHeader: View {
         isHeaderHidden: Bool = false,
         actionIcon: String? = nil,
         actionAccessibilityLabel: String? = nil,
-        action: (() -> Void)? = nil
+        action: (() -> Void)? = nil,
+        blurScope: NagiPageHeaderBlurScope = .none
     ) {
         self.title = title
         self.transitionProgress = transitionProgress
@@ -47,6 +59,7 @@ struct NagiPageHeader: View {
         self.actionIcon = actionIcon
         self.actionAccessibilityLabel = actionAccessibilityLabel
         self.action = action
+        self.blurScope = blurScope
     }
 
     var body: some View {
@@ -84,6 +97,16 @@ struct NagiPageHeader: View {
         .padding(.horizontal, NagiPageHeaderMetrics.horizontalPadding)
         .padding(.vertical, NagiPageHeaderMetrics.verticalPadding)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            if blurScope == .throughTitle {
+                if reduceTransparency {
+                    Color(uiColor: .systemBackground)
+                } else {
+                    Rectangle()
+                        .fill(.bar)
+                }
+            }
+        }
     }
 
     private var normalizedProgress: CGFloat {
@@ -141,6 +164,8 @@ struct NagiStatusBarBlurLayer: View {
 struct LibraryView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
+    @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
+    private var bookCardsUseLiquidGlass = true
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @State private var viewModel = LibraryViewModel()
     @State private var pickerCoordinator: DocumentPickerCoordinator?
@@ -168,14 +193,18 @@ struct LibraryView: View {
                                 Button {
                                     selectedBook = book
                                 } label: {
-                                    BookCard(book: book, layout: .library)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    BookCardButtonLabel(
+                                        book: book,
+                                        layout: .library,
+                                        usesLiquidGlass: bookCardsUseLiquidGlass
+                                    )
                                 }
                                 .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .glassEffect(
-                                    .regular.interactive(),
-                                    in: BookCardMetrics.cardShape
+                                .modifier(
+                                    BookCardSurfaceModifier(
+                                        isLiquidGlassEnabled: bookCardsUseLiquidGlass
+                                    )
                                 )
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
@@ -208,6 +237,7 @@ struct LibraryView: View {
                     }
                     .scrollIndicators(.automatic)
                     .scrollEdgeEffectStyle(.automatic, for: .all)
+                    .ignoresSafeArea(.container, edges: .top)
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -217,6 +247,10 @@ struct LibraryView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: NagiPageHeaderMetrics.contentHeight)
+            }
+            .overlay(alignment: .top) {
                 libraryHeader
             }
             .alert(
@@ -330,6 +364,28 @@ enum BookCardMetrics {
     static var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
     }
+
+    static var contentHeight: CGFloat {
+        coverHeight + cardPadding * 2
+    }
+}
+
+struct BookCardSurfaceModifier: ViewModifier {
+    let isLiquidGlassEnabled: Bool
+
+    func body(content: Content) -> some View {
+        if isLiquidGlassEnabled {
+            content.glassEffect(
+                .regular.interactive(),
+                in: BookCardMetrics.cardShape
+            )
+        } else {
+            content.background(
+                Color(uiColor: .secondarySystemBackground),
+                in: BookCardMetrics.cardShape
+            )
+        }
+    }
 }
 
 struct BookCoverView: View {
@@ -363,6 +419,13 @@ struct BookCoverView: View {
 struct BookCard: View {
     let book: Book
     let layout: BookCardLayout
+    let usesLiquidGlass: Bool
+
+    init(book: Book, layout: BookCardLayout, usesLiquidGlass: Bool = true) {
+        self.book = book
+        self.layout = layout
+        self.usesLiquidGlass = usesLiquidGlass
+    }
 
     var body: some View {
         switch layout {
@@ -393,15 +456,6 @@ struct BookCard: View {
                     }
 
                     Spacer(minLength: 6)
-
-                    Text(progressText)
-                        .font(.caption2.weight(.semibold).monospacedDigit())
-                        .foregroundStyle(.primary)
-                        .padding(.horizontal, 8)
-                        .frame(minWidth: 46, minHeight: 26)
-                        .glassEffect(.clear, in: .capsule)
-                        .accessibilityLabel("阅读进度")
-                        .accessibilityValue(Text(progressText))
                 }
 
                 Label(chapterText, systemImage: "bookmark.fill")
@@ -413,13 +467,14 @@ struct BookCard: View {
 
                 Spacer(minLength: 0)
 
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(.accentColor)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, 12)
-                    .accessibilityLabel("阅读进度")
-                    .accessibilityValue(Text(progressText))
+                VStack(alignment: .trailing, spacing: 4) {
+                    Text(progressText)
+                        .font(.caption2.weight(.semibold).monospacedDigit())
+                        .foregroundStyle(.secondary)
+
+                    progressBar
+                }
+                .padding(.top, 12)
             }
             .frame(maxWidth: .infinity, minHeight: BookCardMetrics.coverHeight, alignment: .topLeading)
         }
@@ -466,6 +521,23 @@ struct BookCard: View {
         "\(Int((progress * 100).rounded()))%"
     }
 
+    @ViewBuilder
+    private var progressBar: some View {
+        let progressView = ProgressView(value: progress)
+            .progressViewStyle(.linear)
+            .tint(.accentColor)
+            .frame(maxWidth: .infinity)
+            .frame(height: 8)
+            .accessibilityLabel("阅读进度")
+            .accessibilityValue(Text(progressText))
+
+        if usesLiquidGlass {
+            progressView.glassEffect(.regular, in: Capsule())
+        } else {
+            progressView
+        }
+    }
+
     private var authorText: String {
         let author = book.author?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return author.isEmpty ? "未知作者" : author
@@ -474,10 +546,8 @@ struct BookCard: View {
     private var chapterText: String {
         guard book.lastReadAt != nil else { return "尚未阅读" }
 
-        let chapterNumber = max(book.currentChapterIndex + 1, 1)
         let title = book.currentChapterTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        guard !title.isEmpty else { return "第\(chapterNumber)章" }
-        return "第\(chapterNumber)章 \(title)"
+        return title.isEmpty ? "尚未阅读" : title
     }
 
     private var formatLabel: String {
@@ -486,6 +556,37 @@ struct BookCard: View {
             return "\(formatName) · \(book.chapterCount) 章"
         }
         return formatName
+    }
+}
+
+/// 给主页和书库页的整卡按钮提供一个真正占满卡片的标签区域。
+struct BookCardButtonLabel: View {
+    let book: Book
+    let layout: BookCardLayout
+    let usesLiquidGlass: Bool
+
+    init(book: Book, layout: BookCardLayout, usesLiquidGlass: Bool = true) {
+        self.book = book
+        self.layout = layout
+        self.usesLiquidGlass = usesLiquidGlass
+    }
+
+    var body: some View {
+        ZStack {
+            Color.clear
+
+            BookCard(
+                book: book,
+                layout: layout,
+                usesLiquidGlass: usesLiquidGlass
+            )
+        }
+        .frame(
+            maxWidth: .infinity,
+            minHeight: BookCardMetrics.contentHeight,
+            alignment: .leading
+        )
+        .contentShape(.interaction, BookCardMetrics.cardShape)
     }
 }
 

@@ -8,6 +8,11 @@
 import SwiftUI
 import UIKit
 
+enum NagiAppearanceSettings {
+    static let bookCardsUseLiquidGlassKey = "appearance.liquidGlass.bookCards"
+    static let readerSettingsUseLiquidGlassKey = "appearance.liquidGlass.readerSettings"
+}
+
 struct SettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHeaderHidden = false
@@ -16,6 +21,14 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section("通用") {
+                    NavigationLink {
+                        AppearanceView()
+                    } label: {
+                        Label("外观", systemImage: "circle.lefthalf.filled")
+                    }
+                }
+
                 Section("应用") {
                     NavigationLink {
                         AboutView()
@@ -25,6 +38,7 @@ struct SettingsView: View {
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
+            .ignoresSafeArea(.container, edges: .top)
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
             } action: { _, scrollOffset in
@@ -32,6 +46,10 @@ struct SettingsView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: NagiPageHeaderMetrics.contentHeight)
+            }
+            .overlay(alignment: .top) {
                 NagiPageHeader(
                     title: "设置",
                     transitionProgress: headerTransitionProgress,
@@ -64,6 +82,32 @@ struct SettingsView: View {
     }
 }
 
+private struct AppearanceView: View {
+    @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
+    private var bookCardsUseLiquidGlass = true
+    @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
+    private var readerSettingsUseLiquidGlass = true
+    @State private var isLiquidGlassExpanded = false
+
+    var body: some View {
+        List {
+            Section {
+                DisclosureGroup(
+                    isExpanded: $isLiquidGlassExpanded
+                ) {
+                    Toggle("书籍卡片", isOn: $bookCardsUseLiquidGlass)
+                    Toggle("阅读设置项", isOn: $readerSettingsUseLiquidGlass)
+                } label: {
+                    Label("Liquid Glass 控件", systemImage: "rectangle.on.rectangle")
+                }
+            }
+        }
+        .navigationTitle("外观")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+    }
+}
+
 private struct AboutView: View {
     private var appVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "未知"
@@ -77,7 +121,6 @@ private struct AboutView: View {
         VStack(spacing: 20) {
             AppIconView()
                 .frame(width: 112, height: 112)
-                .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                 .accessibilityHidden(true)
 
             Text("Nagi")
@@ -97,52 +140,31 @@ private struct AboutView: View {
         .padding(.horizontal, 24)
         .navigationTitle("关于")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .accessibilityElement(children: .combine)
     }
 }
 
 private struct AppIconView: View {
     var body: some View {
-        if let image = Self.image {
-            Image(uiImage: image)
-                .resizable()
-                .scaledToFit()
-        } else {
-            Image(systemName: "app.fill")
-                .resizable()
-                .scaledToFit()
-                .padding(24)
-                .foregroundStyle(.secondary)
+        Group {
+            if let image = Self.image {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Image(systemName: "app.fill")
+                    .resizable()
+                    .scaledToFit()
+                    .padding(24)
+                    .foregroundStyle(.secondary)
+            }
         }
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
 
     private static var image: UIImage? {
-        for name in configuredIconNames + ["Icon", "AppIcon"] {
-            if let image = UIImage(named: name) {
-                return image
-            }
-
-            let resourceName = (name as NSString).deletingPathExtension
-            let resourceExtension = (name as NSString).pathExtension.isEmpty ? "png" : nil
-            if let url = Bundle.main.url(forResource: resourceName, withExtension: resourceExtension),
-               let image = UIImage(contentsOfFile: url.path) {
-                return image
-            }
-        }
-
-        return nil
-    }
-
-    private static var configuredIconNames: [String] {
-        guard
-            let icons = Bundle.main.object(forInfoDictionaryKey: "CFBundleIcons") as? [String: Any],
-            let primaryIcon = icons["CFBundlePrimaryIcon"] as? [String: Any],
-            let iconFiles = primaryIcon["CFBundleIconFiles"] as? [String]
-        else {
-            return []
-        }
-
-        return Array(iconFiles.reversed())
+        UIImage(named: "Icon")
     }
 }
 

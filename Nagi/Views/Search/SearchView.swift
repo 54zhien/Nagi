@@ -9,7 +9,6 @@ import SwiftUI
 import SwiftData
 
 struct SearchView: View {
-    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Query(sort: \Book.title) private var books: [Book]
     @Binding var searchText: String
     @State private var selectedBook: Book?
@@ -36,27 +35,25 @@ struct SearchView: View {
                         }
                         .buttonStyle(.plain)
                     }
+                    .ignoresSafeArea(.container, edges: .top)
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
-            .navigationTitle("搜索")
-            .toolbarTitleDisplayMode(.large)
-            .toolbarBackground(.visible, for: .navigationBar)
-            .toolbarBackground(
-                reduceTransparency
-                    ? AnyShapeStyle(Color(uiColor: .systemBackground))
-                    : AnyShapeStyle(.bar),
-                for: .navigationBar
-            )
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: NagiPageHeaderMetrics.contentHeight)
+            }
+            .overlay(alignment: .top) {
+                NagiPageHeader(
+                    title: "搜索",
+                    blurScope: .throughTitle
+                )
+            }
         }
         .overlay(alignment: .top) {
             NagiStatusBarBlurLayer()
         }
-        .searchable(
-            text: $searchText,
-            placement: .navigationBarDrawer(displayMode: .always),
-            prompt: "搜索书名"
-        )
         .fullScreenCover(
             isPresented: Binding(
                 get: { selectedBook != nil },

@@ -10,6 +10,8 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
+    private var bookCardsUseLiquidGlass = true
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @State private var selectedBook: Book?
     @State private var isHeaderHidden = false
@@ -34,14 +36,18 @@ struct HomeView: View {
                                 Button {
                                     selectedBook = book
                                 } label: {
-                                    BookCard(book: book, layout: .home)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    BookCardButtonLabel(
+                                        book: book,
+                                        layout: .home,
+                                        usesLiquidGlass: bookCardsUseLiquidGlass
+                                    )
                                 }
                                 .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-                                .glassEffect(
-                                    .regular.interactive(),
-                                    in: BookCardMetrics.cardShape
+                                .modifier(
+                                    BookCardSurfaceModifier(
+                                        isLiquidGlassEnabled: bookCardsUseLiquidGlass
+                                    )
                                 )
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
@@ -54,6 +60,7 @@ struct HomeView: View {
                     }
                     .scrollIndicators(.automatic)
                     .scrollEdgeEffectStyle(.automatic, for: .all)
+                    .ignoresSafeArea(.container, edges: .top)
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -63,6 +70,10 @@ struct HomeView: View {
             }
             .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
+                Color.clear
+                    .frame(height: NagiPageHeaderMetrics.contentHeight)
+            }
+            .overlay(alignment: .top) {
                 NagiPageHeader(
                     title: "主页",
                     transitionProgress: headerTransitionProgress,
