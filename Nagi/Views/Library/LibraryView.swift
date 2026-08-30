@@ -80,6 +80,7 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("书库")
+            .toolbarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
