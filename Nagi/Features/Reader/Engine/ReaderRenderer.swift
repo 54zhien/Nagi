@@ -228,6 +228,7 @@ final class ReadiumRenderer: ReaderRenderer {
                 navigator: navigator,
                 background: Color(uiColor: backgroundColor)
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         )
     }
 

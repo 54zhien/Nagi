@@ -49,6 +49,7 @@ struct HomeView: View {
                                         isLiquidGlassEnabled: bookCardsUseLiquidGlass
                                     )
                                 )
+                                .modifier(BookCardLongPressModifier())
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")

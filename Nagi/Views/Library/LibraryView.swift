@@ -162,6 +162,7 @@ struct LibraryView: View {
                                         isLiquidGlassEnabled: bookCardsUseLiquidGlass
                                     )
                                 )
+                                .modifier(BookCardLongPressModifier())
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
@@ -322,7 +323,7 @@ struct BookCardSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         if isLiquidGlassEnabled {
             content.glassEffect(
-                .regular.interactive(),
+                .regular,
                 in: BookCardMetrics.cardShape
             )
         } else {
@@ -330,6 +331,52 @@ struct BookCardSurfaceModifier: ViewModifier {
                 Color(uiColor: .secondarySystemBackground),
                 in: BookCardMetrics.cardShape
             )
+        }
+    }
+}
+
+private enum BookCardInteractionMetrics {
+    static let longPressDuration: Double = 0.5
+    static let longPressMaximumDistance: CGFloat = 10
+    static let pressedScale: CGFloat = 0.98
+    static let animationDuration: Double = 0.16
+}
+
+/// 只在长按识别成功后提供轻微缩放和一次触感反馈。
+struct BookCardLongPressModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @GestureState private var isLongPressActive = false
+
+    func body(content: Content) -> some View {
+        content
+            .scaleEffect(
+                isLongPressActive && !reduceMotion
+                    ? BookCardInteractionMetrics.pressedScale
+                    : 1
+            )
+            .animation(
+                reduceMotion
+                    ? nil
+                    : .smooth(duration: BookCardInteractionMetrics.animationDuration),
+                value: isLongPressActive
+            )
+            .simultaneousGesture(longPressGesture)
+            .sensoryFeedback(
+                .impact(weight: .light, intensity: 0.65),
+                trigger: isLongPressActive,
+                condition: { previous, current in
+                    !previous && current
+                }
+            )
+    }
+
+    private var longPressGesture: some Gesture {
+        LongPressGesture(
+            minimumDuration: BookCardInteractionMetrics.longPressDuration,
+            maximumDistance: BookCardInteractionMetrics.longPressMaximumDistance
+        )
+        .updating($isLongPressActive) { value, state, _ in
+            state = value
         }
     }
 }

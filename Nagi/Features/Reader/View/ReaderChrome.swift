@@ -49,11 +49,12 @@ struct ReaderChrome<Content: View>: View {
     }
 
     var body: some View {
-        // 阅读表面只延伸到左右和底部；顶部必须保留系统安全区，交给页眉和退出控件。
+        // 正文表面独立铺满容器；页眉和控件仍由下方的 safe-area/overlay 层定位。
         GeometryReader { geometry in
             ZStack {
                 content
-                    .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea(.container, edges: .all)
             }
             // 页眉是正文的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
             .safeAreaInset(edge: .top, spacing: 0) {
