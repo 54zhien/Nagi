@@ -772,18 +772,7 @@ private struct CustomReaderSettingsSheet: View {
                 ReaderFontSize.maximumScale
             )
         )
-        switch draft.fontFamily {
-        case .systemSerif:
-            return .system(size: size, design: .serif)
-        case .systemSansSerif:
-            return .system(size: size, design: .default)
-        case .palatino:
-            return .custom("Palatino", size: size)
-        case .athelas:
-            return .custom("Athelas", size: size)
-        case .openDyslexic:
-            return .custom("OpenDyslexic", size: size)
-        }
+        return draft.fontFamily.swiftUIFont(ofSize: size)
     }
 
     private var textSection: some View {
@@ -815,12 +804,19 @@ private struct CustomReaderSettingsSheet: View {
 
     private var fontMenuRow: some View {
         Menu {
-            ForEach(EPUBFontFamily.allCases) { family in
+            ForEach(ReaderFontFamily.options) { family in
                 Button {
                     draft.fontFamily = family
                 } label: {
-                    Label(family.label, systemImage: family == draft.fontFamily ? "checkmark" : "textformat")
+                    HStack(spacing: 10) {
+                        Text(family.label)
+                            .font(family.swiftUIFont(ofSize: 17))
+                        Spacer(minLength: 16)
+                        Image(systemName: family == draft.fontFamily ? "checkmark" : "textformat")
+                            .font(.body.weight(.semibold))
+                    }
                 }
+                .accessibilityLabel(family.label)
             }
         } label: {
             HStack(spacing: 12) {
@@ -829,6 +825,7 @@ private struct CustomReaderSettingsSheet: View {
                 Spacer(minLength: 8)
 
                 Text(draft.fontFamily.label)
+                    .font(draft.fontFamily.swiftUIFont(ofSize: 16))
                     .foregroundStyle(.secondary)
 
                 Image(systemName: "chevron.up.chevron.down")

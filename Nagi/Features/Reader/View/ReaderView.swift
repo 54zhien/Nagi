@@ -8,6 +8,7 @@
 
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct ReaderView: View {
     @Environment(\.colorScheme) private var colorScheme
@@ -15,11 +16,13 @@ struct ReaderView: View {
     let book: Book
 
     @State private var model: ReaderViewModel?
+    @State private var systemBrightness = 0.5
+    @State private var brightnessBeforeReader: CGFloat?
 
     var body: some View {
         Group {
             if let model {
-                ReaderSessionView(model: model)
+                ReaderSessionView(model: model, systemBrightness: $systemBrightness)
             } else {
                 ReaderLoadingView(bookTitle: book.title)
             }
@@ -48,6 +51,29 @@ struct ReaderView: View {
             nextModel.updateSystemAppearance(isDark: colorScheme == .dark)
             await nextModel.loadIfNeeded()
         }
+        .onAppear {
+            beginSystemBrightnessSession()
+        }
+        .onChange(of: systemBrightness) { _, newValue in
+            guard brightnessBeforeReader != nil else { return }
+            UIScreen.main.brightness = CGFloat(min(max(newValue, 0), 1))
+        }
+        .onDisappear {
+            restoreSystemBrightness()
+        }
+    }
+
+    private func beginSystemBrightnessSession() {
+        guard brightnessBeforeReader == nil else { return }
+        let currentBrightness = UIScreen.main.brightness
+        brightnessBeforeReader = currentBrightness
+        systemBrightness = Double(currentBrightness)
+    }
+
+    private func restoreSystemBrightness() {
+        guard let brightnessBeforeReader else { return }
+        UIScreen.main.brightness = brightnessBeforeReader
+        self.brightnessBeforeReader = nil
     }
 }
 
@@ -71,6 +97,7 @@ private struct ReaderSessionView: View {
     @Environment(\.modelContext) private var modelContext
 
     let model: ReaderViewModel
+    @Binding var systemBrightness: Double
     @State private var showControls = true
     @State private var interactionRevision = 0
     @State private var showSettings = false
@@ -143,6 +170,7 @@ private struct ReaderSessionView: View {
         NavigationStack {
             MediumReaderSettingsView(
                 model: model,
+                systemBrightness: $systemBrightness,
                 onCustomSettings: {
                     showCustomSettings = true
                 }

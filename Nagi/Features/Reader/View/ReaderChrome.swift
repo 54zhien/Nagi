@@ -238,7 +238,7 @@ private struct ReaderPageHeader: View {
     var body: some View {
         Text(title)
             .font(.system(size: 15, weight: .medium))
-            .foregroundStyle(color)
+            .foregroundStyle(color.opacity(0.55))
             .lineLimit(1)
             .padding(.horizontal, 72)
             .frame(maxWidth: .infinity, alignment: .center)
@@ -417,16 +417,10 @@ struct ReaderSettingsSheet: View {
 
                 Section("文字") {
                     Picker("字体", selection: $fontFamily) {
-                        Section("内置字体") {
-                            ForEach(ReaderFontFamily.builtInCases) { family in
-                                Text(family.label).tag(family)
-                            }
-                        }
-
-                        Section("已安装字体") {
-                            ForEach(ReaderFontFamily.installedFontFamilies) { family in
-                                Text(family.label).tag(family)
-                            }
+                        ForEach(ReaderFontFamily.options) { family in
+                            Text(family.label)
+                                .font(family.swiftUIFont(ofSize: 17))
+                                .tag(family)
                         }
                     }
 

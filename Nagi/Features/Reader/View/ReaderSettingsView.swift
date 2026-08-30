@@ -12,9 +12,21 @@ struct MediumReaderSettingsView: View {
     let model: ReaderViewModel
     let onCustomSettings: () -> Void
 
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Binding private var systemBrightness: Double
     @State private var showFontSizeIndicator = false
     @State private var fontSizeIndicatorToken = 0
+
+    init(
+        model: ReaderViewModel,
+        systemBrightness: Binding<Double>,
+        onCustomSettings: @escaping () -> Void
+    ) {
+        self.model = model
+        self._systemBrightness = systemBrightness
+        self.onCustomSettings = onCustomSettings
+    }
 
     var body: some View {
         ScrollView {
@@ -100,7 +112,8 @@ struct MediumReaderSettingsView: View {
                 fontSizeButton(
                     title: "小",
                     systemImage: "textformat.size.smaller",
-                    adjustment: -ReaderFontSize.step
+                    adjustment: -ReaderFontSize.step,
+                    iconPointSize: 17
                 )
 
                 Divider()
@@ -110,7 +123,8 @@ struct MediumReaderSettingsView: View {
                 fontSizeButton(
                     title: "大",
                     systemImage: "textformat.size.larger",
-                    adjustment: ReaderFontSize.step
+                    adjustment: ReaderFontSize.step,
+                    iconPointSize: 24
                 )
             }
             .frame(maxWidth: .infinity)
@@ -125,7 +139,8 @@ struct MediumReaderSettingsView: View {
     private func fontSizeButton(
         title: String,
         systemImage: String,
-        adjustment: Double
+        adjustment: Double,
+        iconPointSize: CGFloat
     ) -> some View {
         let currentSize = model.preferences.fontSize
         let direction = adjustment < 0 ? -1 : 1
@@ -149,9 +164,14 @@ struct MediumReaderSettingsView: View {
                 }
             }
         } label: {
-            Label(title, systemImage: systemImage)
-                .labelStyle(.titleAndIcon)
-                .font(.subheadline.weight(.semibold))
+            HStack(spacing: 8) {
+                Image(systemName: systemImage)
+                    .font(.system(size: iconPointSize, weight: .semibold))
+                    .symbolRenderingMode(.hierarchical)
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Capsule())
         }
@@ -212,13 +232,13 @@ struct MediumReaderSettingsView: View {
 
     private var brightnessControl: some View {
         HStack(spacing: 12) {
-            Image(systemName: "sun.min")
+            Image(systemName: "sun.min.fill")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
-            Slider(value: model.binding(\ReaderPreferences.brightness), in: 0.25 ... 1, step: 0.01)
+            Slider(value: $systemBrightness, in: 0 ... 1, step: 0.01)
                 .tint(.accentColor)
-                .accessibilityLabel("阅读亮度")
-                .accessibilityValue("\(Int(model.preferences.brightness * 100))%")
+                .accessibilityLabel("系统亮度")
+                .accessibilityValue("\(Int(systemBrightness * 100))%")
             Image(systemName: "sun.max.fill")
                 .foregroundStyle(.secondary)
                 .accessibilityHidden(true)
@@ -240,41 +260,59 @@ struct MediumReaderSettingsView: View {
 
     private func presetCard(_ preset: ReaderThemePreset) -> some View {
         let isSelected = model.preferences.themePreset == preset
+        let cardColor = preset.backgroundColor(isDarkAppearance: isDarkAppearance)
+        let cardShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
 
         return Button {
             model.selectPreset(preset)
         } label: {
-            VStack(spacing: 7) {
-                Image(systemName: preset.systemImage)
-                    .font(.system(size: 20, weight: .medium))
-                    .symbolRenderingMode(.hierarchical)
-
+            ZStack(alignment: .topTrailing) {
                 Text(preset.label)
                     .font(.subheadline.weight(.medium))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+                    .padding(.horizontal, 12)
+
+                Text("*")
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(
+                        preset.contentColor(isDarkAppearance: isDarkAppearance)
+                            .opacity(0.68)
+                    )
+                    .padding(.top, 10)
+                    .padding(.trailing, 12)
+                    .accessibilityHidden(true)
             }
-            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+            .foregroundStyle(
+                isSelected
+                    ? Color.accentColor
+                    : preset.contentColor(isDarkAppearance: isDarkAppearance)
+            )
             .padding(.vertical, 7)
             // 三列卡片继续沿用原三列两行预设网格的比例，并向下延伸一些。
             .frame(maxWidth: .infinity, minHeight: ReaderControlValues.presetGridHeight)
-            .background(
-                isSelected ? Color.accentColor.opacity(0.16) : .clear,
-                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-            )
-            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .overlay {
+                if isSelected {
+                    cardShape
+                        .stroke(Color.accentColor.opacity(0.85), lineWidth: 2)
+                }
+            }
+            .contentShape(cardShape)
         }
         .buttonStyle(.plain)
         .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            .regular
+                .tint(cardColor)
+                .interactive(),
+            in: cardShape
         )
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(cardShape)
         .accessibilityLabel("主题预设：\(preset.label)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
     private var customButton: some View {
         Button(action: onCustomSettings) {
-            Label("自定义", systemImage: "slider.horizontal.3")
+            Label("自定义", systemImage: "gear")
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 48)
                 .contentShape(Capsule())
@@ -287,6 +325,17 @@ struct MediumReaderSettingsView: View {
         )
         .contentShape(Capsule())
         .accessibilityHint("打开更多文字与布局选项")
+    }
+
+    private var isDarkAppearance: Bool {
+        switch model.preferences.appearanceMode {
+        case .light:
+            return false
+        case .dark:
+            return true
+        case .system:
+            return colorScheme == .dark
+        }
     }
 
     private enum ReaderControlValues {
@@ -408,30 +457,32 @@ struct CustomReaderSettingsSheet: View {
 
     private var previewFont: Font {
         let size = CGFloat(min(max(fontSize, 8), 42))
-        switch draft.fontFamily {
-        case .systemSerif: return .system(size: size, design: .serif)
-        case .systemSansSerif: return .system(size: size)
-        case .palatino: return .custom("Palatino", size: size)
-        case .athelas: return .custom("Athelas", size: size)
-        case .openDyslexic: return .custom("OpenDyslexic", size: size)
-        case .installed(let family): return .custom(family, size: size)
-        }
+        return draft.fontFamily.swiftUIFont(ofSize: size)
     }
 
     private var fontMenu: some View {
         Menu {
-            ForEach(ReaderFontFamily.allOptions) { family in
+            ForEach(ReaderFontFamily.options) { family in
                 Button {
                     draft.fontFamily = family
                 } label: {
-                    Label(family.label, systemImage: family == draft.fontFamily ? "checkmark" : "textformat")
+                    HStack(spacing: 10) {
+                        Text(family.label)
+                            .font(family.swiftUIFont(ofSize: 17))
+                        Spacer(minLength: 16)
+                        Image(systemName: family == draft.fontFamily ? "checkmark" : "textformat")
+                            .font(.body.weight(.semibold))
+                    }
                 }
+                .accessibilityLabel(family.label)
             }
         } label: {
             HStack {
                 Label("字体", systemImage: "textformat")
                 Spacer()
-                Text(draft.fontFamily.label).foregroundStyle(.secondary)
+                Text(draft.fontFamily.label)
+                    .font(draft.fontFamily.swiftUIFont(ofSize: 16))
+                    .foregroundStyle(.secondary)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)

@@ -10,6 +10,14 @@ import Observation
 import SwiftUI
 import UIKit
 
+/// Keeps newer SF Symbols requests usable on devices whose installed symbol
+/// catalog is older than the app's design reference.
+enum ReaderSystemSymbol {
+    static func name(_ preferred: String, fallback: String) -> String {
+        UIImage(systemName: preferred) == nil ? fallback : preferred
+    }
+}
+
 // MARK: - Reading document
 
 struct ReaderChapter: Identifiable, Hashable, Sendable {
@@ -70,9 +78,13 @@ enum ReaderAppearanceMode: String, CaseIterable, Identifiable, Codable, Sendable
 
     var systemImage: String {
         switch self {
-        case .light: return "sun.max"
-        case .dark: return "moon.fill"
-        case .system: return "circle.lefthalf.filled"
+        case .light: return "sunrise.fill"
+        case .dark: return "sunset.fill"
+        case .system:
+            return ReaderSystemSymbol.name(
+                "activity.move.ring",
+                fallback: "circle.lefthalf.filled"
+            )
         }
     }
 }
@@ -89,17 +101,22 @@ enum ReaderPageTransition: String, CaseIterable, Identifiable, Codable, Sendable
         switch self {
         case .slide: return "滑动"
         case .pageCurl: return "卷页"
-        case .fade: return "快速淡入淡出"
+        case .fade: return "淡化"
         case .scroll: return "滚动"
         }
     }
 
     var systemImage: String {
         switch self {
-        case .slide: return "arrow.left.arrow.right"
+        case .slide:
+            return ReaderSystemSymbol.name(
+                "arrow.left.page.on.rectangle",
+                fallback: "inset.filled.lefthalf.arrow.left.rectangle"
+            )
         case .pageCurl: return "book.pages"
-        case .fade: return "rectangle.on.rectangle"
-        case .scroll: return "arrow.up.and.down"
+        case .fade:
+            return ReaderSystemSymbol.name("bolt.rectangle", fallback: "bolt.square")
+        case .scroll: return "scroll"
         }
     }
 }
@@ -126,6 +143,28 @@ enum ReaderThemePreset: String, CaseIterable, Identifiable, Codable, Sendable, H
         case .paper: return "doc.text"
         }
     }
+
+    var paletteTheme: ReaderTheme {
+        switch self {
+        case .original: return .light
+        case .quiet: return .quiet
+        case .paper: return .sepia
+        }
+    }
+
+    func backgroundColor(isDarkAppearance: Bool) -> Color {
+        // In dark appearance, keep the quiet card visually aligned with the
+        // original card. This is a settings-card treatment only; the quiet
+        // reading palette remains unchanged in ReaderTheme.
+        if self == .quiet && isDarkAppearance {
+            return Color(uiColor: ReaderThemePalette.originalDarkBackground)
+        }
+        return Color(uiColor: paletteTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance))
+    }
+
+    func contentColor(isDarkAppearance: Bool) -> Color {
+        Color(uiColor: paletteTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance))
+    }
 }
 
 enum ReaderFontSize {
@@ -140,7 +179,7 @@ enum ReaderFontSize {
 
 struct ReaderPreferences: Codable, Equatable, Sendable {
     var fontSize: Double = ReaderFontSize.defaultValue
-    var fontFamily: ReaderFontFamily = .systemSerif
+    var fontFamily: ReaderFontFamily = .original
     var boldText = false
     var lineHeight: Double = 1.5
     var paragraphSpacing: Double = 10
@@ -151,7 +190,9 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var publisherStyles = false
     var themePreset: ReaderThemePreset = .original
     var appearanceMode: ReaderAppearanceMode = .system
-    var brightness: Double = 0.82
+    /// Kept for decoding older saved preferences. Reader brightness is now
+    /// controlled by the device, so renderers normalize this value to 1.
+    var brightness: Double = 1
     var pageTransition: ReaderPageTransition = .slide
     var showBookTitleInPageHeader = false
 }
@@ -343,7 +384,11 @@ final class ReaderEngine {
         let renderer = repository.makeRenderer()
         self.repository = repository
         self.renderer = renderer
-        preferences = ReaderPreferencesStore.load() ?? renderer.preferences
+        var initialPreferences = ReaderPreferencesStore.load() ?? renderer.preferences
+        // Migrate the retired reader-only brightness value. The medium sheet
+        // now owns a live UIScreen brightness session instead.
+        initialPreferences.brightness = 1
+        preferences = initialPreferences
         renderer.apply(preferences: preferences)
         renderer.onStateChange = { [weak self] in
             guard let self else { return }
@@ -373,7 +418,9 @@ final class ReaderEngine {
     }
 
     func apply(preferences: ReaderPreferences) {
-        renderer.apply(preferences: preferences)
+        var normalizedPreferences = preferences
+        normalizedPreferences.brightness = 1
+        renderer.apply(preferences: normalizedPreferences)
         synchronizeFromRenderer()
     }
 

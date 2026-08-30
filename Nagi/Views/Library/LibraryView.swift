@@ -155,14 +155,13 @@ struct LibraryView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(BookCardPressFeedbackStyle())
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .modifier(
                                     BookCardSurfaceModifier(
                                         isLiquidGlassEnabled: bookCardsUseLiquidGlass
                                     )
                                 )
-                                .modifier(BookCardLongPressModifier())
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
@@ -336,19 +335,28 @@ struct BookCardSurfaceModifier: ViewModifier {
 }
 
 private enum BookCardInteractionMetrics {
-    static let longPressDuration: Double = 0.5
-    static let longPressMaximumDistance: CGFloat = 10
+    // 与 SwiftUI onLongPressGesture 的默认识别时长保持一致。
+    static let longPressNanoseconds: UInt64 = 500_000_000
     static let pressedScale: CGFloat = 0.98
     static let animationDuration: Double = 0.16
 }
 
-/// 只在长按识别成功后提供轻微缩放和一次触感反馈。
-struct BookCardLongPressModifier: ViewModifier {
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @GestureState private var isLongPressActive = false
+/// 使用 Button 的原生按压状态提供长按确认反馈，不接管点击或系统 contextMenu。
+struct BookCardPressFeedbackStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        BookCardPressFeedbackView(configuration: configuration)
+    }
+}
 
-    func body(content: Content) -> some View {
-        content
+private struct BookCardPressFeedbackView: View {
+    let configuration: ButtonStyleConfiguration
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isLongPressActive = false
+    @State private var pressAttemptID = 0
+
+    var body: some View {
+        configuration.label
             .scaleEffect(
                 isLongPressActive && !reduceMotion
                     ? BookCardInteractionMetrics.pressedScale
@@ -360,24 +368,34 @@ struct BookCardLongPressModifier: ViewModifier {
                     : .smooth(duration: BookCardInteractionMetrics.animationDuration),
                 value: isLongPressActive
             )
-            .simultaneousGesture(longPressGesture)
             .sensoryFeedback(
-                .impact(weight: .light, intensity: 0.65),
+                .selection,
                 trigger: isLongPressActive,
                 condition: { previous, current in
                     !previous && current
                 }
             )
-    }
+            .onChange(of: configuration.isPressed, initial: true) { _, _ in
+                pressAttemptID += 1
+                isLongPressActive = false
+            }
+            .onDisappear {
+                isLongPressActive = false
+            }
+            .task(id: pressAttemptID) {
+                guard configuration.isPressed else { return }
 
-    private var longPressGesture: some Gesture {
-        LongPressGesture(
-            minimumDuration: BookCardInteractionMetrics.longPressDuration,
-            maximumDistance: BookCardInteractionMetrics.longPressMaximumDistance
-        )
-        .updating($isLongPressActive) { value, state, _ in
-            state = value
-        }
+                do {
+                    try await Task.sleep(
+                        nanoseconds: BookCardInteractionMetrics.longPressNanoseconds
+                    )
+                } catch {
+                    return
+                }
+
+                guard !Task.isCancelled, configuration.isPressed else { return }
+                isLongPressActive = true
+            }
     }
 }
 
@@ -517,18 +535,17 @@ struct BookCard: View {
     @ViewBuilder
     private var progressBar: some View {
         let progressView = ProgressView(value: progress)
-            .progressViewStyle(.linear)
-            .tint(.accentColor)
+            .progressViewStyle(
+                BookCardProgressViewStyle(
+                    usesLiquidGlass: usesLiquidGlass
+                )
+            )
             .frame(maxWidth: .infinity)
-            .frame(height: 8)
+            .frame(height: BookCardProgressMetrics.height)
             .accessibilityLabel("阅读进度")
             .accessibilityValue(Text(progressText))
 
-        if usesLiquidGlass {
-            progressView.glassEffect(.regular, in: Capsule())
-        } else {
-            progressView
-        }
+        progressView
     }
 
     private var authorText: String {
@@ -549,6 +566,92 @@ struct BookCard: View {
             return "\(formatName) · \(book.chapterCount) 章"
         }
         return formatName
+    }
+}
+
+private enum BookCardProgressMetrics {
+    static let height: CGFloat = 8
+    static let animationDuration: Double = 0.24
+}
+
+private struct BookCardProgressViewStyle: ProgressViewStyle {
+    let usesLiquidGlass: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        BookCardProgressTrack(
+            progress: configuration.fractionCompleted ?? 0,
+            usesLiquidGlass: usesLiquidGlass
+        )
+    }
+}
+
+private struct BookCardProgressTrack: View {
+    let progress: Double
+    let usesLiquidGlass: Bool
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    private var clampedProgress: Double {
+        min(max(progress, 0), 1)
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                track
+
+                if clampedProgress > 0 {
+                    progressFill(
+                        width: geometry.size.width * clampedProgress
+                    )
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: BookCardProgressMetrics.height)
+        .animation(
+            reduceMotion
+                ? nil
+                : .smooth(duration: BookCardProgressMetrics.animationDuration),
+            value: clampedProgress
+        )
+    }
+
+    @ViewBuilder
+    private var track: some View {
+        if usesLiquidGlass {
+            Color.clear
+                .glassEffect(.regular, in: Capsule())
+        } else {
+            Capsule()
+                .fill(Color(uiColor: .secondarySystemFill))
+                .overlay {
+                    Capsule()
+                        .strokeBorder(.quaternary, lineWidth: 0.5)
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func progressFill(width: CGFloat) -> some View {
+        if usesLiquidGlass {
+            Color.clear
+                .frame(
+                    width: width,
+                    height: BookCardProgressMetrics.height
+                )
+                .glassEffect(
+                    .regular.tint(.accentColor),
+                    in: Capsule()
+                )
+        } else {
+            Capsule()
+                .fill(.tint)
+                .frame(
+                    width: width,
+                    height: BookCardProgressMetrics.height
+                )
+        }
     }
 }
 

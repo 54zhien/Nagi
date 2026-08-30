@@ -8,6 +8,28 @@
 import SwiftUI
 import UIKit
 
+/// Reader surface colors sampled from the approved reading references.
+/// Keeping these values in one palette prevents the TXT and EPUB renderers
+/// from drifting apart as the settings UI evolves.
+enum ReaderThemePalette {
+    static let originalLightBackground = UIColor.white
+    static let originalLightContent = UIColor(red: 18 / 255, green: 18 / 255, blue: 18 / 255, alpha: 1)
+    static let originalDarkBackground = UIColor(white: 0.12, alpha: 1)
+    static let originalDarkContent = UIColor(red: 242 / 255, green: 242 / 255, blue: 247 / 255, alpha: 1)
+
+    // Reference image 1: quiet theme.
+    static let quietBackground = UIColor(red: 0x4A / 255, green: 0x49 / 255, blue: 0x4E / 255, alpha: 1)
+    static let quietContent = UIColor(red: 242 / 255, green: 242 / 255, blue: 247 / 255, alpha: 1)
+
+    // Reference image 2: light paper theme.
+    static let paperLightBackground = UIColor(red: 0xEE / 255, green: 0xE2 / 255, blue: 0xCA / 255, alpha: 1)
+    static let paperLightContent = UIColor(red: 76 / 255, green: 64 / 255, blue: 46 / 255, alpha: 1)
+
+    // Reference image 3: dark paper theme.
+    static let paperDarkBackground = UIColor(red: 0x42 / 255, green: 0x3C / 255, blue: 0x30 / 255, alpha: 1)
+    static let paperDarkContent = UIColor(red: 242 / 255, green: 238 / 255, blue: 229 / 255, alpha: 1)
+}
+
 enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
     case light
     case quiet
@@ -27,19 +49,19 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
 
     var background: Color {
         switch self {
-        case .light: return Color(red: 1.0, green: 1.0, blue: 1.0)
-        case .quiet: return Color(red: 0.95, green: 0.96, blue: 0.97)
-        case .sepia: return Color(red: 0.97, green: 0.94, blue: 0.86)
-        case .dark: return Color(red: 0.12, green: 0.12, blue: 0.13)
+        case .light: return Color(uiColor: ReaderThemePalette.originalLightBackground)
+        case .quiet: return Color(uiColor: ReaderThemePalette.quietBackground)
+        case .sepia: return Color(uiColor: ReaderThemePalette.paperLightBackground)
+        case .dark: return Color(uiColor: ReaderThemePalette.originalDarkBackground)
         }
     }
 
     var foreground: Color {
         switch self {
-        case .light: return Color(red: 0.1, green: 0.1, blue: 0.1)
-        case .quiet: return Color(red: 0.15, green: 0.16, blue: 0.18)
-        case .sepia: return Color(red: 0.3, green: 0.25, blue: 0.18)
-        case .dark: return Color(red: 0.85, green: 0.85, blue: 0.85)
+        case .light: return Color(uiColor: ReaderThemePalette.originalLightContent)
+        case .quiet: return Color(uiColor: ReaderThemePalette.quietContent)
+        case .sepia: return Color(uiColor: ReaderThemePalette.paperLightContent)
+        case .dark: return Color(uiColor: ReaderThemePalette.originalDarkContent)
         }
     }
 
@@ -51,36 +73,48 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
         foregroundUIColor
     }
 
-    func adjustedBackgroundUIColor(brightness: Double) -> UIColor {
-        let level = CGFloat(min(max(brightness, 0.25), 1))
-        if self == .dark {
-            return UIColor(white: 0.12 * level, alpha: 1)
+    func readerBackgroundUIColor(isDarkAppearance: Bool) -> UIColor {
+        switch self {
+        case .light:
+            return isDarkAppearance
+                ? ReaderThemePalette.originalDarkBackground
+                : ReaderThemePalette.originalLightBackground
+        case .quiet:
+            return ReaderThemePalette.quietBackground
+        case .sepia:
+            return isDarkAppearance
+                ? ReaderThemePalette.paperDarkBackground
+                : ReaderThemePalette.paperLightBackground
+        case .dark:
+            return ReaderThemePalette.originalDarkBackground
         }
-        return applyingBrightness(to: UIColor(background), multiplier: 0.72 + 0.28 * level)
     }
 
-    func adjustedForegroundUIColor(brightness: Double) -> UIColor {
-        let level = CGFloat(min(max(brightness, 0.25), 1))
-        if self == .dark {
-            return UIColor(white: 0.66 + 0.34 * level, alpha: 1)
+    func readerContentUIColor(isDarkAppearance: Bool) -> UIColor {
+        switch self {
+        case .light:
+            return isDarkAppearance
+                ? ReaderThemePalette.originalDarkContent
+                : ReaderThemePalette.originalLightContent
+        case .quiet:
+            return ReaderThemePalette.quietContent
+        case .sepia:
+            return isDarkAppearance
+                ? ReaderThemePalette.paperDarkContent
+                : ReaderThemePalette.paperLightContent
+        case .dark:
+            return ReaderThemePalette.originalDarkContent
         }
-        return applyingBrightness(to: foregroundUIColor, multiplier: 0.72 + 0.28 * level)
     }
 
-    private func applyingBrightness(to color: UIColor, multiplier: CGFloat) -> UIColor {
-        var red: CGFloat = 0
-        var green: CGFloat = 0
-        var blue: CGFloat = 0
-        var alpha: CGFloat = 0
-        guard color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
-            return color
-        }
-        return UIColor(
-            red: min(max(red * multiplier, 0), 1),
-            green: min(max(green * multiplier, 0), 1),
-            blue: min(max(blue * multiplier, 0), 1),
-            alpha: alpha
-        )
+    /// Compatibility entry points for older renderer code. Brightness is now
+    /// controlled by the device and never changes these reader colors.
+    func adjustedBackgroundUIColor(brightness _: Double) -> UIColor {
+        readerBackgroundUIColor(isDarkAppearance: false)
+    }
+
+    func adjustedForegroundUIColor(brightness _: Double) -> UIColor {
+        readerContentUIColor(isDarkAppearance: false)
     }
 }
 
@@ -106,102 +140,100 @@ enum ReaderPageTransitionMode: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
-/// A built-in or user-installed system font available to both reader engines.
+/// The only font choices exposed by the reader.
 ///
-/// The built-in cases keep the existing reader defaults stable, while the
-/// `installed` case stores the family name returned by UIKit.  Keeping the
-/// family name (instead of a font face name) lets each renderer choose the
-/// appropriate regular/bold face for the selected family.
-enum ReaderFontFamily: Hashable, Identifiable, Codable, Sendable {
-    case systemSerif
-    case systemSansSerif
-    case palatino
-    case athelas
-    case openDyslexic
-    case installed(String)
+/// This is deliberately a fixed catalogue.  In particular, it must not be
+/// populated from the system-wide font enumeration, because an unrelated font
+/// installed by the user can be unavailable to Readium or can change the
+/// settings UI between launches.
+enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Sendable {
+    case original
+    case pingFang
+    case song
+    case kai
+    case yuan
 
-    static let builtInCases: [ReaderFontFamily] = [
-        .systemSerif,
-        .systemSansSerif,
-        .palatino,
-        .athelas,
-        .openDyslexic,
-    ]
+    /// Kept as a named catalogue so every reader settings surface uses the
+    /// same order instead of rebuilding its own list.
+    static var options: [ReaderFontFamily] { allCases }
 
-    /// Kept as a compatibility alias for any callers that previously used
-    /// `CaseIterable.allCases`; the picker now renders the grouped options.
-    static var allCases: [ReaderFontFamily] { allOptions }
-
-    /// All fonts currently registered with UIKit, excluding families already
-    /// represented by a built-in option.  This is evaluated when the settings
-    /// view renders so fonts downloaded while the app is installed can appear
-    /// without shipping another app update.
-    static var installedFontFamilies: [ReaderFontFamily] {
-        let builtInNames = Set([
-            "new york",
-            "palatino",
-            "athelas",
-            "opendyslexic",
-        ])
-
-        return UIFont.familyNames
-            .filter { family in
-                !family.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                    && !builtInNames.contains(family.lowercased())
-                    && !UIFont.fontNames(forFamilyName: family).isEmpty
-            }
-            .sorted {
-                $0.localizedCaseInsensitiveCompare($1) == .orderedAscending
-            }
-            .map { .installed($0) }
-    }
-
-    static var allOptions: [ReaderFontFamily] {
-        builtInCases + installedFontFamilies
-    }
+    /// Compatibility aliases for the legacy settings surface.  Neither alias
+    /// performs system-font discovery.
+    static var allOptions: [ReaderFontFamily] { options }
+    static var builtInCases: [ReaderFontFamily] { options }
 
     var id: String { rawValue }
 
-    /// Stable UserDefaults representation. Legacy built-in values remain
-    /// unchanged so existing reader preferences migrate automatically.
-    var rawValue: String {
+    var label: String {
         switch self {
-        case .systemSerif: return "systemSerif"
-        case .systemSansSerif: return "systemSansSerif"
-        case .palatino: return "palatino"
-        case .athelas: return "athelas"
-        case .openDyslexic: return "openDyslexic"
-        case .installed(let family): return "installed:\(family)"
+        case .original: return "原始"
+        case .pingFang: return "苹方"
+        case .song: return "宋体"
+        case .kai: return "楷体"
+        case .yuan: return "圆体"
         }
     }
 
-    init?(_ rawValue: String) {
+    /// PostScript names used by UIKit and SwiftUI for the bundled/system
+    /// regular faces.  These are not the user-facing labels.
+    var uiFontName: String? {
+        switch self {
+        case .original: return nil
+        case .pingFang: return "PingFangSC-Regular"
+        case .song: return "STSong"
+        case .kai: return "STKaiti"
+        case .yuan: return "STYuanti-SC-Regular"
+        }
+    }
+
+    /// The resource name used by Readium's HTML font declarations.  The
+    /// extension is intentionally omitted for `Bundle.url` lookup.
+    var bundledFontResourceName: String? {
+        switch self {
+        case .original, .pingFang: return nil
+        case .song: return "NagiSong-Regular"
+        case .kai: return "NagiKaiti-Regular"
+        case .yuan: return "NagiYuanti-Regular"
+        }
+    }
+
+    /// The CSS family aliases used inside the EPUB Navigator.  Aliases keep
+    /// the web renderer independent from the internal names in the TTF files.
+    var readiumFamilyName: String? {
+        switch self {
+        case .original: return nil
+        case .pingFang: return "PingFang SC"
+        case .song: return "Nagi Song"
+        case .kai: return "Nagi Kaiti"
+        case .yuan: return "Nagi Yuanti"
+        }
+    }
+
+    /// Migrates values written by the previous font picker.  Removed fonts
+    /// intentionally fall back to the first supported option instead of
+    /// leaving a selection that no longer exists in the fixed catalogue.
+    init?(rawValue: String) {
         switch rawValue {
-        case "systemSerif": self = .systemSerif
-        case "systemSansSerif": self = .systemSansSerif
-        case "palatino": self = .palatino
-        case "athelas": self = .athelas
-        case "openDyslexic": self = .openDyslexic
+        case "original": self = .original
+        case "pingFang": self = .pingFang
+        case "song": self = .song
+        case "kai": self = .kai
+        case "yuan": self = .yuan
+        case "systemSerif", "systemSansSerif", "palatino", "athelas", "openDyslexic":
+            self = .original
         default:
-            let prefix = "installed:"
-            guard rawValue.hasPrefix(prefix) else { return nil }
-            let family = String(rawValue.dropFirst(prefix.count))
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !family.isEmpty else { return nil }
-            self = .installed(family)
+            if rawValue.hasPrefix("installed:") {
+                self = .original
+            } else {
+                return nil
+            }
         }
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let value = try container.decode(String.self)
-        guard let family = Self(value) else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "未知字体：\(value)"
-            )
-        }
-        self = family
+        self = Self(rawValue: value) ?? .original
     }
 
     func encode(to encoder: Encoder) throws {
@@ -209,41 +241,17 @@ enum ReaderFontFamily: Hashable, Identifiable, Codable, Sendable {
         try container.encode(rawValue)
     }
 
-    var label: String {
-        switch self {
-        case .systemSerif: return "系统衬线"
-        case .systemSansSerif: return "系统无衬线"
-        case .palatino: return "Palatino"
-        case .athelas: return "Athelas"
-        case .openDyslexic: return "OpenDyslexic"
-        case .installed(let family): return family
-        }
+    func uiFont(ofSize size: CGFloat) -> UIFont {
+        let baseFont = uiFontName.flatMap { UIFont(name: $0, size: size) }
+            ?? UIFont.systemFont(ofSize: size)
+        return UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
     }
 
-    func uiFont(ofSize size: CGFloat) -> UIFont {
-        let baseFont: UIFont
-        switch self {
-        case .systemSerif:
-            baseFont = UIFont(name: "New York", size: size)
-                ?? UIFont.systemFont(ofSize: size)
-        case .systemSansSerif:
-            baseFont = UIFont.systemFont(ofSize: size)
-        case .palatino:
-            baseFont = UIFont(name: "Palatino", size: size)
-                ?? UIFont.systemFont(ofSize: size)
-        case .athelas:
-            baseFont = UIFont(name: "Athelas", size: size)
-                ?? UIFont.systemFont(ofSize: size)
-        case .openDyslexic:
-            baseFont = UIFont(name: "OpenDyslexic", size: size)
-                ?? UIFont.systemFont(ofSize: size)
-        case .installed(let family):
-            let face = UIFont.fontNames(forFamilyName: family)
-                .compactMap { UIFont(name: $0, size: size) }
-                .first
-            baseFont = face ?? UIFont.systemFont(ofSize: size)
+    /// Font used by the SwiftUI settings preview and each menu item.
+    func swiftUIFont(ofSize size: CGFloat) -> Font {
+        guard let uiFontName else {
+            return .system(size: size)
         }
-
-        return UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
+        return .custom(uiFontName, size: size)
     }
 }

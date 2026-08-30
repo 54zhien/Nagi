@@ -89,7 +89,9 @@ final class TXTReaderModel {
     var contentBottomInset: Double { didSet { styleDidChange() } }
     var theme: ReaderTheme { didSet { styleDidChange() } }
     var appearanceMode: ReaderAppearanceMode { didSet { styleDidChange() } }
-    var brightness: Double { didSet { styleDidChange() } }
+    /// Retained only for migration compatibility. Device brightness is
+    /// managed by ReaderView and is never applied to the text palette.
+    var brightness: Double
     var flowMode: ReaderFlowMode { didSet { flowModeDidChange() } }
     var pageTransition: ReaderPageTransitionMode { didSet { persistPreferences() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
@@ -158,7 +160,7 @@ final class TXTReaderModel {
             ReaderFontSize.maximumScale
         )
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily)
-            .flatMap(ReaderFontFamily.init) ?? .systemSerif
+            .flatMap(ReaderFontFamily.init) ?? .original
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
         paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
@@ -168,7 +170,7 @@ final class TXTReaderModel {
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
         appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
             .flatMap(ReaderAppearanceMode.init) ?? .system
-        brightness = defaults.object(forKey: PreferenceKey.brightness) as? Double ?? 0.82
+        brightness = 1
         flowMode = defaults.string(forKey: PreferenceKey.flowMode).flatMap(ReaderFlowMode.init) ?? .paged
         pageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
             .flatMap(ReaderPageTransitionMode.init) ?? .pageCurl
@@ -354,11 +356,11 @@ final class TXTReaderModel {
     }
 
     var readerBackgroundUIColor: UIColor {
-        resolvedTheme.adjustedBackgroundUIColor(brightness: brightness)
+        resolvedTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
     }
 
     var readerContentUIColor: UIColor {
-        resolvedTheme.adjustedForegroundUIColor(brightness: brightness)
+        resolvedTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance)
     }
 
     var resolvedTheme: ReaderTheme {
@@ -366,9 +368,22 @@ final class TXTReaderModel {
         case .light:
             return theme == .dark ? .light : theme
         case .dark:
-            return .dark
+            return theme == .light ? .dark : theme
         case .system:
-            return systemIsDark ? .dark : (theme == .dark ? .light : theme)
+            return systemIsDark
+                ? (theme == .light ? .dark : theme)
+                : (theme == .dark ? .light : theme)
+        }
+    }
+
+    private var isDarkAppearance: Bool {
+        switch appearanceMode {
+        case .light:
+            return false
+        case .dark:
+            return true
+        case .system:
+            return systemIsDark
         }
     }
 
@@ -951,7 +966,7 @@ final class TXTReaderModel {
         contentTopInset = min(max(preferences.contentTopInset, 0), 160)
         contentBottomInset = min(max(preferences.contentBottomInset, 0), 160)
         appearanceMode = preferences.appearanceMode
-        brightness = min(max(preferences.brightness, 0.25), 1)
+        brightness = 1
         showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
         theme = Self.theme(for: preferences.themePreset)
 
@@ -970,29 +985,8 @@ final class TXTReaderModel {
     func apply(preset: ReaderThemePreset) {
         var preferences = readerPreferences
         preferences.themePreset = preset
-        switch preset {
-        case .original:
-            preferences.fontSize = 17
-            preferences.lineHeight = 1.5
-            preferences.pageMargins = 1
-            preferences.paragraphIndent = 2
-            preferences.contentTopInset = 56
-            preferences.contentBottomInset = 32
-        case .quiet:
-            preferences.fontSize = 17
-            preferences.lineHeight = 1.65
-            preferences.pageMargins = 1.1
-            preferences.paragraphIndent = 2
-            preferences.contentTopInset = 56
-            preferences.contentBottomInset = 32
-        case .paper:
-            preferences.fontSize = 17
-            preferences.lineHeight = 1.55
-            preferences.pageMargins = 1
-            preferences.paragraphIndent = 2
-            preferences.contentTopInset = 56
-            preferences.contentBottomInset = 32
-        }
+        // Theme cards only select the reading palette. Typography and layout
+        // remain the user's current choices and are edited in Custom settings.
         apply(preferences: preferences)
     }
 
@@ -1010,7 +1004,7 @@ final class TXTReaderModel {
             publisherStyles: false,
             themePreset: Self.preset(for: theme),
             appearanceMode: appearanceMode,
-            brightness: brightness,
+            brightness: 1,
             pageTransition: Self.pageTransition(for: flowMode, mode: pageTransition),
             showBookTitleInPageHeader: showBookTitleInPageHeader
         )
@@ -1274,7 +1268,7 @@ final class TXTReaderModel {
 
     func resetTypography() {
         fontScale = 1.0
-        fontFamily = .systemSerif
+        fontFamily = .original
         boldText = false
         lineHeight = 1.5
         paragraphIndent = 2.0
@@ -1307,7 +1301,7 @@ final class TXTReaderModel {
         defaults.set(contentBottomInset, forKey: PreferenceKey.contentBottomInset)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
         defaults.set(appearanceMode.rawValue, forKey: PreferenceKey.appearanceMode)
-        defaults.set(brightness, forKey: PreferenceKey.brightness)
+        defaults.set(1.0, forKey: PreferenceKey.brightness)
         defaults.set(flowMode.rawValue, forKey: PreferenceKey.flowMode)
         defaults.set(pageTransition.rawValue, forKey: PreferenceKey.pageTransition)
         defaults.set(showBookTitleInPageHeader, forKey: PreferenceKey.showBookTitleInPageHeader)

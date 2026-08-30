@@ -42,14 +42,13 @@ struct HomeView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(BookCardPressFeedbackStyle())
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .modifier(
                                     BookCardSurfaceModifier(
                                         isLiquidGlassEnabled: bookCardsUseLiquidGlass
                                     )
                                 )
-                                .modifier(BookCardLongPressModifier())
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")

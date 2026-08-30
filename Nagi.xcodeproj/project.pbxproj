@@ -15,6 +15,9 @@
 		4A0000000000000000000005 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000005 /* SearchView.swift */; };
 		4A0000000000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000006 /* Assets.xcassets */; };
 		4A0000000000000000000007 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000008 /* AppIcon.icon */; };
+		4A0000000000000000000080 /* NagiSong-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000080 /* NagiSong-Regular.ttf */; };
+		4A0000000000000000000081 /* NagiKaiti-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000081 /* NagiKaiti-Regular.ttf */; };
+		4A0000000000000000000082 /* NagiYuanti-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000082 /* NagiYuanti-Regular.ttf */; };
 		4A0000000000000000000008 /* FileImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000009 /* FileImportService.swift */; };
 		4A0000000000000000000009 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000000A /* Book.swift */; };
 		4A000000000000000000000A /* ModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000000B /* ModelContainer.swift */; };
@@ -78,6 +81,9 @@
 		3A0000000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3A0000000000000000000007 /* Nagi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nagi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A0000000000000000000008 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
+		3A0000000000000000000080 /* NagiSong-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiSong-Regular.ttf; sourceTree = "<group>"; };
+		3A0000000000000000000081 /* NagiKaiti-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiKaiti-Regular.ttf; sourceTree = "<group>"; };
+		3A0000000000000000000082 /* NagiYuanti-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiYuanti-Regular.ttf; sourceTree = "<group>"; };
 		3A0000000000000000000009 /* FileImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportService.swift; sourceTree = "<group>"; };
 		3A000000000000000000000A /* Book.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Book.swift; sourceTree = "<group>"; };
 		3A000000000000000000000B /* ModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainer.swift; sourceTree = "<group>"; };
@@ -155,6 +161,7 @@
 			children = (
 				2A0000000000000000000003 /* App */,
 				2A0000000000000000000004 /* Views */,
+				2A0000000000000000000014 /* Resources */,
 				3A0000000000000000000006 /* Assets.xcassets */,
 				3A0000000000000000000008 /* AppIcon.icon */,
 				2A000000000000000000000A /* Services */,
@@ -185,6 +192,24 @@
 				2A0000000000000000000008 /* Search */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000014 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				2A0000000000000000000015 /* Fonts */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000015 /* Fonts */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000080 /* NagiSong-Regular.ttf */,
+				3A0000000000000000000081 /* NagiKaiti-Regular.ttf */,
+				3A0000000000000000000082 /* NagiYuanti-Regular.ttf */,
+			);
+			path = Fonts;
 			sourceTree = "<group>";
 		};
 		2A0000000000000000000005 /* Home */ = {
@@ -462,6 +487,9 @@
 			files = (
 				4A0000000000000000000006 /* Assets.xcassets in Resources */,
 				4A0000000000000000000007 /* AppIcon.icon in Resources */,
+				4A0000000000000000000080 /* NagiSong-Regular.ttf in Resources */,
+				4A0000000000000000000081 /* NagiKaiti-Regular.ttf in Resources */,
+				4A0000000000000000000082 /* NagiYuanti-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -618,7 +646,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 81;
+			CURRENT_PROJECT_VERSION = 82;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -627,7 +655,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.27.0;
+			MARKETING_VERSION = 0.28.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -644,7 +672,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 81;
+			CURRENT_PROJECT_VERSION = 82;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -653,7 +681,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.27.0;
+			MARKETING_VERSION = 0.28.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
