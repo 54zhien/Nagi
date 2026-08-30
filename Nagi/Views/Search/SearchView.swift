@@ -15,39 +15,8 @@ struct SearchView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
-                if searchTerms.isEmpty {
-                    ContentUnavailableView {
-                        searchUnavailableLabel("搜索书库")
-                    }
-                } else if matchingBooks.isEmpty {
-                    ContentUnavailableView {
-                        searchUnavailableLabel("未找到书籍")
-                    } description: {
-                        Text("没有找到书名中包含“\(searchText)”的书籍")
-                    }
-                } else {
-                    List {
-                        ForEach(matchingBooks) { book in
-                            Button {
-                                selectedBook = book
-                            } label: {
-                                BookRow(book: book)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                    .listStyle(.plain)
-                    .scrollContentBackground(.hidden)
-                }
-            }
-            .scrollEdgeEffectStyle(.soft, for: .top)
-            .toolbar(.hidden, for: .navigationBar)
-            .safeAreaBar(edge: .top, spacing: 0) {
-                NagiPageHeader(
-                    title: "搜索"
-                )
-            }
+            searchContent
+                .toolbar(.hidden, for: .navigationBar)
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -59,6 +28,48 @@ struct SearchView: View {
                 ReaderView(book: selectedBook)
             }
         }
+    }
+
+    @ViewBuilder
+    private var searchContent: some View {
+        if searchTerms.isEmpty {
+            ContentUnavailableView {
+                searchUnavailableLabel("搜索书库")
+            }
+            .safeAreaBar(edge: .top, spacing: 0) {
+                searchHeader
+            }
+        } else if matchingBooks.isEmpty {
+            ContentUnavailableView {
+                searchUnavailableLabel("未找到书籍")
+            } description: {
+                Text("没有找到书名中包含“\(searchText)”的书籍")
+            }
+            .safeAreaBar(edge: .top, spacing: 0) {
+                searchHeader
+            }
+        } else {
+            List {
+                ForEach(matchingBooks) { book in
+                    Button {
+                        selectedBook = book
+                    } label: {
+                        BookRow(book: book)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .scrollEdgeEffectStyle(.soft, for: .top)
+            .safeAreaBar(edge: .top, spacing: 0) {
+                searchHeader
+            }
+        }
+    }
+
+    private var searchHeader: some View {
+        NagiPageHeader(title: "搜索")
     }
 
     @ViewBuilder
