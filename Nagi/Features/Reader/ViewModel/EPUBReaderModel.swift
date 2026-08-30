@@ -379,9 +379,11 @@ final class EPUBReaderModel {
 
         do {
             let readingURL = try await ReaderAssetResolver.resolve(book: book)
+            try Task.checkCancellation()
             let publication = try await ReadiumService.shared.openEPUB(
                 at: readingURL
             )
+            try Task.checkCancellation()
             activePublicationURL = readingURL
             self.publication = publication
             title = publication.metadata.title ?? book.title
@@ -398,6 +400,7 @@ final class EPUBReaderModel {
                 currentLocatorJSON = nil
                 initialLocation = nil
             }
+            try Task.checkCancellation()
             let navigator = try EPUBNavigatorViewController(
                 publication: publication,
                 initialLocation: initialLocation,
@@ -426,6 +429,8 @@ final class EPUBReaderModel {
             }
 
             await loadTableOfContents(from: publication)
+        } catch is CancellationError {
+            return
         } catch {
             let formatName = book.format == .txt ? "TXT" : "EPUB"
             errorMessage = "无法打开 \(formatName)：\(error.localizedDescription)"

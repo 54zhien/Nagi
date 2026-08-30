@@ -292,15 +292,8 @@ struct LibraryView: View {
         .task(id: books.map(\.id)) {
             viewModel.backfillMissingCovers(for: books, into: modelContext)
         }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { selectedBook != nil },
-                set: { if !$0 { selectedBook = nil } }
-            )
-        ) {
-            if let selectedBook {
-                ReaderView(book: selectedBook)
-            }
+        .fullScreenCover(item: $selectedBook) { book in
+            ReaderView(book: book)
         }
     }
 

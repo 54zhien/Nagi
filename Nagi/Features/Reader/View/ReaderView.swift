@@ -11,22 +11,71 @@ import SwiftUI
 
 struct ReaderView: View {
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.dismiss) private var dismiss
-    @Environment(\.modelContext) private var modelContext
 
     let book: Book
 
-    @State private var model: ReaderViewModel
+    @State private var model: ReaderViewModel?
+
+    var body: some View {
+        Group {
+            if let model {
+                ReaderSessionView(model: model)
+            } else {
+                ReaderLoadingView(bookTitle: book.title)
+            }
+        }
+        .task(id: book.id) {
+            if model?.book.id != book.id {
+                model = nil
+            }
+            guard model == nil else { return }
+
+            // Let the full-screen presentation render its first frame before
+            // constructing the main-actor reader graph.  This keeps the
+            // presenting library responsive during the modal transition.
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+
+            let nextModel = ReaderViewModel(book: book)
+            model = nextModel
+
+            // The session initially renders its loading state. Yield again so
+            // that state can reach the screen before Readium starts opening
+            // the publication and creating its UIKit navigator.
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+
+            nextModel.updateSystemAppearance(isDark: colorScheme == .dark)
+            await nextModel.loadIfNeeded()
+        }
+    }
+}
+
+private struct ReaderLoadingView: View {
+    let bookTitle: String
+
+    var body: some View {
+        ZStack {
+            Color(uiColor: .systemBackground)
+
+            ProgressView("正在打开阅读器…")
+                .accessibilityLabel("正在打开 \(bookTitle)")
+        }
+        .ignoresSafeArea()
+    }
+}
+
+private struct ReaderSessionView: View {
+    @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    let model: ReaderViewModel
     @State private var showControls = true
     @State private var interactionRevision = 0
     @State private var showSettings = false
     @State private var showTableOfContents = false
     @State private var showCustomSettings = false
-
-    init(book: Book) {
-        self.book = book
-        _model = State(initialValue: ReaderViewModel(book: book))
-    }
 
     var body: some View {
         ReaderChrome(
@@ -42,10 +91,6 @@ struct ReaderView: View {
             onSwipeStart: hideControlsForSwipe
         ) {
             content
-        }
-        .task {
-            model.updateSystemAppearance(isDark: colorScheme == .dark)
-            await model.loadIfNeeded()
         }
         .onChange(of: colorScheme) { _, newValue in
             model.updateSystemAppearance(isDark: newValue == .dark)
