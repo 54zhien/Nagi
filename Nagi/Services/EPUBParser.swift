@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import CoreGraphics
 import ImageIO
 import SwiftSoup
 import UniformTypeIdentifiers
@@ -146,8 +147,8 @@ struct EPUBParser: Sendable {
 
     /// Resolves the EPUB cover according to the OPF cover metadata, then
     /// falls back to a cover-like image and finally the first raster image.
-    /// The result is a small JPEG thumbnail so SwiftData and scrolling do not
-    /// repeatedly carry full-resolution archive assets.
+    /// The result is a small, center-cropped 3:4 JPEG thumbnail so SwiftData
+    /// and scrolling do not repeatedly carry full-resolution archive assets.
     private func extractCoverData(
         from archive: Archive,
         opfXml: String,
@@ -228,6 +229,8 @@ struct EPUBParser: Sendable {
             return nil
         }
 
+        let croppedImage = centerCrop(image, toAspectRatio: 3.0 / 4.0) ?? image
+
         let output = NSMutableData()
         guard let destination = CGImageDestinationCreateWithData(
             output,
@@ -241,8 +244,42 @@ struct EPUBParser: Sendable {
         let properties: [CFString: Any] = [
             kCGImageDestinationLossyCompressionQuality: 0.85,
         ]
-        CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+        CGImageDestinationAddImage(destination, croppedImage, properties as CFDictionary)
         return CGImageDestinationFinalize(destination) ? output as Data : nil
+    }
+
+    /// Crops from the center while preserving the requested width-to-height
+    /// ratio. The thumbnail has already applied the source image orientation.
+    private static func centerCrop(_ image: CGImage, toAspectRatio aspectRatio: CGFloat) -> CGImage? {
+        guard image.width > 0, image.height > 0, aspectRatio > 0 else { return nil }
+
+        let sourceRatio = CGFloat(image.width) / CGFloat(image.height)
+        let cropWidth: Int
+        let cropHeight: Int
+
+        if sourceRatio > aspectRatio {
+            cropHeight = image.height
+            cropWidth = max(
+                1,
+                min(image.width, Int((CGFloat(cropHeight) * aspectRatio).rounded(.down)))
+            )
+        } else {
+            cropWidth = image.width
+            cropHeight = max(
+                1,
+                min(image.height, Int((CGFloat(cropWidth) / aspectRatio).rounded(.down)))
+            )
+        }
+
+        let originX = (image.width - cropWidth) / 2
+        let originY = (image.height - cropHeight) / 2
+        let cropRect = CGRect(
+            x: originX,
+            y: originY,
+            width: cropWidth,
+            height: cropHeight
+        )
+        return image.cropping(to: cropRect)
     }
 
     private func parseSpine(_ opfXml: String) -> [String] {

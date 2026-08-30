@@ -103,7 +103,7 @@ struct NagiPageHeader: View {
                     Color(uiColor: .systemBackground)
                 } else {
                     Rectangle()
-                        .fill(.bar)
+                        .fill(.regularMaterial)
                 }
             }
         }
@@ -143,21 +143,43 @@ struct NagiStatusBarBlurLayer: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let topInset = Self.windowTopSafeAreaInset ?? geometry.safeAreaInsets.top
+            let globalTop = max(geometry.frame(in: .global).minY, 0)
+
             Group {
                 if reduceTransparency {
                     Color(uiColor: .systemBackground)
                 } else {
                     Rectangle()
-                        .fill(.bar)
+                        .fill(.regularMaterial)
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: max(geometry.safeAreaInsets.top, 0), alignment: .top)
+            .frame(height: max(topInset, 0), alignment: .top)
+            // 页面内容可能从安全区起点开始布局；将层校正到窗口顶部，
+            // 这样滚动内容进入系统栏区域时才会经过 Material。
+            .offset(y: -globalTop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .ignoresSafeArea(.container, edges: .top)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+
+    /// 页面可能位于 TabView 的局部安全区内，GeometryProxy 读到的 inset
+    /// 不一定是窗口真实的顶部安全区；窗口值只用于确定模糊层高度，
+    /// 不改变任何页面内容布局。
+    private static var windowTopSafeAreaInset: CGFloat? {
+        let windows = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap { $0.windows }
+
+        guard let window = windows.first(where: { $0.isKeyWindow }) else {
+            return nil
+        }
+
+        let inset = window.safeAreaInsets.top
+        return inset > 0 ? inset : nil
     }
 }
 
@@ -350,7 +372,7 @@ enum BookCardMetrics {
     static let cardCornerRadius: CGFloat = 20
     static let coverCornerRadius: CGFloat = 12
     static let coverWidth: CGFloat = 84
-    static let coverHeight: CGFloat = 126
+    static let coverHeight: CGFloat = 112
     static let contentSpacing: CGFloat = 12
     static let cardPadding: CGFloat = 10
 
@@ -403,7 +425,7 @@ struct BookCoverView: View {
                 }
             }
         }
-        .aspectRatio(2.0 / 3.0, contentMode: .fit)
+        .aspectRatio(3.0 / 4.0, contentMode: .fit)
         .clipShape(BookCardMetrics.coverShape)
         .overlay {
             BookCardMetrics.coverShape

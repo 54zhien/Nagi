@@ -20,29 +20,45 @@ struct SearchView: View {
                     ContentUnavailableView {
                         searchUnavailableLabel("搜索书库")
                     }
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Color.clear
+                            .frame(height: NagiPageHeaderMetrics.contentHeight)
+                    }
                 } else if matchingBooks.isEmpty {
                     ContentUnavailableView {
                         searchUnavailableLabel("未找到书籍")
                     } description: {
                         Text("没有找到书名中包含“\(searchText)”的书籍")
                     }
-                } else {
-                    List(matchingBooks) { book in
-                        Button {
-                            selectedBook = book
-                        } label: {
-                            BookRow(book: book)
-                        }
-                        .buttonStyle(.plain)
+                    .safeAreaInset(edge: .top, spacing: 0) {
+                        Color.clear
+                            .frame(height: NagiPageHeaderMetrics.contentHeight)
                     }
+                } else {
+                    List {
+                        Color.clear
+                            .frame(height: NagiPageHeaderMetrics.contentHeight)
+                            .frame(maxWidth: .infinity)
+                            .listRowInsets(EdgeInsets())
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .accessibilityHidden(true)
+
+                        ForEach(matchingBooks) { book in
+                            Button {
+                                selectedBook = book
+                            } label: {
+                                BookRow(book: book)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .listStyle(.plain)
+                    .scrollContentBackground(.hidden)
                 }
             }
             .scrollEdgeEffectStyle(.automatic, for: .all)
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaInset(edge: .top, spacing: 0) {
-                Color.clear
-                    .frame(height: NagiPageHeaderMetrics.contentHeight)
-            }
             .overlay(alignment: .top) {
                 NagiPageHeader(
                     title: "搜索",
