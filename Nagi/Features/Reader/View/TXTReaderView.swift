@@ -68,12 +68,14 @@ struct TXTReaderView: View {
                 fontFamily: $model.fontFamily,
                 boldText: $model.boldText,
                 fontScale: $model.fontScale,
-                lineHeight: $model.lineHeight,
-                paragraphIndent: $model.paragraphIndent,
-                pageMargins: $model.pageMargins,
-                contentTopInset: $model.contentTopInset,
-                contentBottomInset: $model.contentBottomInset,
-                theme: $model.theme,
+                 lineHeight: $model.lineHeight,
+                 paragraphIndent: $model.paragraphIndent,
+                 pageMargins: $model.pageMargins,
+                 contentTopInset: $model.contentTopInset,
+                 contentBottomInset: $model.contentBottomInset,
+                 characterSpacing: $model.characterSpacing,
+                 wordSpacing: $model.wordSpacing,
+                 theme: $model.theme,
                 onReset: { model.resetTypography() }
             )
         }

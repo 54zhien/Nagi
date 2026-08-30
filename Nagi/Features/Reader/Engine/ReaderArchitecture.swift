@@ -76,6 +76,10 @@ enum ReaderAppearanceMode: String, CaseIterable, Identifiable, Codable, Sendable
         }
     }
 
+    var assetName: String? {
+        self == .system ? "readerAppearanceMatchDevice" : nil
+    }
+
     var systemImage: String {
         switch self {
         case .light: return "sunrise.fill"
@@ -103,6 +107,15 @@ enum ReaderPageTransition: String, CaseIterable, Identifiable, Codable, Sendable
         case .pageCurl: return "卷页"
         case .fade: return "淡化"
         case .scroll: return "滚动"
+        }
+    }
+
+    var assetName: String {
+        switch self {
+        case .slide: return "readerPageTransitionSlide"
+        case .pageCurl: return "readerPageTransitionPageCurl"
+        case .fade: return "readerPageTransitionFade"
+        case .scroll: return "readerPageTransitionScroll"
         }
     }
 
@@ -177,24 +190,215 @@ enum ReaderFontSize {
     static let maximumScale = maximum / defaultValue
 }
 
+/// The typography values that are shared by the TXT and EPUB renderers.
+///
+/// Keep the physical page clearance here instead of letting each renderer
+/// invent its own interpretation.  `pageMargins` is retained as the existing
+/// property name for source compatibility, but its value is now a signed
+/// percentage around a 24 pt base margin.
+enum ReaderLayoutMetrics {
+    static let fixedContentTopInset = 116.0
+    static let fixedContentBottomInset = 84.0
+    static let fixedParagraphIndent = 2.0
+
+    static let pageMarginBase = 24.0
+    static let pageMarginsRange = -10.0 ... 10.0
+    static let lineHeightRange = 0.80 ... 2.50
+    static let characterSpacingRange = -10.0 ... 10.0
+    static let wordSpacingRange = -20.0 ... 20.0
+    static let defaultLineHeight = 1.50
+    static let defaultPageMargins = 0.0
+    static let defaultCharacterSpacing = 0.0
+    static let defaultWordSpacing = 0.0
+
+    /// The percentage controls are based on the requested 24 pt reference,
+    /// rather than changing their meaning when the reader font changes.
+    static let spacingReferencePointSize = 24.0
+
+    /// Readium CSS expresses these two values in `rem`.  Its public
+    /// `letterSpacing` value is divided by two before it becomes CSS, so the
+    /// conversion is kept here to make the EPUB and TextKit paths agree.
+    static let readiumRootPointSize = 16.0
+
+    static func clampPageMargins(_ value: Double) -> Double {
+        min(max(value, pageMarginsRange.lowerBound), pageMarginsRange.upperBound)
+    }
+
+    static func clampLineHeight(_ value: Double) -> Double {
+        min(max(value, lineHeightRange.lowerBound), lineHeightRange.upperBound)
+    }
+
+    static func clampCharacterSpacing(_ value: Double) -> Double {
+        min(max(value, characterSpacingRange.lowerBound), characterSpacingRange.upperBound)
+    }
+
+    static func clampWordSpacing(_ value: Double) -> Double {
+        min(max(value, wordSpacingRange.lowerBound), wordSpacingRange.upperBound)
+    }
+
+    static func pageBlankInset(for adjustment: Double) -> CGFloat {
+        CGFloat(pageMarginBase * (1 + clampPageMargins(adjustment) / 100))
+    }
+
+    static func pageMarginFactor(for adjustment: Double) -> Double {
+        1 + clampPageMargins(adjustment) / 100
+    }
+
+    static func spacingPoints(for percentage: Double) -> CGFloat {
+        CGFloat(spacingReferencePointSize * percentage / 100)
+    }
+
+    static func readiumLetterSpacing(for percentage: Double) -> Double {
+        Double(spacingPoints(for: clampCharacterSpacing(percentage)))
+            / readiumRootPointSize * 2
+    }
+
+    static func readiumWordSpacing(for percentage: Double) -> Double {
+        Double(spacingPoints(for: clampWordSpacing(percentage))) / readiumRootPointSize
+    }
+
+    /// Values written by the pre-percentage settings screen were factors in
+    /// the 0.5...2.0 range.  The new setting is stored under a new key, so
+    /// this conversion is only used when migrating an old value.
+    static func migrateLegacyPageMargins(_ value: Double?) -> Double {
+        guard let value else { return defaultPageMargins }
+        return clampPageMargins((value - 1) * 100)
+    }
+}
+
 struct ReaderPreferences: Codable, Equatable, Sendable {
-    var fontSize: Double = ReaderFontSize.defaultValue
-    var fontFamily: ReaderFontFamily = .original
-    var boldText = false
-    var lineHeight: Double = 1.5
-    var paragraphSpacing: Double = 10
-    var pageMargins: Double = 1
-    var contentTopInset: Double = 56
-    var contentBottomInset: Double = 32
-    var paragraphIndent: Double = 2
-    var publisherStyles = false
-    var themePreset: ReaderThemePreset = .original
-    var appearanceMode: ReaderAppearanceMode = .system
+    var fontSize: Double
+    var fontFamily: ReaderFontFamily
+    var boldText: Bool
+    var lineHeight: Double
+    var paragraphSpacing: Double
+    /// Signed percentage around the 24 pt base page blank.
+    var pageMargins: Double
+    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
+    var contentTopInset: Double
+    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
+    var contentBottomInset: Double
+    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
+    var paragraphIndent: Double
+    var characterSpacing: Double
+    var wordSpacing: Double
+    var publisherStyles: Bool
+    var themePreset: ReaderThemePreset
+    var appearanceMode: ReaderAppearanceMode
     /// Kept for decoding older saved preferences. Reader brightness is now
     /// controlled by the device, so renderers normalize this value to 1.
-    var brightness: Double = 1
-    var pageTransition: ReaderPageTransition = .slide
-    var showBookTitleInPageHeader = false
+    var brightness: Double
+    var pageTransition: ReaderPageTransition
+    var showBookTitleInPageHeader: Bool
+
+    init(
+        fontSize: Double = ReaderFontSize.defaultValue,
+        fontFamily: ReaderFontFamily = .original,
+        boldText: Bool = false,
+        lineHeight: Double = ReaderLayoutMetrics.defaultLineHeight,
+        paragraphSpacing: Double = 10,
+        pageMargins: Double = ReaderLayoutMetrics.defaultPageMargins,
+        contentTopInset _: Double = ReaderLayoutMetrics.fixedContentTopInset,
+        contentBottomInset _: Double = ReaderLayoutMetrics.fixedContentBottomInset,
+        paragraphIndent _: Double = ReaderLayoutMetrics.fixedParagraphIndent,
+        characterSpacing: Double = ReaderLayoutMetrics.defaultCharacterSpacing,
+        wordSpacing: Double = ReaderLayoutMetrics.defaultWordSpacing,
+        publisherStyles: Bool = false,
+        themePreset: ReaderThemePreset = .original,
+        appearanceMode: ReaderAppearanceMode = .system,
+        brightness: Double = 1,
+        pageTransition: ReaderPageTransition = .slide,
+        showBookTitleInPageHeader: Bool = false
+    ) {
+        self.fontSize = fontSize
+        self.fontFamily = fontFamily
+        self.boldText = boldText
+        self.lineHeight = ReaderLayoutMetrics.clampLineHeight(lineHeight)
+        self.paragraphSpacing = paragraphSpacing
+        self.pageMargins = ReaderLayoutMetrics.clampPageMargins(pageMargins)
+        self.contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+        self.contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+        self.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+        self.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(characterSpacing)
+        self.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(wordSpacing)
+        self.publisherStyles = publisherStyles
+        self.themePreset = themePreset
+        self.appearanceMode = appearanceMode
+        self.brightness = brightness
+        self.pageTransition = pageTransition
+        self.showBookTitleInPageHeader = showBookTitleInPageHeader
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case storageVersion
+        case fontSize
+        case fontFamily
+        case boldText
+        case lineHeight
+        case paragraphSpacing
+        case pageMargins
+        case contentTopInset
+        case contentBottomInset
+        case paragraphIndent
+        case characterSpacing
+        case wordSpacing
+        case publisherStyles
+        case themePreset
+        case appearanceMode
+        case brightness
+        case pageTransition
+        case showBookTitleInPageHeader
+    }
+
+    private static let currentStorageVersion = 2
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let storageVersion = try container.decodeIfPresent(Int.self, forKey: .storageVersion) ?? 1
+        let storedPageMargins = try container.decodeIfPresent(Double.self, forKey: .pageMargins)
+        let pageMargins = storageVersion >= Self.currentStorageVersion
+            ? ReaderLayoutMetrics.clampPageMargins(storedPageMargins ?? ReaderLayoutMetrics.defaultPageMargins)
+            : ReaderLayoutMetrics.migrateLegacyPageMargins(storedPageMargins)
+
+        self.init(
+            fontSize: try container.decodeIfPresent(Double.self, forKey: .fontSize) ?? ReaderFontSize.defaultValue,
+            fontFamily: try container.decodeIfPresent(ReaderFontFamily.self, forKey: .fontFamily) ?? .original,
+            boldText: try container.decodeIfPresent(Bool.self, forKey: .boldText) ?? false,
+            lineHeight: try container.decodeIfPresent(Double.self, forKey: .lineHeight) ?? ReaderLayoutMetrics.defaultLineHeight,
+            paragraphSpacing: try container.decodeIfPresent(Double.self, forKey: .paragraphSpacing) ?? 10,
+            pageMargins: pageMargins,
+            characterSpacing: try container.decodeIfPresent(Double.self, forKey: .characterSpacing) ?? ReaderLayoutMetrics.defaultCharacterSpacing,
+            wordSpacing: try container.decodeIfPresent(Double.self, forKey: .wordSpacing) ?? ReaderLayoutMetrics.defaultWordSpacing,
+            publisherStyles: try container.decodeIfPresent(Bool.self, forKey: .publisherStyles) ?? false,
+            themePreset: try container.decodeIfPresent(ReaderThemePreset.self, forKey: .themePreset) ?? .original,
+            appearanceMode: try container.decodeIfPresent(ReaderAppearanceMode.self, forKey: .appearanceMode) ?? .system,
+            brightness: try container.decodeIfPresent(Double.self, forKey: .brightness) ?? 1,
+            pageTransition: try container.decodeIfPresent(ReaderPageTransition.self, forKey: .pageTransition) ?? .slide,
+            showBookTitleInPageHeader: try container.decodeIfPresent(Bool.self, forKey: .showBookTitleInPageHeader) ?? false
+        )
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(Self.currentStorageVersion, forKey: .storageVersion)
+        try container.encode(fontSize, forKey: .fontSize)
+        try container.encode(fontFamily, forKey: .fontFamily)
+        try container.encode(boldText, forKey: .boldText)
+        try container.encode(lineHeight, forKey: .lineHeight)
+        try container.encode(paragraphSpacing, forKey: .paragraphSpacing)
+        try container.encode(pageMargins, forKey: .pageMargins)
+        try container.encode(contentTopInset, forKey: .contentTopInset)
+        try container.encode(contentBottomInset, forKey: .contentBottomInset)
+        try container.encode(paragraphIndent, forKey: .paragraphIndent)
+        try container.encode(characterSpacing, forKey: .characterSpacing)
+        try container.encode(wordSpacing, forKey: .wordSpacing)
+        try container.encode(publisherStyles, forKey: .publisherStyles)
+        try container.encode(themePreset, forKey: .themePreset)
+        try container.encode(appearanceMode, forKey: .appearanceMode)
+        try container.encode(brightness, forKey: .brightness)
+        try container.encode(pageTransition, forKey: .pageTransition)
+        try container.encode(showBookTitleInPageHeader, forKey: .showBookTitleInPageHeader)
+    }
 }
 
 /// Resolves the distance from the physical screen edge to the readable text.
@@ -243,6 +447,8 @@ struct ReaderCustomizationDraft: Equatable, Sendable {
     var contentBottomInset: Double
     var pageMargins: Double
     var paragraphIndent: Double
+    var characterSpacing: Double
+    var wordSpacing: Double
     var publisherStyles: Bool
 }
 
@@ -577,10 +783,12 @@ final class ReaderViewModel {
             fontFamily: preferences.fontFamily,
             boldText: preferences.boldText,
             lineHeight: preferences.lineHeight,
-            contentTopInset: preferences.contentTopInset,
-            contentBottomInset: preferences.contentBottomInset,
+            contentTopInset: ReaderLayoutMetrics.fixedContentTopInset,
+            contentBottomInset: ReaderLayoutMetrics.fixedContentBottomInset,
             pageMargins: preferences.pageMargins,
-            paragraphIndent: preferences.paragraphIndent,
+            paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
+            characterSpacing: preferences.characterSpacing,
+            wordSpacing: preferences.wordSpacing,
             publisherStyles: preferences.publisherStyles
         )
     }
@@ -589,11 +797,13 @@ final class ReaderViewModel {
         setPreference { preferences in
             preferences.fontFamily = draft.fontFamily
             preferences.boldText = draft.boldText
-            preferences.lineHeight = draft.lineHeight
-            preferences.contentTopInset = draft.contentTopInset
-            preferences.contentBottomInset = draft.contentBottomInset
-            preferences.pageMargins = draft.pageMargins
-            preferences.paragraphIndent = draft.paragraphIndent
+            preferences.lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
+            preferences.contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+            preferences.contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+            preferences.pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
+            preferences.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+            preferences.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
+            preferences.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(draft.wordSpacing)
             preferences.publisherStyles = draft.publisherStyles
         }
     }

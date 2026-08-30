@@ -718,7 +718,8 @@ private struct CustomReaderSettingsSheet: View {
             .font(previewFont)
             .fontWeight(draft.boldText ? .bold : .regular)
             .foregroundStyle(Color(uiColor: previewContentColor))
-            .lineSpacing(max(0, CGFloat(draft.lineHeight - 1.0) * 8))
+            .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
+            .lineSpacing(CGFloat(draft.lineHeight - 1.0) * 8)
             .padding(.horizontal, previewHorizontalPadding)
             .padding(.top, previewTopPadding)
             .padding(.bottom, previewBottomPadding)
@@ -739,15 +740,15 @@ private struct CustomReaderSettingsSheet: View {
     }
 
     private var previewHorizontalPadding: CGFloat {
-        min(28, max(8, CGFloat(draft.pageMargins) * 10))
+        CGFloat(ReaderLayoutMetrics.pageBlankInset(for: draft.pageMargins) * 0.6)
     }
 
     private var previewTopPadding: CGFloat {
-        min(22, max(4, CGFloat(draft.contentTopInset) / 4))
+        CGFloat(ReaderLayoutMetrics.fixedContentTopInset * 0.1)
     }
 
     private var previewBottomPadding: CGFloat {
-        min(22, max(4, CGFloat(draft.contentBottomInset) / 4))
+        CGFloat(ReaderLayoutMetrics.fixedContentBottomInset * 0.1)
     }
 
     @ViewBuilder
@@ -756,7 +757,10 @@ private struct CustomReaderSettingsSheet: View {
             .components(separatedBy: "\n\n")
             .filter { !$0.isEmpty }
             .prefix(5)
-        let indent = String(repeating: "　", count: max(0, Int(draft.paragraphIndent.rounded())))
+        let indent = String(
+            repeating: "　",
+            count: Int(ReaderLayoutMetrics.fixedParagraphIndent.rounded())
+        )
 
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(paragraphs.enumerated()), id: \.offset) { _, paragraph in
@@ -850,53 +854,42 @@ private struct CustomReaderSettingsSheet: View {
                     title: "行间距",
                     systemImage: "line.3.horizontal",
                     value: $draft.lineHeight,
-                    range: 1.0 ... 2.0,
-                    step: 0.1,
-                    valueText: String(format: "%.1f", draft.lineHeight)
+                    range: ReaderLayoutMetrics.lineHeightRange,
+                    step: 0.05,
+                    valueText: String(format: "%.2f", draft.lineHeight)
                 )
 
                 Divider()
 
                 sliderRow(
-                    title: "上边距",
-                    systemImage: "arrow.up.to.line",
-                    value: $draft.contentTopInset,
-                    range: 0 ... 160,
-                    step: 4,
-                    valueText: "\(Int(draft.contentTopInset)) pt"
-                )
-
-                Divider()
-
-                sliderRow(
-                    title: "下边距",
-                    systemImage: "arrow.down.to.line",
-                    value: $draft.contentBottomInset,
-                    range: 0 ... 160,
-                    step: 4,
-                    valueText: "\(Int(draft.contentBottomInset)) pt"
-                )
-
-                Divider()
-
-                sliderRow(
-                    title: "页边距",
+                    title: "页边空白",
                     systemImage: "arrow.left.and.right",
                     value: $draft.pageMargins,
-                    range: 0.5 ... 2.0,
-                    step: 0.1,
-                    valueText: String(format: "%.1f×", draft.pageMargins)
+                    range: ReaderLayoutMetrics.pageMarginsRange,
+                    step: 1,
+                    valueText: "\(Int(draft.pageMargins))%"
                 )
 
                 Divider()
 
                 sliderRow(
-                    title: "首行缩进",
-                    systemImage: "increase.indent",
-                    value: $draft.paragraphIndent,
-                    range: 0 ... 3.0,
-                    step: 0.5,
-                    valueText: String(format: "%.1f em", draft.paragraphIndent)
+                    title: "字符间距",
+                    systemImage: "character",
+                    value: $draft.characterSpacing,
+                    range: ReaderLayoutMetrics.characterSpacingRange,
+                    step: 1,
+                    valueText: "\(Int(draft.characterSpacing))%"
+                )
+
+                Divider()
+
+                sliderRow(
+                    title: "词间距",
+                    systemImage: "text.word.spacing",
+                    value: $draft.wordSpacing,
+                    range: ReaderLayoutMetrics.wordSpacingRange,
+                    step: 2,
+                    valueText: "\(Int(draft.wordSpacing))%"
                 )
 
                 Divider()
@@ -912,7 +905,7 @@ private struct CustomReaderSettingsSheet: View {
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
 
-            Text("开启出版方样式后，部分自定义行间距、缩进和字体设置可能由书籍本身覆盖。")
+            Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白以 24 pt 为基准。开启出版方样式后，部分自定义排版可能由书籍本身覆盖。")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)

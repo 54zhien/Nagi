@@ -259,6 +259,8 @@ struct EPUBReaderDraft: Equatable {
     var contentBottomInset: Double
     var pageMargins: Double
     var paragraphIndent: Double
+    var characterSpacing: Double
+    var wordSpacing: Double
     var publisherStyles: Bool
 }
 
@@ -293,6 +295,8 @@ final class EPUBReaderModel {
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
     var contentTopInset: Double { didSet { preferencesDidChange() } }
     var contentBottomInset: Double { didSet { preferencesDidChange() } }
+    var characterSpacing: Double { didSet { preferencesDidChange() } }
+    var wordSpacing: Double { didSet { preferencesDidChange() } }
     var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
     var appearanceMode: EPUBAppearanceMode { didSet { preferencesDidChange() } }
     /// Retained only for migration compatibility. Device brightness is
@@ -338,9 +342,12 @@ final class EPUBReaderModel {
         static let boldText = "reader.epub.boldText"
         static let lineHeight = "reader.epub.lineHeight"
         static let pageMargins = "reader.epub.pageMargins"
+        static let pageMarginAdjustment = "reader.epub.pageMarginAdjustment"
         static let paragraphIndent = "reader.epub.paragraphIndent"
         static let contentTopInset = "reader.epub.contentTopInset"
         static let contentBottomInset = "reader.epub.contentBottomInset"
+        static let characterSpacing = "reader.epub.characterSpacing"
+        static let wordSpacing = "reader.epub.wordSpacing"
         static let theme = "reader.epub.theme"
         static let appearanceMode = "reader.epub.appearanceMode"
         static let brightness = "reader.epub.brightness"
@@ -373,11 +380,28 @@ final class EPUBReaderModel {
         )
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(EPUBFontFamily.init) ?? .original
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
-        lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
-        pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
-        paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
-        contentTopInset = defaults.object(forKey: PreferenceKey.contentTopInset) as? Double ?? 56
-        contentBottomInset = defaults.object(forKey: PreferenceKey.contentBottomInset) as? Double ?? 32
+        lineHeight = ReaderLayoutMetrics.clampLineHeight(
+            defaults.object(forKey: PreferenceKey.lineHeight) as? Double
+                ?? ReaderLayoutMetrics.defaultLineHeight
+        )
+        if let adjustment = defaults.object(forKey: PreferenceKey.pageMarginAdjustment) as? Double {
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(adjustment)
+        } else {
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(
+                defaults.object(forKey: PreferenceKey.pageMargins) as? Double
+            )
+        }
+        paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+        characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(
+            defaults.object(forKey: PreferenceKey.characterSpacing) as? Double
+                ?? ReaderLayoutMetrics.defaultCharacterSpacing
+        )
+        wordSpacing = ReaderLayoutMetrics.clampWordSpacing(
+            defaults.object(forKey: PreferenceKey.wordSpacing) as? Double
+                ?? ReaderLayoutMetrics.defaultWordSpacing
+        )
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(EPUBReaderTheme.init) ?? .light
         appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
             .flatMap(EPUBAppearanceMode.init) ?? .system
@@ -566,6 +590,8 @@ final class EPUBReaderModel {
             contentBottomInset: contentBottomInset,
             pageMargins: pageMargins,
             paragraphIndent: paragraphIndent,
+            characterSpacing: characterSpacing,
+            wordSpacing: wordSpacing,
             publisherStyles: publisherStyles
         )
     }
@@ -574,11 +600,13 @@ final class EPUBReaderModel {
         withPreferenceUpdatesSuspended {
             fontFamily = draft.fontFamily
             boldText = draft.boldText
-            lineHeight = draft.lineHeight
-            contentTopInset = draft.contentTopInset
-            contentBottomInset = draft.contentBottomInset
-            pageMargins = draft.pageMargins
-            paragraphIndent = draft.paragraphIndent
+            lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
+            contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+            contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
+            paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+            characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
+            wordSpacing = ReaderLayoutMetrics.clampWordSpacing(draft.wordSpacing)
             publisherStyles = draft.publisherStyles
             selectedPreset = nil
         }
@@ -594,9 +622,11 @@ final class EPUBReaderModel {
             lineHeight: lineHeight,
             paragraphSpacing: 10,
             pageMargins: pageMargins,
-            contentTopInset: contentTopInset,
-            contentBottomInset: contentBottomInset,
-            paragraphIndent: paragraphIndent,
+            contentTopInset: ReaderLayoutMetrics.fixedContentTopInset,
+            contentBottomInset: ReaderLayoutMetrics.fixedContentBottomInset,
+            paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
+            characterSpacing: characterSpacing,
+            wordSpacing: wordSpacing,
             publisherStyles: publisherStyles,
             themePreset: Self.themePreset(for: theme),
             appearanceMode: ReaderAppearanceMode(rawValue: appearanceMode.rawValue) ?? .system,
@@ -614,11 +644,13 @@ final class EPUBReaderModel {
             )
             fontFamily = EPUBFontFamily(rawValue: preferences.fontFamily.rawValue) ?? .original
             boldText = preferences.boldText
-            lineHeight = min(max(preferences.lineHeight, 1.0), 2.0)
-            pageMargins = min(max(preferences.pageMargins, 0.5), 2.0)
-            paragraphIndent = min(max(preferences.paragraphIndent, 0), 3.0)
-            contentTopInset = min(max(preferences.contentTopInset, 0), 160)
-            contentBottomInset = min(max(preferences.contentBottomInset, 0), 160)
+            lineHeight = ReaderLayoutMetrics.clampLineHeight(preferences.lineHeight)
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(preferences.pageMargins)
+            paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+            contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+            contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+            characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(preferences.characterSpacing)
+            wordSpacing = ReaderLayoutMetrics.clampWordSpacing(preferences.wordSpacing)
             publisherStyles = preferences.publisherStyles
             appearanceMode = EPUBAppearanceMode(rawValue: preferences.appearanceMode.rawValue) ?? .system
             brightness = 1
@@ -652,11 +684,13 @@ final class EPUBReaderModel {
             fontScale = 1.0
             fontFamily = .original
             boldText = false
-            lineHeight = 1.5
-            pageMargins = 1.0
-            paragraphIndent = 2.0
-            contentTopInset = 56
-            contentBottomInset = 32
+            lineHeight = ReaderLayoutMetrics.defaultLineHeight
+            pageMargins = ReaderLayoutMetrics.defaultPageMargins
+            paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+            contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+            contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+            characterSpacing = ReaderLayoutMetrics.defaultCharacterSpacing
+            wordSpacing = ReaderLayoutMetrics.defaultWordSpacing
             publisherStyles = false
             selectedPreset = nil
         }
@@ -740,16 +774,17 @@ final class EPUBReaderModel {
 
     private func makePreferences() -> EPUBPreferences {
         let effectiveTheme = resolvedTheme
-        return EPUBPreferences(
+        var preferences = EPUBPreferences(
             backgroundColor: ReadiumNavigator.Color(
                 uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
             ),
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
             fontWeight: boldText ? 1.75 : 1.0,
+            letterSpacing: 0,
             lineHeight: lineHeight,
-            pageMargins: pageMargins,
-            paragraphIndent: paragraphIndent,
+            pageMargins: ReaderLayoutMetrics.pageMarginFactor(for: pageMargins),
+            paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             publisherStyles: publisherStyles,
             scroll: flowMode == .scroll,
             spread: .auto,
@@ -757,8 +792,19 @@ final class EPUBReaderModel {
                 uiColor: effectiveTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance)
             ),
             textNormalization: !publisherStyles,
-            theme: effectiveTheme.readiumTheme(isDarkAppearance: isDarkAppearance)
+            theme: effectiveTheme.readiumTheme(isDarkAppearance: isDarkAppearance),
+            wordSpacing: 0
         )
+        // Readium 3.8 clamps only values passed through its initializer.  Set
+        // the public properties after initialization so the requested signed
+        // ranges remain intact and are emitted by Readium CSS.
+        preferences.letterSpacing = ReaderLayoutMetrics.readiumLetterSpacing(
+            for: characterSpacing
+        )
+        preferences.wordSpacing = ReaderLayoutMetrics.readiumWordSpacing(
+            for: wordSpacing
+        )
+        return preferences
     }
 
     private func loadPreviewIfNeeded() {
@@ -812,10 +858,12 @@ final class EPUBReaderModel {
         defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
         defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
-        defaults.set(pageMargins, forKey: PreferenceKey.pageMargins)
-        defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
-        defaults.set(contentTopInset, forKey: PreferenceKey.contentTopInset)
-        defaults.set(contentBottomInset, forKey: PreferenceKey.contentBottomInset)
+        defaults.set(pageMargins, forKey: PreferenceKey.pageMarginAdjustment)
+        defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
+        defaults.set(ReaderLayoutMetrics.fixedContentTopInset, forKey: PreferenceKey.contentTopInset)
+        defaults.set(ReaderLayoutMetrics.fixedContentBottomInset, forKey: PreferenceKey.contentBottomInset)
+        defaults.set(characterSpacing, forKey: PreferenceKey.characterSpacing)
+        defaults.set(wordSpacing, forKey: PreferenceKey.wordSpacing)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
         defaults.set(appearanceMode.rawValue, forKey: PreferenceKey.appearanceMode)
         defaults.set(1.0, forKey: PreferenceKey.brightness)
@@ -918,8 +966,9 @@ extension EPUBReaderModel {
         let safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
         return ReaderContentInsetResolver.resolve(
             safeAreaInsets: safeAreaInsets,
-            top: CGFloat(contentTopInset),
-            bottom: CGFloat(contentBottomInset)
+            top: CGFloat(ReaderLayoutMetrics.fixedContentTopInset),
+            bottom: CGFloat(ReaderLayoutMetrics.fixedContentBottomInset),
+            horizontal: 0
         )
     }
 }

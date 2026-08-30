@@ -111,20 +111,20 @@ struct MediumReaderSettingsView: View {
             HStack(spacing: 0) {
                 fontSizeButton(
                     title: "小",
-                    systemImage: "textformat.size.smaller",
+                    assetName: "readerFontSizeSmaller",
                     adjustment: -ReaderFontSize.step,
-                    iconPointSize: 17
+                    iconPointSize: 20
                 )
 
                 Divider()
-                    .frame(height: 24)
-                    .opacity(0.5)
+                    .frame(height: 32)
+                    .overlay(Color.primary.opacity(0.36))
 
                 fontSizeButton(
                     title: "大",
-                    systemImage: "textformat.size.larger",
+                    assetName: "readerFontSizeLarger",
                     adjustment: ReaderFontSize.step,
-                    iconPointSize: 24
+                    iconPointSize: 28
                 )
             }
             .frame(maxWidth: .infinity)
@@ -138,7 +138,7 @@ struct MediumReaderSettingsView: View {
 
     private func fontSizeButton(
         title: String,
-        systemImage: String,
+        assetName: String,
         adjustment: Double,
         iconPointSize: CGFloat
     ) -> some View {
@@ -165,9 +165,12 @@ struct MediumReaderSettingsView: View {
             }
         } label: {
             HStack(spacing: 8) {
-                Image(systemName: systemImage)
-                    .font(.system(size: iconPointSize, weight: .semibold))
-                    .symbolRenderingMode(.hierarchical)
+                Image(assetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: iconPointSize, height: iconPointSize)
+                    .foregroundStyle(.primary)
 
                 Text(title)
                     .font(.subheadline.weight(.semibold))
@@ -187,14 +190,26 @@ struct MediumReaderSettingsView: View {
         Menu {
             Picker("翻页方式", selection: model.binding(\ReaderPreferences.pageTransition)) {
                 ForEach(ReaderPageTransition.allCases) { transition in
-                    Label(transition.label, systemImage: transition.systemImage)
+                    Label {
+                        Text(transition.label)
+                    } icon: {
+                        Image(transition.assetName)
+                            .renderingMode(.template)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 22, height: 22)
+                            .foregroundStyle(.primary)
+                    }
                         .tag(transition)
                 }
             }
         } label: {
-            Image(systemName: model.preferences.pageTransition.systemImage)
-                .font(.system(size: 17, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
+            Image(model.preferences.pageTransition.assetName)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 28, height: 28)
+                .foregroundStyle(.primary)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -211,13 +226,16 @@ struct MediumReaderSettingsView: View {
         Menu {
             Picker("外观模式", selection: model.binding(\ReaderPreferences.appearanceMode)) {
                 ForEach(ReaderAppearanceMode.allCases) { mode in
-                    Label(mode.label, systemImage: mode.systemImage).tag(mode)
+                    Label {
+                        Text(mode.label)
+                    } icon: {
+                        appearanceIcon(for: mode, size: 22)
+                    }
+                    .tag(mode)
                 }
             }
         } label: {
-            Image(systemName: model.preferences.appearanceMode.systemImage)
-                .font(.system(size: 17, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
+            appearanceIcon(for: model.preferences.appearanceMode, size: 28)
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -228,6 +246,24 @@ struct MediumReaderSettingsView: View {
         .glassEffect(.regular.interactive(), in: Capsule())
         .accessibilityLabel("外观模式")
         .accessibilityValue(model.preferences.appearanceMode.label)
+    }
+
+    @ViewBuilder
+    private func appearanceIcon(for mode: ReaderAppearanceMode, size: CGFloat) -> some View {
+        if let assetName = mode.assetName {
+            Image(assetName)
+                .renderingMode(.template)
+                .resizable()
+                .scaledToFit()
+                .frame(width: size, height: size)
+                .foregroundStyle(.primary)
+        } else {
+            Image(systemName: mode.systemImage)
+                .font(.system(size: size * 0.62, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+                .frame(width: size, height: size)
+                .foregroundStyle(.primary)
+        }
     }
 
     private var brightnessControl: some View {
@@ -392,11 +428,38 @@ struct CustomReaderSettingsSheet: View {
                     preview
                     fontMenu
                     Toggle("粗体文本", isOn: $draft.boldText)
-                    slider("行间距", value: $draft.lineHeight, range: 1 ... 2, step: 0.1, text: String(format: "%.1f", draft.lineHeight))
-                    slider("上边距", value: $draft.contentTopInset, range: 0 ... 160, step: 4, text: "\(Int(draft.contentTopInset)) pt")
-                    slider("下边距", value: $draft.contentBottomInset, range: 0 ... 160, step: 4, text: "\(Int(draft.contentBottomInset)) pt")
-                    slider("页边距", value: $draft.pageMargins, range: 0.5 ... 2, step: 0.1, text: String(format: "%.1f×", draft.pageMargins))
-                    slider("首行缩进", value: $draft.paragraphIndent, range: 0 ... 3, step: 0.5, text: String(format: "%.1f em", draft.paragraphIndent))
+                    slider(
+                        "行间距",
+                        value: $draft.lineHeight,
+                        range: ReaderLayoutMetrics.lineHeightRange,
+                        step: 0.05,
+                        text: String(format: "%.2f", draft.lineHeight)
+                    )
+                    slider(
+                        "页边空白",
+                        value: $draft.pageMargins,
+                        range: ReaderLayoutMetrics.pageMarginsRange,
+                        step: 1,
+                        text: "\(Int(draft.pageMargins))%"
+                    )
+                    slider(
+                        "字符间距",
+                        value: $draft.characterSpacing,
+                        range: ReaderLayoutMetrics.characterSpacingRange,
+                        step: 1,
+                        text: "\(Int(draft.characterSpacing))%"
+                    )
+                    slider(
+                        "词间距",
+                        value: $draft.wordSpacing,
+                        range: ReaderLayoutMetrics.wordSpacingRange,
+                        step: 2,
+                        text: "\(Int(draft.wordSpacing))%"
+                    )
+                    Text("正文上下边距固定为上 116 pt、下 84 pt；首行缩进固定为 2；页边空白以 24 pt 为基准。")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
                     Toggle("保留出版方样式", isOn: $draft.publisherStyles)
                 }
                 .padding(16)
@@ -442,7 +505,8 @@ struct CustomReaderSettingsSheet: View {
                 Text(previewText)
                     .font(previewFont)
                     .fontWeight(draft.boldText ? .bold : .regular)
-                    .lineSpacing(max(0, CGFloat(draft.lineHeight - 1) * 8))
+                    .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
+                    .lineSpacing(CGFloat(draft.lineHeight - 1) * 8)
                     .lineLimit(7)
             }
         }

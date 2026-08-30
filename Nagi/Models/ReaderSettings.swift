@@ -180,7 +180,7 @@ enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Se
         switch self {
         case .original: return nil
         case .pingFang: return "PingFangSC-Regular"
-        case .song: return "STSong"
+        case .song: return "STZhongsong"
         case .kai: return "STKaiti"
         case .yuan: return "STYuanti-SC-Regular"
         }

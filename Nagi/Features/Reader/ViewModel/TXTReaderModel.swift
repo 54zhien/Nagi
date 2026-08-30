@@ -23,6 +23,8 @@ private struct TXTLayoutSnapshot: @unchecked Sendable {
     let boldText: Bool
     let lineHeight: Double
     let paragraphIndent: Double
+    let characterSpacing: Double
+    let wordSpacing: Double
     let foregroundColor: UIColor
 }
 
@@ -87,6 +89,8 @@ final class TXTReaderModel {
     var pageMargins: Double { didSet { styleDidChange() } }
     var contentTopInset: Double { didSet { styleDidChange() } }
     var contentBottomInset: Double { didSet { styleDidChange() } }
+    var characterSpacing: Double { didSet { styleDidChange() } }
+    var wordSpacing: Double { didSet { styleDidChange() } }
     var theme: ReaderTheme { didSet { styleDidChange() } }
     var appearanceMode: ReaderAppearanceMode { didSet { styleDidChange() } }
     /// Retained only for migration compatibility. Device brightness is
@@ -138,8 +142,11 @@ final class TXTReaderModel {
         static let lineHeight = "reader.txt.lineHeight"
         static let paragraphIndent = "reader.txt.paragraphIndent"
         static let pageMargins = "reader.txt.pageMargins"
+        static let pageMarginAdjustment = "reader.txt.pageMarginAdjustment"
         static let contentTopInset = "reader.txt.contentTopInset"
         static let contentBottomInset = "reader.txt.contentBottomInset"
+        static let characterSpacing = "reader.txt.characterSpacing"
+        static let wordSpacing = "reader.txt.wordSpacing"
         static let theme = "reader.txt.theme"
         static let appearanceMode = "reader.txt.appearanceMode"
         static let brightness = "reader.txt.brightness"
@@ -162,11 +169,28 @@ final class TXTReaderModel {
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily)
             .flatMap(ReaderFontFamily.init) ?? .original
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
-        lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
-        paragraphIndent = defaults.object(forKey: PreferenceKey.paragraphIndent) as? Double ?? 2.0
-        pageMargins = defaults.object(forKey: PreferenceKey.pageMargins) as? Double ?? 1.0
-        contentTopInset = defaults.object(forKey: PreferenceKey.contentTopInset) as? Double ?? 56
-        contentBottomInset = defaults.object(forKey: PreferenceKey.contentBottomInset) as? Double ?? 32
+        lineHeight = ReaderLayoutMetrics.clampLineHeight(
+            defaults.object(forKey: PreferenceKey.lineHeight) as? Double
+                ?? ReaderLayoutMetrics.defaultLineHeight
+        )
+        paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+        if let adjustment = defaults.object(forKey: PreferenceKey.pageMarginAdjustment) as? Double {
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(adjustment)
+        } else {
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(
+                defaults.object(forKey: PreferenceKey.pageMargins) as? Double
+            )
+        }
+        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+        characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(
+            defaults.object(forKey: PreferenceKey.characterSpacing) as? Double
+                ?? ReaderLayoutMetrics.defaultCharacterSpacing
+        )
+        wordSpacing = ReaderLayoutMetrics.clampWordSpacing(
+            defaults.object(forKey: PreferenceKey.wordSpacing) as? Double
+                ?? ReaderLayoutMetrics.defaultWordSpacing
+        )
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
         appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
             .flatMap(ReaderAppearanceMode.init) ?? .system
@@ -345,13 +369,11 @@ final class TXTReaderModel {
     }
 
     var readerInsets: UIEdgeInsets {
-        let horizontal = max(0, CGFloat(pageMargins) * 24)
-        return UIEdgeInsets(
-            // ReaderChrome 负责控件布局；正文仍要避开设备的所有安全区。
-            top: max(CGFloat(contentTopInset), safeAreaInsets.top),
-            left: max(horizontal, safeAreaInsets.left),
-            bottom: max(CGFloat(contentBottomInset), safeAreaInsets.bottom),
-            right: max(horizontal, safeAreaInsets.right)
+        ReaderContentInsetResolver.resolve(
+            safeAreaInsets: safeAreaInsets,
+            top: CGFloat(ReaderLayoutMetrics.fixedContentTopInset),
+            bottom: CGFloat(ReaderLayoutMetrics.fixedContentBottomInset),
+            horizontal: ReaderLayoutMetrics.pageBlankInset(for: pageMargins)
         )
     }
 
@@ -475,6 +497,8 @@ final class TXTReaderModel {
             boldText: boldText,
             lineHeight: lineHeight,
             paragraphIndent: paragraphIndent,
+            characterSpacing: characterSpacing,
+            wordSpacing: wordSpacing,
             foregroundColor: readerContentUIColor
         )
         let restoreCharacterOffset = pendingCharacterOffset
@@ -705,7 +729,10 @@ final class TXTReaderModel {
             return UIFont(descriptor: descriptor, size: baseFont.pointSize)
         }()
         let paragraphStyle = NSMutableParagraphStyle()
-        paragraphStyle.lineSpacing = max(0, font.lineHeight * CGFloat(snapshot.lineHeight - 1))
+        paragraphStyle.lineHeightMultiple = CGFloat(
+            ReaderLayoutMetrics.clampLineHeight(snapshot.lineHeight)
+        )
+        paragraphStyle.lineSpacing = 0
         paragraphStyle.paragraphSpacing = font.lineHeight * 0.65
         // Use the final Dynamic Type-scaled font so the indent follows the
         // glyph metrics instead of drifting when a font family is changed.
@@ -716,7 +743,34 @@ final class TXTReaderModel {
             .font: font,
             .paragraphStyle: paragraphStyle,
             .foregroundColor: snapshot.foregroundColor,
+            .kern: ReaderLayoutMetrics.spacingPoints(for: snapshot.characterSpacing),
         ])
+
+        let wordSpacing = ReaderLayoutMetrics.spacingPoints(for: snapshot.wordSpacing)
+        if wordSpacing != 0 {
+            text.enumerateSubstrings(
+                in: text.startIndex..<text.endIndex,
+                options: [.byComposedCharacterSequences]
+            ) { substring, substringRange, _, _ in
+                guard let substring,
+                      substring.unicodeScalars.contains(where: {
+                          CharacterSet.whitespaces.contains($0) || $0.value == 0x3000
+                      })
+                else {
+                    return
+                }
+
+                let range = NSRange(substringRange, in: text)
+                let characterSpacing = ReaderLayoutMetrics.spacingPoints(
+                    for: snapshot.characterSpacing
+                )
+                attributed.addAttribute(
+                    .kern,
+                    value: characterSpacing + wordSpacing,
+                    range: range
+                )
+            }
+        }
         let string = text as NSString
         var location = 0
         while location < string.length {
@@ -846,6 +900,8 @@ final class TXTReaderModel {
             boldText: settings.boldText,
             lineHeight: settings.lineHeight,
             paragraphIndent: settings.paragraphIndent,
+            characterSpacing: settings.characterSpacing,
+            wordSpacing: settings.wordSpacing,
             foregroundColor: settings.readerContentUIColor
         )
         return attributedText(from: text, snapshot: snapshot)
@@ -960,11 +1016,13 @@ final class TXTReaderModel {
         )
         fontFamily = preferences.fontFamily
         boldText = preferences.boldText
-        lineHeight = min(max(preferences.lineHeight, 1.0), 2.0)
-        paragraphIndent = min(max(preferences.paragraphIndent, 0), 3.0)
-        pageMargins = min(max(preferences.pageMargins, 0.5), 2.0)
-        contentTopInset = min(max(preferences.contentTopInset, 0), 160)
-        contentBottomInset = min(max(preferences.contentBottomInset, 0), 160)
+        lineHeight = ReaderLayoutMetrics.clampLineHeight(preferences.lineHeight)
+        paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+        pageMargins = ReaderLayoutMetrics.clampPageMargins(preferences.pageMargins)
+        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+        characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(preferences.characterSpacing)
+        wordSpacing = ReaderLayoutMetrics.clampWordSpacing(preferences.wordSpacing)
         appearanceMode = preferences.appearanceMode
         brightness = 1
         showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
@@ -998,9 +1056,11 @@ final class TXTReaderModel {
             lineHeight: lineHeight,
             paragraphSpacing: 10,
             pageMargins: pageMargins,
-            contentTopInset: contentTopInset,
-            contentBottomInset: contentBottomInset,
-            paragraphIndent: paragraphIndent,
+            contentTopInset: ReaderLayoutMetrics.fixedContentTopInset,
+            contentBottomInset: ReaderLayoutMetrics.fixedContentBottomInset,
+            paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
+            characterSpacing: characterSpacing,
+            wordSpacing: wordSpacing,
             publisherStyles: false,
             themePreset: Self.preset(for: theme),
             appearanceMode: appearanceMode,
@@ -1178,6 +1238,8 @@ final class TXTReaderModel {
             boldText: boldText,
             lineHeight: lineHeight,
             paragraphIndent: paragraphIndent,
+            characterSpacing: characterSpacing,
+            wordSpacing: wordSpacing,
             foregroundColor: readerContentUIColor
         )
     }
@@ -1270,11 +1332,13 @@ final class TXTReaderModel {
         fontScale = 1.0
         fontFamily = .original
         boldText = false
-        lineHeight = 1.5
-        paragraphIndent = 2.0
-        pageMargins = 1.0
-        contentTopInset = 56
-        contentBottomInset = 32
+        lineHeight = ReaderLayoutMetrics.defaultLineHeight
+        paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+        pageMargins = ReaderLayoutMetrics.defaultPageMargins
+        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
+        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
+        characterSpacing = ReaderLayoutMetrics.defaultCharacterSpacing
+        wordSpacing = ReaderLayoutMetrics.defaultWordSpacing
         theme = .light
     }
 
@@ -1296,9 +1360,12 @@ final class TXTReaderModel {
         defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
         defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
-        defaults.set(pageMargins, forKey: PreferenceKey.pageMargins)
-        defaults.set(contentTopInset, forKey: PreferenceKey.contentTopInset)
-        defaults.set(contentBottomInset, forKey: PreferenceKey.contentBottomInset)
+        defaults.set(pageMargins, forKey: PreferenceKey.pageMarginAdjustment)
+        defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
+        defaults.set(ReaderLayoutMetrics.fixedContentTopInset, forKey: PreferenceKey.contentTopInset)
+        defaults.set(ReaderLayoutMetrics.fixedContentBottomInset, forKey: PreferenceKey.contentBottomInset)
+        defaults.set(characterSpacing, forKey: PreferenceKey.characterSpacing)
+        defaults.set(wordSpacing, forKey: PreferenceKey.wordSpacing)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
         defaults.set(appearanceMode.rawValue, forKey: PreferenceKey.appearanceMode)
         defaults.set(1.0, forKey: PreferenceKey.brightness)

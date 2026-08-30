@@ -349,6 +349,8 @@ struct ReaderSettingsSheet: View {
     @Binding var pageMargins: Double
     @Binding var contentTopInset: Double
     @Binding var contentBottomInset: Double
+    @Binding var characterSpacing: Double
+    @Binding var wordSpacing: Double
     @Binding var theme: ReaderTheme
 
     let publisherStyles: Binding<Bool>?
@@ -366,6 +368,8 @@ struct ReaderSettingsSheet: View {
         pageMargins: Binding<Double>,
         contentTopInset: Binding<Double>,
         contentBottomInset: Binding<Double>,
+        characterSpacing: Binding<Double>,
+        wordSpacing: Binding<Double>,
         theme: Binding<ReaderTheme>,
         publisherStyles: Binding<Bool>? = nil,
         onReset: @escaping () -> Void
@@ -381,6 +385,8 @@ struct ReaderSettingsSheet: View {
         self._pageMargins = pageMargins
         self._contentTopInset = contentTopInset
         self._contentBottomInset = contentBottomInset
+        self._characterSpacing = characterSpacing
+        self._wordSpacing = wordSpacing
         self._theme = theme
         self.publisherStyles = publisherStyles
         self.onReset = onReset
@@ -429,28 +435,23 @@ struct ReaderSettingsSheet: View {
                     LabeledContent("字号", value: "\(Int(fontScale * 100))%")
                     Slider(value: $fontScale, in: 0.8 ... 2.0, step: 0.05)
 
-                    LabeledContent("行高", value: lineHeight.formatted(.number.precision(.fractionLength(1))))
-                    Slider(value: $lineHeight, in: 1.0 ... 2.0, step: 0.1)
+                    LabeledContent("行间距", value: lineHeight.formatted(.number.precision(.fractionLength(2))))
+                    Slider(value: $lineHeight, in: ReaderLayoutMetrics.lineHeightRange, step: 0.05)
 
-                    LabeledContent("首行缩进", value: paragraphIndent.formatted(.number.precision(.fractionLength(1))))
-                    Slider(value: $paragraphIndent, in: 0 ... 3.0, step: 0.5)
+                    LabeledContent("字符间距", value: "\(Int(characterSpacing))%")
+                    Slider(value: $characterSpacing, in: ReaderLayoutMetrics.characterSpacingRange, step: 1)
+
+                    LabeledContent("词间距", value: "\(Int(wordSpacing))%")
+                    Slider(value: $wordSpacing, in: ReaderLayoutMetrics.wordSpacingRange, step: 2)
                 }
 
                 Section {
-                    LabeledContent("页边距", value: pageMargins.formatted(.number.precision(.fractionLength(1))))
-                    Slider(value: $pageMargins, in: 0.5 ... 2.0, step: 0.1)
-
-                    LabeledContent("上边距", value: "\(Int(contentTopInset)) pt")
-                    Slider(value: $contentTopInset, in: 0 ... 160, step: 4)
-                        .accessibilityLabel("正文上边距")
-
-                    LabeledContent("下边距", value: "\(Int(contentBottomInset)) pt")
-                    Slider(value: $contentBottomInset, in: 0 ... 160, step: 4)
-                        .accessibilityLabel("正文下边距")
+                    LabeledContent("页边空白", value: "\(Int(pageMargins))%")
+                    Slider(value: $pageMargins, in: ReaderLayoutMetrics.pageMarginsRange, step: 1)
                 } header: {
                     Text("页面与正文间距")
                 } footer: {
-                    Text("最小值仍会遵守设备安全区，避免正文被刘海、动态岛或 Home Indicator 遮挡。")
+                    Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白以 24 pt 为基准。")
                 }
 
                 Section("背景色") {
