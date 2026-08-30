@@ -79,23 +79,9 @@ struct LibraryView: View {
                     .scrollEdgeEffectStyle(.automatic, for: .all)
                 }
             }
-            .navigationTitle("书库")
-            .toolbarTitleDisplayMode(.large)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        pickerCoordinator = DocumentPickerPresenter.present(
-                            allowedContentTypes: [.plainText, .epub],
-                            allowsMultipleSelection: true,
-                            onPick: { files in
-                                viewModel.importAndParse(files, into: modelContext)
-                            }
-                        )
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("导入小说")
-                }
+            .toolbar(.hidden, for: .navigationBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                libraryHeader
             }
             .alert(
                 "导入失败",
@@ -144,6 +130,40 @@ struct LibraryView: View {
                 ReaderView(book: selectedBook)
             }
         }
+    }
+
+    private var libraryHeader: some View {
+        HStack(alignment: .center, spacing: 16) {
+            Text("书库")
+                .font(.largeTitle.weight(.bold))
+                .foregroundStyle(.primary)
+                .lineLimit(1)
+                .accessibilityAddTraits(.isHeader)
+
+            Spacer(minLength: 12)
+
+            Button(action: presentImportPicker) {
+                Image(systemName: "plus")
+                    .font(.title2.weight(.medium))
+                    .frame(width: 48, height: 48)
+            }
+            .buttonStyle(.plain)
+            .glassEffect(.regular.interactive(), in: Circle())
+            .accessibilityLabel("导入小说")
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func presentImportPicker() {
+        pickerCoordinator = DocumentPickerPresenter.present(
+            allowedContentTypes: [.plainText, .epub],
+            allowsMultipleSelection: true,
+            onPick: { files in
+                viewModel.importAndParse(files, into: modelContext)
+            }
+        )
     }
 }
 

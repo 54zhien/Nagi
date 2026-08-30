@@ -146,6 +146,30 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var showBookTitleInPageHeader = false
 }
 
+/// Resolves the distance from the physical screen edge to the readable text.
+///
+/// The user-facing inset is a total distance, so it must not be added to the
+/// system safe area. Whichever is larger is the effective clearance.
+enum ReaderContentInsetResolver {
+    static func resolve(
+        safeAreaInsets: UIEdgeInsets,
+        top: CGFloat,
+        bottom: CGFloat,
+        horizontal: CGFloat = 0
+    ) -> UIEdgeInsets {
+        let requestedTop = max(0, top)
+        let requestedBottom = max(0, bottom)
+        let requestedHorizontal = max(0, horizontal)
+
+        return UIEdgeInsets(
+            top: max(safeAreaInsets.top, requestedTop),
+            left: max(safeAreaInsets.left, requestedHorizontal),
+            bottom: max(safeAreaInsets.bottom, requestedBottom),
+            right: max(safeAreaInsets.right, requestedHorizontal)
+        )
+    }
+}
+
 enum ReaderPreferencesStore {
     private static let key = "reader.shared.preferences.v1"
 

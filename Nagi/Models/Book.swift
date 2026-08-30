@@ -30,6 +30,8 @@ final class Book {
     var progressPercent: Double
     /// Readium Locator JSON，TXT 也使用同一字段保存字符锚点。
     var readerLocatorJSON: String?
+    /// TXT 的派生 EPUB 路径。原始 sourceURL 始终保留，用于分享、重命名和删除原文件。
+    var readerAssetURL: String?
     /// TXT 的字符锚点；与 EPUB 的 Readium Locator 分开保存，避免两种格式互相覆盖。
     var txtReadingLocationJSON: String?
 
@@ -39,7 +41,8 @@ final class Book {
         format: BookFormat,
         sourceURL: String,
         chapterCount: Int = 0,
-        coverData: Data? = nil
+        coverData: Data? = nil,
+        readerAssetURL: String? = nil
     ) {
         self.id = UUID()
         self.title = title
@@ -53,6 +56,7 @@ final class Book {
         self.currentChapterTitle = nil
         self.progressPercent = 0
         self.readerLocatorJSON = nil
+        self.readerAssetURL = readerAssetURL
         self.txtReadingLocationJSON = nil
     }
 

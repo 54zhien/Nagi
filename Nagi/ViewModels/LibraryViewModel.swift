@@ -18,6 +18,7 @@ struct BookImportResult: Sendable {
     let sourceURL: String
     let chapterCount: Int
     let coverData: Data?
+    let readerAssetURL: String?
 
     func makeBook() -> Book {
         Book(
@@ -26,7 +27,8 @@ struct BookImportResult: Sendable {
             format: format,
             sourceURL: sourceURL,
             chapterCount: chapterCount,
-            coverData: coverData
+            coverData: coverData,
+            readerAssetURL: readerAssetURL
         )
     }
 }
@@ -54,11 +56,15 @@ final class LibraryViewModel {
         // 第二步：后台解析返回纯值，主线程创建 Book 存入 SwiftData（不跨线程碰 ModelContext）
         let files = importedFiles
         Task {
+            var results: [BookImportResult] = []
             do {
-                let results = try await Self.parseBooksInBackground(files)
+                results = try await Self.parseBooksInBackground(files)
                 try Self.upsert(results, into: context)
                 try context.save()
             } catch {
+                for result in results {
+                    TXTReaderAssetStore.removeAsset(atPath: result.readerAssetURL)
+                }
                 errorMessage = error.localizedDescription
             }
         }
@@ -120,17 +126,41 @@ final class LibraryViewModel {
         let task = Task.detached(priority: .userInitiated) {
             var results: [BookImportResult] = []
             let parserFactory = BookImportParserFactory()
-            for fileURL in files {
-                let parser = try parserFactory.parser(for: fileURL)
-                let parsed = try parser.parse(url: fileURL)
-                results.append(BookImportResult(
-                    title: parsed.title,
-                    author: parsed.author,
-                    format: try parserFactory.format(for: fileURL),
-                    sourceURL: fileURL.path,
-                    chapterCount: parsed.chapterCount,
-                    coverData: parsed.coverData
-                ))
+            var generatedAssetPaths: [String] = []
+
+            do {
+                for fileURL in files {
+                    try Task.checkCancellation()
+                    let format = try parserFactory.format(for: fileURL)
+                    let parser = try parserFactory.parser(for: fileURL)
+                    let parsed = try parser.parse(url: fileURL)
+
+                    var readerAssetURL: String?
+                    if format == .txt {
+                        let assetURL = try TXTReaderAssetStore.makeAssetURL()
+                        try TXTReaderAssetBuilder.build(
+                            parsed: parsed,
+                            destinationURL: assetURL
+                        )
+                        readerAssetURL = assetURL.path
+                        generatedAssetPaths.append(assetURL.path)
+                    }
+
+                    results.append(BookImportResult(
+                        title: parsed.title,
+                        author: parsed.author,
+                        format: format,
+                        sourceURL: fileURL.path,
+                        chapterCount: parsed.chapterCount,
+                        coverData: parsed.coverData,
+                        readerAssetURL: readerAssetURL
+                    ))
+                }
+            } catch {
+                for path in generatedAssetPaths {
+                    TXTReaderAssetStore.removeAsset(atPath: path)
+                }
+                throw error
             }
             return results
         }
@@ -148,6 +178,7 @@ final class LibraryViewModel {
                 existing.formatRaw = result.format.rawValue
                 existing.chapterCount = result.chapterCount
                 existing.coverData = result.coverData
+                existing.readerAssetURL = result.readerAssetURL
             } else {
                 let book = result.makeBook()
                 context.insert(book)
@@ -190,6 +221,7 @@ final class LibraryViewModel {
     /// 删除：删文件 + 删 SwiftData 记录。
     func delete(_ book: Book, context: ModelContext) {
         try? FileManager.default.removeItem(at: URL(fileURLWithPath: book.sourceURL))
+        TXTReaderAssetStore.removeAsset(atPath: book.readerAssetURL)
         context.delete(book)
         do {
             try context.save()

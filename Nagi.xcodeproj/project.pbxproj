@@ -62,6 +62,7 @@
 		4A000000000000000000007B /* ReaderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007B /* ReaderSettingsView.swift */; };
 		4A000000000000000000007C /* BookImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007C /* BookImportParser.swift */; };
 		4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007D /* EPUBReadingContentProvider.swift */; };
+		4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007E /* TXTReaderAssetService.swift */; };
 		4A0000000000000000000074 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
 		4A0000000000000000000075 /* ReadiumStreamer in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000075 /* ReadiumStreamer */; };
 		4A0000000000000000000076 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
@@ -123,6 +124,7 @@
 		3A000000000000000000007B /* ReaderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsView.swift; sourceTree = "<group>"; };
 		3A000000000000000000007C /* BookImportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookImportParser.swift; sourceTree = "<group>"; };
 		3A000000000000000000007D /* EPUBReadingContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReadingContentProvider.swift; sourceTree = "<group>"; };
+		3A000000000000000000007E /* TXTReaderAssetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderAssetService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -227,6 +229,7 @@
 				3A000000000000000000000D /* EPUBParser.swift */,
 				3A000000000000000000007C /* BookImportParser.swift */,
 				3A000000000000000000007D /* EPUBReadingContentProvider.swift */,
+				3A000000000000000000007E /* TXTReaderAssetService.swift */,
 				3A0000000000000000000070 /* ReadiumService.swift */,
 			);
 			path = Services;
@@ -521,6 +524,7 @@
 				4A000000000000000000007B /* ReaderSettingsView.swift in Sources */,
 				4A000000000000000000007C /* BookImportParser.swift in Sources */,
 				4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */,
+				4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -614,7 +618,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 64;
+			CURRENT_PROJECT_VERSION = 65;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -623,7 +627,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.21.1;
+			MARKETING_VERSION = 0.22.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -640,7 +644,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 64;
+			CURRENT_PROJECT_VERSION = 65;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -649,7 +653,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.21.1;
+			MARKETING_VERSION = 0.22.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

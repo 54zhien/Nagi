@@ -296,6 +296,8 @@ final class EPUBReaderModel {
     var onStateChange: (() -> Void)?
 
     private var publication: Publication?
+    /// 当前 Readium 打开的文件。TXT 会指向派生 EPUB，预览不能再读取原始 TXT。
+    private var activePublicationURL: URL?
     private var preferenceUpdateTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
@@ -326,7 +328,14 @@ final class EPUBReaderModel {
         self.book = book
         title = book.title
         chapterTitle = book.currentChapterTitle ?? ""
-        currentLocatorJSON = book.readerLocatorJSON
+        if let locatorJSON = book.readerLocatorJSON,
+           let locator = try? Locator(jsonString: locatorJSON) {
+            currentLocatorJSON = locator.jsonString
+        } else {
+            // Older TXT versions stored a different location payload in this
+            // field.  Keep it out of the Readium position channel.
+            currentLocatorJSON = nil
+        }
         progress = min(max(book.progressPercent, 0), 1)
 
         let defaults = UserDefaults.standard
@@ -369,14 +378,25 @@ final class EPUBReaderModel {
         defer { isLoading = false }
 
         do {
+            let readingURL = try await ReaderAssetResolver.resolve(book: book)
             let publication = try await ReadiumService.shared.openEPUB(
-                at: URL(fileURLWithPath: book.sourceURL)
+                at: readingURL
             )
+            activePublicationURL = readingURL
             self.publication = publication
             title = publication.metadata.title ?? book.title
 
-            let initialLocation = book.readerLocatorJSON.flatMap {
-                try? Locator(jsonString: $0)
+            let initialLocation: Locator?
+            if let locatorJSON = book.readerLocatorJSON,
+               let locator = try? Locator(jsonString: locatorJSON) {
+                initialLocation = locator
+            } else if book.format == .txt, progress > 0 {
+                // 兼容切换架构前已经读过的 TXT：旧版本只有总进度，没有 Readium Locator。
+                currentLocatorJSON = nil
+                initialLocation = try? await publication.locate(progression: progress).get()
+            } else {
+                currentLocatorJSON = nil
+                initialLocation = nil
             }
             let navigator = try EPUBNavigatorViewController(
                 publication: publication,
@@ -384,12 +404,6 @@ final class EPUBReaderModel {
                 config: .init(
                     preferences: makePreferences(),
                     disablePageTurnsWhileScrolling: true,
-                    contentInset: [
-                        // 给正文顶部留出稳定的呼吸空间，避免贴近屏幕边缘；
-                        // 该 inset 也包含 Readium 要求的安全区预留。
-                        .compact: (top: 56, bottom: 32),
-                        .regular: (top: 64, bottom: 48),
-                    ],
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6
                 )
@@ -413,7 +427,8 @@ final class EPUBReaderModel {
 
             await loadTableOfContents(from: publication)
         } catch {
-            errorMessage = "无法打开 EPUB：\(error.localizedDescription)"
+            let formatName = book.format == .txt ? "TXT" : "EPUB"
+            errorMessage = "无法打开 \(formatName)：\(error.localizedDescription)"
         }
     }
 
@@ -734,7 +749,7 @@ final class EPUBReaderModel {
         previewTask?.cancel()
         isLoadingPreview = true
 
-        let sourceURL = URL(fileURLWithPath: book.sourceURL)
+        let sourceURL = activePublicationURL ?? URL(fileURLWithPath: book.sourceURL)
         let contentProvider = EPUBReadingContentProvider()
         previewTask = Task { [weak self] in
             let text = await Task.detached(priority: .userInitiated) {
@@ -876,11 +891,10 @@ extension EPUBReaderModel {
     /// Readium 会在分页重建及窗口尺寸变化时重新调用该代理方法。
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
         let safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
-        return UIEdgeInsets(
-            top: max(safeAreaInsets.top, CGFloat(contentTopInset)),
-            left: 0,
-            bottom: max(safeAreaInsets.bottom, CGFloat(contentBottomInset)),
-            right: 0
+        return ReaderContentInsetResolver.resolve(
+            safeAreaInsets: safeAreaInsets,
+            top: CGFloat(contentTopInset),
+            bottom: CGFloat(contentBottomInset)
         )
     }
 }

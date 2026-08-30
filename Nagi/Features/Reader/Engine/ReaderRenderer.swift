@@ -2,8 +2,8 @@
 //  ReaderRenderer.swift
 //  Nagi
 //
-//  TXT 与 EPUB 的渲染适配器。阅读编排层只面对 ReaderRenderer，
-//  TextKit 和 Readium 保留各自最合适的底层实现。
+//  TXT 与 EPUB 的渲染适配器。两种格式的活动阅读路径都交给 Readium；
+//  TextKit 实现暂时保留为兼容代码，工厂不会再选择它。
 //
 
 import Foundation
@@ -14,9 +14,7 @@ import UIKit
 enum ReaderRendererFactory {
     static func make(book: Book) -> any ReaderRenderer {
         switch book.format {
-        case .txt:
-            return TextKitRenderer(book: book)
-        case .epub:
+        case .txt, .epub:
             return ReadiumRenderer(book: book)
         }
     }
@@ -219,7 +217,7 @@ final class ReadiumRenderer: ReaderRenderer {
             }
 
             return AnyView(
-                ProgressView("正在打开 EPUB…")
+                ProgressView("正在打开阅读器…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(Color(uiColor: backgroundColor))
             )
@@ -288,7 +286,10 @@ final class ReadiumRenderer: ReaderRenderer {
     }
 
     func readingPosition() -> ReadingPosition? {
-        guard let locatorJSON = model.currentLocatorJSON ?? book.readerLocatorJSON else { return nil }
+        // Do not re-persist a legacy TXT location JSON as if it were a
+        // Readium Locator.  The model only exposes a value after validation or
+        // after the navigator reports a new location.
+        guard let locatorJSON = model.currentLocatorJSON else { return nil }
         return ReadingPosition(
             bookID: book.id,
             chapterID: currentChapterID,
