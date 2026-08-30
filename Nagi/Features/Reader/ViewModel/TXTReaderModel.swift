@@ -739,36 +739,34 @@ final class TXTReaderModel {
         paragraphStyle.firstLineHeadIndent = font.pointSize * CGFloat(snapshot.paragraphIndent)
         paragraphStyle.lineBreakMode = .byWordWrapping
 
+        let characterSpacing = ReaderLayoutMetrics.spacingPoints(
+            for: snapshot.characterSpacing
+        )
         let attributed = NSMutableAttributedString(string: text, attributes: [
             .font: font,
             .paragraphStyle: paragraphStyle,
             .foregroundColor: snapshot.foregroundColor,
-            .kern: ReaderLayoutMetrics.spacingPoints(for: snapshot.characterSpacing),
+            .kern: characterSpacing,
         ])
 
         let wordSpacing = ReaderLayoutMetrics.spacingPoints(for: snapshot.wordSpacing)
         if wordSpacing != 0 {
-            text.enumerateSubstrings(
-                in: text.startIndex..<text.endIndex,
-                options: [.byComposedCharacterSequences]
-            ) { substring, substringRange, _, _ in
-                guard let substring,
-                      substring.unicodeScalars.contains(where: {
-                          CharacterSet.whitespaces.contains($0) || $0.value == 0x3000
-                      })
-                else {
-                    return
+            var index = text.startIndex
+            while index < text.endIndex {
+                let nextIndex = text.index(after: index)
+                let character = text[index]
+                let isWordSeparator = character.unicodeScalars.contains {
+                    CharacterSet.whitespaces.contains($0) || $0.value == 0x3000
                 }
-
-                let range = NSRange(substringRange, in: text)
-                let characterSpacing = ReaderLayoutMetrics.spacingPoints(
-                    for: snapshot.characterSpacing
-                )
-                attributed.addAttribute(
-                    .kern,
-                    value: characterSpacing + wordSpacing,
-                    range: range
-                )
+                if isWordSeparator {
+                    let range = NSRange(index..<nextIndex, in: text)
+                    attributed.addAttribute(
+                        .kern,
+                        value: characterSpacing + wordSpacing,
+                        range: range
+                    )
+                }
+                index = nextIndex
             }
         }
         let string = text as NSString
@@ -1359,7 +1357,6 @@ final class TXTReaderModel {
         defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
         defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
-        defaults.set(paragraphIndent, forKey: PreferenceKey.paragraphIndent)
         defaults.set(pageMargins, forKey: PreferenceKey.pageMarginAdjustment)
         defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
         defaults.set(ReaderLayoutMetrics.fixedContentTopInset, forKey: PreferenceKey.contentTopInset)

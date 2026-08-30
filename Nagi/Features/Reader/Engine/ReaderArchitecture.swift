@@ -298,9 +298,9 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         lineHeight: Double = ReaderLayoutMetrics.defaultLineHeight,
         paragraphSpacing: Double = 10,
         pageMargins: Double = ReaderLayoutMetrics.defaultPageMargins,
-        contentTopInset _: Double = ReaderLayoutMetrics.fixedContentTopInset,
-        contentBottomInset _: Double = ReaderLayoutMetrics.fixedContentBottomInset,
-        paragraphIndent _: Double = ReaderLayoutMetrics.fixedParagraphIndent,
+        contentTopInset: Double = ReaderLayoutMetrics.fixedContentTopInset,
+        contentBottomInset: Double = ReaderLayoutMetrics.fixedContentBottomInset,
+        paragraphIndent: Double = ReaderLayoutMetrics.fixedParagraphIndent,
         characterSpacing: Double = ReaderLayoutMetrics.defaultCharacterSpacing,
         wordSpacing: Double = ReaderLayoutMetrics.defaultWordSpacing,
         publisherStyles: Bool = false,
@@ -310,6 +310,9 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         pageTransition: ReaderPageTransition = .slide,
         showBookTitleInPageHeader: Bool = false
     ) {
+        _ = contentTopInset
+        _ = contentBottomInset
+        _ = paragraphIndent
         self.fontSize = fontSize
         self.fontFamily = fontFamily
         self.boldText = boldText

@@ -14,6 +14,7 @@ struct ReaderChrome<Content: View>: View {
     let title: String
     let titleColor: Color
     let readerBackground: Color
+    let titleFontFamily: ReaderFontFamily
     let showsTitle: Bool
     @Binding var showControls: Bool
     @Binding var interactionRevision: Int
@@ -26,6 +27,7 @@ struct ReaderChrome<Content: View>: View {
         title: String,
         titleColor: Color,
         readerBackground: Color,
+        titleFontFamily: ReaderFontFamily,
         showsTitle: Bool,
         showControls: Binding<Bool>,
         interactionRevision: Binding<Int>,
@@ -39,6 +41,7 @@ struct ReaderChrome<Content: View>: View {
         self.title = title
         self.titleColor = titleColor
         self.readerBackground = readerBackground
+        self.titleFontFamily = titleFontFamily
         self.showsTitle = showsTitle
         self._showControls = showControls
         self._interactionRevision = interactionRevision
@@ -59,7 +62,11 @@ struct ReaderChrome<Content: View>: View {
             // 页眉是正文的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showsTitle {
-                    ReaderPageHeader(title: title, color: titleColor)
+                    ReaderPageHeader(
+                        title: title,
+                        color: titleColor,
+                        fontFamily: titleFontFamily
+                    )
                 }
             }
             .overlay(alignment: .topTrailing) {
@@ -234,10 +241,11 @@ struct ReaderChrome<Content: View>: View {
 private struct ReaderPageHeader: View {
     let title: String
     let color: Color
+    let fontFamily: ReaderFontFamily
 
     var body: some View {
         Text(title)
-            .font(.system(size: 15, weight: .medium))
+            .font(fontFamily.swiftUIFont(ofSize: 15))
             .foregroundStyle(color.opacity(0.55))
             .lineLimit(1)
             .padding(.horizontal, 72)

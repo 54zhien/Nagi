@@ -464,7 +464,10 @@ final class EPUBReaderModel {
                     disablePageTurnsWhileScrolling: true,
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6,
-                    fontFamilyDeclarations: ReaderEmbeddedFontDeclarations.all
+                    fontFamilyDeclarations: ReaderEmbeddedFontDeclarations.all,
+                    readiumCSSRSProperties: CSSRSProperties(
+                        pageGutter: CSSPxLength(ReaderLayoutMetrics.pageMarginBase)
+                    )
                 )
             )
             navigator.delegate = self

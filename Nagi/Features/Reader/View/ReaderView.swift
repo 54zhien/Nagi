@@ -109,6 +109,7 @@ private struct ReaderSessionView: View {
             title: model.title,
             titleColor: Color(uiColor: model.headerColor),
             readerBackground: Color(uiColor: model.backgroundColor),
+            titleFontFamily: model.preferences.fontFamily,
             showsTitle: model.preferences.showBookTitleInPageHeader,
             showControls: $showControls,
             interactionRevision: $interactionRevision,
