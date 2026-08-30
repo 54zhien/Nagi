@@ -152,7 +152,11 @@ final class TXTReaderModel {
         currentChapterIndex = max(book.currentChapterIndex, 0)
 
         let defaults = UserDefaults.standard
-        fontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
+        let savedFontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
+        fontScale = min(
+            max(savedFontScale, ReaderFontSize.minimumScale),
+            ReaderFontSize.maximumScale
+        )
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily)
             .flatMap(ReaderFontFamily.init) ?? .systemSerif
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
@@ -670,7 +674,12 @@ final class TXTReaderModel {
         snapshot: TXTLayoutSnapshot,
         shouldCancel: @Sendable () -> Bool = { false }
     ) -> NSAttributedString {
-        let fontSize = CGFloat(max(12, min(72, 17 * snapshot.fontScale)))
+        let fontSize = CGFloat(
+            max(
+                ReaderFontSize.minimum,
+                min(72, ReaderFontSize.defaultValue * snapshot.fontScale)
+            )
+        )
         let baseFont = snapshot.fontFamily.uiFont(ofSize: fontSize)
         let font: UIFont = {
             guard snapshot.boldText,
@@ -930,7 +939,10 @@ final class TXTReaderModel {
     }
 
     func apply(preferences: ReaderPreferences) {
-        fontScale = min(max(preferences.fontSize / 17, 0.8), 2.0)
+        fontScale = min(
+            max(preferences.fontSize / ReaderFontSize.defaultValue, ReaderFontSize.minimumScale),
+            ReaderFontSize.maximumScale
+        )
         fontFamily = preferences.fontFamily
         boldText = preferences.boldText
         lineHeight = min(max(preferences.lineHeight, 1.0), 2.0)
@@ -986,7 +998,7 @@ final class TXTReaderModel {
 
     var readerPreferences: ReaderPreferences {
         ReaderPreferences(
-            fontSize: 17 * fontScale,
+            fontSize: ReaderFontSize.defaultValue * fontScale,
             fontFamily: fontFamily,
             boldText: boldText,
             lineHeight: lineHeight,

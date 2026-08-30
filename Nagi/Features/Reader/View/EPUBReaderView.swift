@@ -766,7 +766,12 @@ private struct CustomReaderSettingsSheet: View {
     }
 
     private var previewFont: Font {
-        let size = CGFloat(17 * min(max(fontScale, 0.8), 2.0))
+        let size = CGFloat(
+            ReaderFontSize.defaultValue * min(
+                max(fontScale, ReaderFontSize.minimumScale),
+                ReaderFontSize.maximumScale
+            )
+        )
         switch draft.fontFamily {
         case .systemSerif:
             return .system(size: size, design: .serif)

@@ -339,7 +339,11 @@ final class EPUBReaderModel {
         progress = min(max(book.progressPercent, 0), 1)
 
         let defaults = UserDefaults.standard
-        fontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
+        let savedFontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
+        fontScale = min(
+            max(savedFontScale, ReaderFontSize.minimumScale),
+            ReaderFontSize.maximumScale
+        )
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(EPUBFontFamily.init) ?? .systemSerif
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
         lineHeight = defaults.object(forKey: PreferenceKey.lineHeight) as? Double ?? 1.5
@@ -506,7 +510,7 @@ final class EPUBReaderModel {
 
     func setFontScale(_ scale: Double) {
         withPreferenceUpdatesSuspended {
-            fontScale = min(max(scale, 0.8), 2.0)
+            fontScale = min(max(scale, ReaderFontSize.minimumScale), ReaderFontSize.maximumScale)
             selectedPreset = nil
         }
         persistPreferences()
@@ -584,7 +588,7 @@ final class EPUBReaderModel {
 
     var readerPreferences: ReaderPreferences {
         ReaderPreferences(
-            fontSize: 17 * fontScale,
+            fontSize: ReaderFontSize.defaultValue * fontScale,
             fontFamily: ReaderFontFamily(fontFamily.rawValue) ?? .systemSerif,
             boldText: boldText,
             lineHeight: lineHeight,
@@ -604,7 +608,10 @@ final class EPUBReaderModel {
 
     func apply(preferences: ReaderPreferences) {
         withPreferenceUpdatesSuspended {
-            fontScale = min(max(preferences.fontSize / 17, 0.8), 2.0)
+            fontScale = min(
+                max(preferences.fontSize / ReaderFontSize.defaultValue, ReaderFontSize.minimumScale),
+                ReaderFontSize.maximumScale
+            )
             fontFamily = EPUBFontFamily(rawValue: preferences.fontFamily.rawValue) ?? .systemSerif
             boldText = preferences.boldText
             lineHeight = min(max(preferences.lineHeight, 1.0), 2.0)

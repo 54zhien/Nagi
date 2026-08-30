@@ -156,8 +156,11 @@ private struct ReaderSessionView: View {
                     } label: {
                         Image(systemName: "xmark")
                             .frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
+                            .contentShape(Circle())
                     }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .glassEffect(.regular.interactive(), in: Circle())
                     .accessibilityLabel("关闭主题与排版")
                 }
             }

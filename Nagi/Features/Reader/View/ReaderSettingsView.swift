@@ -12,6 +12,10 @@ struct MediumReaderSettingsView: View {
     let model: ReaderViewModel
     let onCustomSettings: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var showFontSizeIndicator = false
+    @State private var fontSizeIndicatorToken = 0
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -30,12 +34,64 @@ struct MediumReaderSettingsView: View {
 
     private var topControls: some View {
         HStack(spacing: 10) {
-            fontSizeControl
-                .layoutPriority(1)
-
-            Spacer(minLength: 0)
-            compactModeControls
+            fontSizeControlWithIndicator
+                .frame(maxWidth: .infinity)
+            transitionMenu
+            appearanceMenu
         }
+    }
+
+    private var fontSizeControlWithIndicator: some View {
+        ZStack(alignment: .bottom) {
+            fontSizeControl
+
+            if showFontSizeIndicator {
+                fontSizeIndicator
+                    .offset(y: 11)
+                    .transition(.opacity)
+                    .task(id: fontSizeIndicatorToken) {
+                        do {
+                            try await Task.sleep(nanoseconds: 1_000_000_000)
+                        } catch {
+                            return
+                        }
+
+                        guard !Task.isCancelled else { return }
+                        if reduceMotion {
+                            showFontSizeIndicator = false
+                        } else {
+                            withAnimation(.easeOut(duration: 0.15)) {
+                                showFontSizeIndicator = false
+                            }
+                        }
+                    }
+            }
+        }
+    }
+
+    private var fontSizeIndicator: some View {
+        HStack(spacing: 4) {
+            ForEach(0..<ReaderFontSize.indicatorCount, id: \.self) { index in
+                Circle()
+                    .fill(
+                        index <= fontSizeIndicatorIndex
+                            ? Color.accentColor
+                            : Color.secondary.opacity(0.22)
+                    )
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
+    private var fontSizeIndicatorIndex: Int {
+        let rawIndex = Int(
+            ((model.preferences.fontSize - ReaderFontSize.minimum) / ReaderFontSize.step)
+                .rounded()
+        )
+        return min(max(rawIndex, 0), ReaderFontSize.indicatorCount - 1)
     }
 
     private var fontSizeControl: some View {
@@ -44,7 +100,7 @@ struct MediumReaderSettingsView: View {
                 fontSizeButton(
                     title: "小",
                     systemImage: "textformat.size.smaller",
-                    size: ReaderControlValues.smallFontSize
+                    adjustment: -ReaderFontSize.step
                 )
 
                 Divider()
@@ -54,55 +110,57 @@ struct MediumReaderSettingsView: View {
                 fontSizeButton(
                     title: "大",
                     systemImage: "textformat.size.larger",
-                    size: ReaderControlValues.largeFontSize
+                    adjustment: ReaderFontSize.step
                 )
             }
+            .frame(maxWidth: .infinity)
             .padding(4)
             .glassEffect(.regular.interactive(), in: Capsule())
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("字号")
-        .accessibilityValue(model.preferences.fontSize <= 17 ? "小" : "大")
+        .accessibilityValue("当前字号 \(Int(model.preferences.fontSize.rounded())) 磅")
     }
 
     private func fontSizeButton(
         title: String,
         systemImage: String,
-        size: Double
+        adjustment: Double
     ) -> some View {
-        let isSelected = abs(model.preferences.fontSize - size) < 0.01
+        let currentSize = model.preferences.fontSize
+        let direction = adjustment < 0 ? -1 : 1
+        let adjustedIndex = min(
+            max(fontSizeIndicatorIndex + direction, 0),
+            ReaderFontSize.indicatorCount - 1
+        )
+        let adjustedSize = ReaderFontSize.minimum
+            + Double(adjustedIndex) * ReaderFontSize.step
+        let canAdjust = adjustedIndex != fontSizeIndicatorIndex
 
         return Button {
-            model.setFontSize(size)
+            guard canAdjust else { return }
+            model.setFontSize(adjustedSize)
+            fontSizeIndicatorToken &+= 1
+            if reduceMotion {
+                showFontSizeIndicator = true
+            } else {
+                withAnimation(.easeIn(duration: 0.12)) {
+                    showFontSizeIndicator = true
+                }
+            }
         } label: {
             Label(title, systemImage: systemImage)
                 .labelStyle(.titleAndIcon)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
-                .frame(minWidth: 62, minHeight: 44)
-                .background(
-                    isSelected ? Color.accentColor.opacity(0.16) : .clear,
-                    in: Capsule()
-                )
+                .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .contentShape(Capsule())
+        .disabled(!canAdjust)
+        .opacity(canAdjust ? 1 : 0.45)
         .accessibilityLabel("字号\(title)")
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private var compactModeControls: some View {
-        GlassEffectContainer(spacing: 0) {
-            HStack(spacing: 0) {
-                transitionMenu
-                appearanceMenu
-            }
-            .padding(4)
-            .glassEffect(.regular.interactive(), in: Capsule())
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("翻页与外观")
+        .accessibilityValue("当前字号 \(Int(currentSize.rounded())) 磅")
     }
 
     private var transitionMenu: some View {
@@ -124,6 +182,7 @@ struct MediumReaderSettingsView: View {
         .buttonStyle(.plain)
         .frame(width: 48, height: 44)
         .contentShape(Rectangle())
+        .glassEffect(.regular.interactive(), in: Capsule())
         .accessibilityLabel("翻页方式")
         .accessibilityValue(model.preferences.pageTransition.label)
     }
@@ -146,6 +205,7 @@ struct MediumReaderSettingsView: View {
         .buttonStyle(.plain)
         .frame(width: 48, height: 44)
         .contentShape(Rectangle())
+        .glassEffect(.regular.interactive(), in: Capsule())
         .accessibilityLabel("外观模式")
         .accessibilityValue(model.preferences.appearanceMode.label)
     }
@@ -194,7 +254,7 @@ struct MediumReaderSettingsView: View {
             }
             .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
             .padding(.vertical, 7)
-            // 三列卡片占据原三列两行预设网格的整体高度，不增加预设数量。
+            // 三列卡片继续沿用原三列两行预设网格的比例，并向下延伸一些。
             .frame(maxWidth: .infinity, minHeight: ReaderControlValues.presetGridHeight)
             .background(
                 isSelected ? Color.accentColor.opacity(0.16) : .clear,
@@ -217,22 +277,20 @@ struct MediumReaderSettingsView: View {
             Label("自定义", systemImage: "slider.horizontal.3")
                 .font(.body.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 48)
-                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
         .glassEffect(
             .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            in: Capsule()
         )
-        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .contentShape(Capsule())
         .accessibilityHint("打开更多文字与布局选项")
     }
 
     private enum ReaderControlValues {
-        static let smallFontSize = 17.0 * 0.9
-        static let largeFontSize = 17.0 * 1.1
-        static let presetGridHeight: CGFloat = 182
+        static let presetGridHeight: CGFloat = 208
     }
 }
 

@@ -128,8 +128,18 @@ enum ReaderThemePreset: String, CaseIterable, Identifiable, Codable, Sendable, H
     }
 }
 
+enum ReaderFontSize {
+    static let defaultValue = 17.0
+    static let step = 2.0
+    static let minimum = 9.0
+    static let maximum = 41.0
+    static let indicatorCount = Int((maximum - minimum) / step) + 1
+    static let minimumScale = minimum / defaultValue
+    static let maximumScale = maximum / defaultValue
+}
+
 struct ReaderPreferences: Codable, Equatable, Sendable {
-    var fontSize: Double = 17
+    var fontSize: Double = ReaderFontSize.defaultValue
     var fontFamily: ReaderFontFamily = .systemSerif
     var boldText = false
     var lineHeight: Double = 1.5
@@ -488,7 +498,9 @@ final class ReaderViewModel {
     }
 
     func setFontSize(_ size: Double) {
-        setPreference { $0.fontSize = min(max(size, 8), 42) }
+        setPreference {
+            $0.fontSize = min(max(size, ReaderFontSize.minimum), ReaderFontSize.maximum)
+        }
     }
 
     func setAppearance(_ appearance: ReaderAppearanceMode) {
