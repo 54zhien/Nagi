@@ -966,10 +966,21 @@ extension EPUBReaderModel {
     /// 让正文边距滑杆在不遮挡刘海、动态岛或 Home Indicator 的前提下生效。
     /// Readium 会在分页重建及窗口尺寸变化时重新调用该代理方法。
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
-        let safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
+        var safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
+        // EPUBReaderView's safeAreaInset owns the top system area while the
+        // embedded page header is visible. Do not reserve that same area in
+        // Readium a second time, or the first paragraph gets a large blank
+        // band above it.
+        let topInset: CGFloat
+        if showBookTitleInPageHeader {
+            safeAreaInsets.top = 0
+            topInset = 0
+        } else {
+            topInset = CGFloat(ReaderLayoutMetrics.fixedContentTopInset)
+        }
         return ReaderContentInsetResolver.resolve(
             safeAreaInsets: safeAreaInsets,
-            top: CGFloat(ReaderLayoutMetrics.fixedContentTopInset),
+            top: topInset,
             bottom: CGFloat(ReaderLayoutMetrics.fixedContentBottomInset),
             horizontal: 0
         )
