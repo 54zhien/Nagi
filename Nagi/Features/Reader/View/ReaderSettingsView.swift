@@ -15,27 +15,11 @@ struct MediumReaderSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                HStack(spacing: 10) {
-                    fontSizeControl
-                        .layoutPriority(1)
-
-                    Spacer(minLength: 0)
-                    transitionMenu
-                    appearanceMenu
-                }
+                topControls
 
                 brightnessControl
                 presetCards
-                Button(action: onCustomSettings) {
-                    Label("自定义", systemImage: "slider.horizontal.3")
-                        .font(.body.weight(.semibold))
-                        .frame(maxWidth: .infinity, minHeight: 48)
-                }
-                .buttonStyle(.plain)
-                .glassEffect(
-                    .regular.interactive(),
-                    in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                )
+                customButton
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
@@ -44,56 +28,102 @@ struct MediumReaderSettingsView: View {
         .scrollIndicators(.hidden)
     }
 
+    private var topControls: some View {
+        HStack(spacing: 10) {
+            fontSizeControl
+                .layoutPriority(1)
+
+            Spacer(minLength: 0)
+            compactModeControls
+        }
+    }
+
     private var fontSizeControl: some View {
         GlassEffectContainer(spacing: 0) {
             HStack(spacing: 0) {
-                fontSizeButton("小", systemImage: "textformat.size.smaller", size: 15)
-                Divider().frame(height: 24).opacity(0.5)
-                fontSizeButton("大", systemImage: "textformat.size.larger", size: 19)
+                fontSizeButton(
+                    title: "小",
+                    systemImage: "textformat.size.smaller",
+                    size: ReaderControlValues.smallFontSize
+                )
+
+                Divider()
+                    .frame(height: 24)
+                    .opacity(0.5)
+
+                fontSizeButton(
+                    title: "大",
+                    systemImage: "textformat.size.larger",
+                    size: ReaderControlValues.largeFontSize
+                )
             }
             .padding(4)
             .glassEffect(.regular.interactive(), in: Capsule())
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("字号")
-        .accessibilityValue("\(Int(model.preferences.fontSize)) 磅")
+        .accessibilityValue(model.preferences.fontSize <= 17 ? "小" : "大")
     }
 
-    private func fontSizeButton(_ title: String, systemImage: String, size: Double) -> some View {
-        let selected = abs(model.preferences.fontSize - size) < 0.01
+    private func fontSizeButton(
+        title: String,
+        systemImage: String,
+        size: Double
+    ) -> some View {
+        let isSelected = abs(model.preferences.fontSize - size) < 0.01
+
         return Button {
             model.setFontSize(size)
         } label: {
             Label(title, systemImage: systemImage)
                 .labelStyle(.titleAndIcon)
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selected ? Color.accentColor : Color.primary)
-                .frame(minWidth: 62, minHeight: 40)
+                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .frame(minWidth: 62, minHeight: 44)
                 .background(
-                    selected ? Color.accentColor.opacity(0.16) : .clear,
+                    isSelected ? Color.accentColor.opacity(0.16) : .clear,
                     in: Capsule()
                 )
+                .contentShape(Capsule())
         }
         .buttonStyle(.plain)
+        .contentShape(Capsule())
         .accessibilityLabel("字号\(title)")
-        .accessibilityAddTraits(selected ? .isSelected : [])
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var compactModeControls: some View {
+        GlassEffectContainer(spacing: 0) {
+            HStack(spacing: 0) {
+                transitionMenu
+                appearanceMenu
+            }
+            .padding(4)
+            .glassEffect(.regular.interactive(), in: Capsule())
+        }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("翻页与外观")
     }
 
     private var transitionMenu: some View {
         Menu {
             Picker("翻页方式", selection: model.binding(\ReaderPreferences.pageTransition)) {
                 ForEach(ReaderPageTransition.allCases) { transition in
-                    Label(transition.label, systemImage: transition.systemImage).tag(transition)
+                    Label(transition.label, systemImage: transition.systemImage)
+                        .tag(transition)
                 }
             }
         } label: {
             Image(systemName: model.preferences.pageTransition.systemImage)
                 .font(.system(size: 17, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
                 .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .frame(width: 48, height: 44)
+        .contentShape(Rectangle())
         .accessibilityLabel("翻页方式")
         .accessibilityValue(model.preferences.pageTransition.label)
     }
@@ -108,11 +138,14 @@ struct MediumReaderSettingsView: View {
         } label: {
             Image(systemName: model.preferences.appearanceMode.systemImage)
                 .font(.system(size: 17, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
                 .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .frame(width: 48, height: 44)
+        .contentShape(Rectangle())
         .accessibilityLabel("外观模式")
         .accessibilityValue(model.preferences.appearanceMode.label)
     }
@@ -137,35 +170,69 @@ struct MediumReaderSettingsView: View {
         GlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
                 ForEach(ReaderThemePreset.allCases) { preset in
-                    let selected = model.preferences.themePreset == preset
-                    Button {
-                        model.selectPreset(preset)
-                    } label: {
-                        VStack(spacing: 7) {
-                            Image(systemName: preset.systemImage)
-                                .font(.system(size: 20, weight: .medium))
-                            Text(preset.label)
-                                .font(.subheadline.weight(.medium))
-                        }
-                        .foregroundStyle(selected ? Color.accentColor : Color.primary)
-                        .frame(maxWidth: .infinity, minHeight: 72)
-                        .background(
-                            selected ? Color.accentColor.opacity(0.16) : .clear,
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .glassEffect(
-                        .regular.interactive(),
-                        in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    )
-                    .accessibilityLabel("主题预设：\(preset.label)")
-                    .accessibilityAddTraits(selected ? .isSelected : [])
+                    presetCard(preset)
                 }
             }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("主题预设")
+    }
+
+    private func presetCard(_ preset: ReaderThemePreset) -> some View {
+        let isSelected = model.preferences.themePreset == preset
+
+        return Button {
+            model.selectPreset(preset)
+        } label: {
+            VStack(spacing: 7) {
+                Image(systemName: preset.systemImage)
+                    .font(.system(size: 20, weight: .medium))
+                    .symbolRenderingMode(.hierarchical)
+
+                Text(preset.label)
+                    .font(.subheadline.weight(.medium))
+            }
+            .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+            .padding(.vertical, 7)
+            // 三列卡片占据原三列两行预设网格的整体高度，不增加预设数量。
+            .frame(maxWidth: .infinity, minHeight: ReaderControlValues.presetGridHeight)
+            .background(
+                isSelected ? Color.accentColor.opacity(0.16) : .clear,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityLabel("主题预设：\(preset.label)")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private var customButton: some View {
+        Button(action: onCustomSettings) {
+            Label("自定义", systemImage: "slider.horizontal.3")
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity, minHeight: 48)
+                .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .frame(maxWidth: .infinity)
+        .glassEffect(
+            .regular.interactive(),
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        )
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .accessibilityHint("打开更多文字与布局选项")
+    }
+
+    private enum ReaderControlValues {
+        static let smallFontSize = 17.0 * 0.9
+        static let largeFontSize = 17.0 * 1.1
+        static let presetGridHeight: CGFloat = 182
     }
 }
 

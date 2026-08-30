@@ -150,13 +150,20 @@ private struct ReaderSessionView: View {
             .navigationTitle("主题与排版")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { showSettings = false }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button {
+                        showSettings = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("关闭主题与排版")
                 }
             }
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .presentationDetents([.medium])
+        .presentationDragIndicator(.hidden)
         .sheet(isPresented: $showCustomSettings) {
             CustomReaderSettingsSheet(
                 initialDraft: model.makeCustomizationDraft(),
