@@ -660,15 +660,6 @@ final class ReaderEngine {
         synchronizeFromRenderer()
     }
 
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    func refreshFontDiagnostics() async {
-        if let renderer = renderer as? ReadiumRenderer {
-            await renderer.refreshFontDiagnostics()
-        }
-        synchronizeFromRenderer()
-    }
-#endif
-
     func goForward() {
         renderer.goForward()
     }
@@ -712,10 +703,6 @@ final class ReaderViewModel {
     private(set) var isLoadingPreview = false
     private(set) var preferences: ReaderPreferences
     private(set) var stateRevision = 0
-
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    private(set) var fontDiagnostics: ReaderFontDiagnostics?
-#endif
 
     init(book: Book) {
         self.book = book
@@ -857,13 +844,6 @@ final class ReaderViewModel {
         synchronize()
     }
 
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    func refreshFontDiagnostics() async {
-        await engine.refreshFontDiagnostics()
-        synchronize()
-    }
-#endif
-
     private func synchronize() {
         let renderer = engine.renderer
         document = engine.document ?? renderer.document
@@ -877,10 +857,6 @@ final class ReaderViewModel {
         previewChapterTitle = renderer.previewChapterTitle
         isLoadingPreview = renderer.isLoadingPreview
         preferences = renderer.preferences
-
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-        fontDiagnostics = (renderer as? ReadiumRenderer)?.fontDiagnostics
-#endif
 
         stateRevision &+= 1
     }

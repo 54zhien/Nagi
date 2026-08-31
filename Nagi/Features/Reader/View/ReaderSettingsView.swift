@@ -19,10 +19,6 @@ struct MediumReaderSettingsView: View {
     @State private var showFontSizeIndicator = false
     @State private var fontSizeIndicatorToken = 0
 
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    @State private var showFontDiagnostics = false
-#endif
-
     init(
         model: ReaderViewModel,
         systemBrightness: Binding<Double>,
@@ -44,9 +40,6 @@ struct MediumReaderSettingsView: View {
                 presetCards
                 customButton
 
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-                fontDiagnosticsButton
-#endif
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
@@ -54,25 +47,7 @@ struct MediumReaderSettingsView: View {
         }
         .scrollIndicators(.hidden)
 
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-        .sheet(isPresented: $showFontDiagnostics) {
-            FontDiagnosticsView(model: model)
-        }
-#endif
     }
-
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    private var fontDiagnosticsButton: some View {
-        Button {
-            showFontDiagnostics = true
-        } label: {
-            Label("字体诊断", systemImage: "stethoscope")
-                .frame(maxWidth: .infinity, minHeight: 44)
-        }
-        .buttonStyle(.bordered)
-        .frame(maxWidth: .infinity)
-    }
-#endif
 
     private var topControls: some View {
         HStack(spacing: 10) {
@@ -856,181 +831,3 @@ struct CustomReaderSettingsSheet: View {
         dismiss()
     }
 }
-
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-private struct FontDiagnosticsView: View {
-    let model: ReaderViewModel
-
-    @Environment(\.dismiss) private var dismiss
-    @State private var isRefreshing = false
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    if let diagnostics = model.fontDiagnostics {
-                        diagnosticsContent(diagnostics)
-                    } else {
-                        ContentUnavailableView(
-                            "尚未读取正文状态",
-                            systemImage: "text.magnifyingglass",
-                            description: Text("点击刷新，读取当前可见 EPUB 正文的 WebView 状态。")
-                        )
-                    }
-
-                    Button {
-                        Task { await refresh() }
-                    } label: {
-                        Label(
-                            isRefreshing ? "正在读取…" : "刷新诊断",
-                            systemImage: "arrow.clockwise"
-                        )
-                        .frame(maxWidth: .infinity, minHeight: 44)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isRefreshing)
-                }
-                .padding(20)
-            }
-            .navigationTitle("字体诊断")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("完成") { dismiss() }
-                }
-            }
-        }
-        .task {
-            await refresh()
-        }
-    }
-
-    @ViewBuilder
-    private func diagnosticsContent(_ diagnostics: ReaderFontDiagnostics) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            diagnosticRow("App 当前选择", diagnostics.appSelection)
-            diagnosticRow("UIKit 字体探针", diagnostics.nativeFontFace)
-            diagnosticRow("Readium 当前设置", diagnostics.readiumPreference)
-            diagnosticRow("CSS 目标族", diagnostics.requestedCSSFamily)
-            diagnosticRow("Root CSS 变量", diagnostics.rootCSSFamily)
-            diagnosticRow("CSS Body", diagnostics.bodyFontFamily)
-            diagnosticRow(
-                "正文元素",
-                diagnostics.elementFontFamily,
-                detail: diagnostics.elementTag.isEmpty ? nil : diagnostics.elementTag
-            )
-            diagnosticRow("覆盖脚本", diagnostics.overridePresent ? "已存在" : "不存在")
-            diagnosticRow("文档状态", diagnostics.readyState)
-            diagnosticRow("字体面数量", diagnostics.fontFaceCount.map(String.init) ?? "未知")
-        }
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-        diagnosticBlock("UIKit Family / Face 扫描", diagnostics.nativeFamilyReport)
-
-        VStack(alignment: .leading, spacing: 0) {
-            Text("WebKit Font Check")
-                .font(.headline)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 12)
-
-            ForEach(diagnostics.fontChecks.keys.sorted(), id: \.self) { family in
-                HStack(spacing: 12) {
-                    Text(family)
-                        .font(.footnote.monospaced())
-                    Spacer(minLength: 12)
-                    checkValue(diagnostics.fontChecks[family] ?? nil)
-                }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-            }
-        }
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-
-        diagnosticBlock(
-            "EPUB Publisher CSS font-family",
-            diagnostics.publisherFontRuleReport
-        )
-
-        if let errorMessage = diagnostics.errorMessage {
-            Text(errorMessage)
-                .font(.footnote)
-                .foregroundStyle(.red)
-                .textSelection(.enabled)
-        }
-
-        VStack(alignment: .leading, spacing: 8) {
-            Text("说明")
-                .font(.headline)
-            Text("computedStyle 显示的是 CSS 请求值，不等于最终字形来源；Font Check 用于确认当前 WebView 是否接受该系统字体。此面板只读取当前可见资源，不修改正文样式。")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-            if !diagnostics.resourceURL.isEmpty {
-                Text(diagnostics.resourceURL)
-                    .font(.caption2.monospaced())
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-            }
-        }
-    }
-
-    private func diagnosticBlock(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-            Text(value.isEmpty ? "—" : value)
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .textSelection(.enabled)
-        }
-        .padding(16)
-        .background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
-
-    private func diagnosticRow(_ title: String, _ value: String, detail: String? = nil) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(title)
-                .foregroundStyle(.secondary)
-            Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 2) {
-                Text(value.isEmpty ? "—" : value)
-                    .font(.footnote.monospaced())
-                    .multilineTextAlignment(.trailing)
-                    .textSelection(.enabled)
-                if let detail {
-                    Text(detail)
-                        .font(.caption2.monospaced())
-                        .foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-    }
-
-    @ViewBuilder
-    private func checkValue(_ value: Bool?) -> some View {
-        switch value {
-        case .some(true):
-            Text("true")
-                .foregroundStyle(.green)
-                .font(.footnote.monospaced())
-        case .some(false):
-            Text("false")
-                .foregroundStyle(.red)
-                .font(.footnote.monospaced())
-        case .none:
-            Text("unknown")
-                .foregroundStyle(.secondary)
-                .font(.footnote.monospaced())
-        }
-    }
-
-    private func refresh() async {
-        guard !isRefreshing else { return }
-        isRefreshing = true
-        await model.refreshFontDiagnostics()
-        isRefreshing = false
-    }
-}
-#endif

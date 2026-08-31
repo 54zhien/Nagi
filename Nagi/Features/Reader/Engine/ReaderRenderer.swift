@@ -186,22 +186,12 @@ final class ReadiumRenderer: ReaderRenderer {
     var canGoNext: Bool { model.navigator != nil }
     var canGoPrevious: Bool { model.navigator != nil }
 
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    var fontDiagnostics: ReaderFontDiagnostics? { model.fontDiagnostics }
-#endif
-
     func load() async {
         model.onStateChange = { [weak self] in self?.onStateChange?() }
         await model.loadIfNeeded()
         rebuildDocument()
         onStateChange?()
     }
-
-#if DEBUG || NAGI_FONT_DIAGNOSTICS
-    func refreshFontDiagnostics() async {
-        await model.refreshFontDiagnostics()
-    }
-#endif
 
     func makeContentView(
         onToggleControls: @escaping () -> Void,
