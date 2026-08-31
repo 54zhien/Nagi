@@ -59,11 +59,13 @@ extension EPUBNavigatorViewController {
     func applyNagiReaderOverrides(_ script: String) async {
         let webViews = makeNagiReaderWebViews(in: view)
         guard !webViews.isEmpty else {
+            guard !Task.isCancelled else { return }
             _ = await evaluateJavaScript(script)
             return
         }
 
         for webView in webViews {
+            guard !Task.isCancelled else { return }
             await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
                 webView.evaluateJavaScript(script) { _, _ in
                     continuation.resume()
@@ -71,6 +73,7 @@ extension EPUBNavigatorViewController {
             }
         }
 
+        guard !Task.isCancelled else { return }
         // Keep Readium's spread-loaded path for the current resource. Direct
         // WKWebView evaluation is useful for preloads, but can otherwise run
         // before the current spread has finished loading its document.

@@ -237,11 +237,19 @@ final class ReaderChromeView: UIView {
             return
         }
 
+        if visible {
+            exitContainer.isHidden = false
+            bottomControlGroup.isHidden = false
+        }
         animator.setVisible(
             visible,
             animated: animated,
             reduceMotion: reduceMotion
-        )
+        ) { [weak self] in
+            guard let self, !visible, !self.isControlsVisible else { return }
+            self.exitContainer.isHidden = true
+            self.bottomControlGroup.isHidden = true
+        }
         updateAccessibilityActions()
 
         if visible {

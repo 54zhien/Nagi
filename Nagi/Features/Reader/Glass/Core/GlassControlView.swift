@@ -106,6 +106,12 @@ final class GlassControlView: UIControl {
             traits.insert(.selected)
         }
         accessibilityTraits = traits
+        let contentAlpha: CGFloat = isEnabled ? 1 : 0.45
+        iconView.alpha = contentAlpha
+        titleLabel.alpha = contentAlpha
+        if !isEnabled {
+            highlightLayer.opacity = 0
+        }
         currentReduceMotion = reduceMotion
         touchDriver.update(reduceMotion: reduceMotion)
 
@@ -120,7 +126,6 @@ final class GlassControlView: UIControl {
             surfaceView.update(state)
             currentState = state
         }
-        alpha = isEnabled ? 1 : 0.45
     }
 
     private var resolvedCornerRadius: CGFloat {

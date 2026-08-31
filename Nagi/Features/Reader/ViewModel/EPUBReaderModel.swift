@@ -328,6 +328,7 @@ final class EPUBReaderModel {
     private var viewportSafeAreaInsets: UIEdgeInsets?
     private var viewportDisplayScale: CGFloat = 0
     private var latestPreferenceGeneration: UInt64 = 0
+    private var latestOverrideRequestGeneration: UInt64 = 0
 
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
@@ -888,20 +889,28 @@ final class EPUBReaderModel {
         guard let navigator, isReflowable else { return }
 
         applyVisibleReaderBaseAppearance()
-        let script = makeReaderOverrideScript()
+        latestOverrideRequestGeneration &+= 1
+        let requestGeneration = latestOverrideRequestGeneration
+        let script = makeReaderOverrideScript(requestGeneration: requestGeneration)
         readerOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
             guard let self, let navigator else { return }
+            guard self.latestOverrideRequestGeneration == requestGeneration else { return }
             if let generation {
                 guard self.latestPreferenceGeneration == generation else { return }
             }
             await navigator.applyNagiReaderOverrides(script)
             if let generation {
-                guard !Task.isCancelled, self.latestPreferenceGeneration == generation else { return }
+                guard !Task.isCancelled,
+                      self.latestOverrideRequestGeneration == requestGeneration,
+                      self.latestPreferenceGeneration == generation else { return }
+            } else {
+                guard !Task.isCancelled,
+                      self.latestOverrideRequestGeneration == requestGeneration else { return }
             }
         }
     }
 
-    private func makeReaderOverrideScript() -> String {
+    private func makeReaderOverrideScript(requestGeneration: UInt64) -> String {
         let publisherFontFamily = Self.javascriptStringLiteral(fontFamily.readiumFamilyName)
         let lineHeightValue = Self.javascriptStringLiteral(
             Self.cssDecimal(ReaderLayoutMetrics.clampLineHeight(lineHeight))
@@ -913,9 +922,11 @@ final class EPUBReaderModel {
             Self.cssEmSpacing(for: wordSpacing, range: ReaderLayoutMetrics.wordSpacingRange)
         )
         let typographyEnabled = publisherStyles ? "false" : "true"
+        let overrideGeneration = String(requestGeneration)
         return """
         (() => {
             const styleID = "nagi-reader-reader-overrides";
+            const requestGeneration = \(overrideGeneration);
             const publisherFontFamily = \(publisherFontFamily);
             const lineHeight = \(lineHeightValue);
             const letterSpacing = \(letterSpacingValue);
@@ -925,6 +936,19 @@ final class EPUBReaderModel {
 
             if (!root) {
                 return;
+            }
+
+            const appliedGeneration = Number(
+                root.getAttribute("data-nagi-reader-override-generation") || "0"
+            );
+            if (requestGeneration > 0 && appliedGeneration > requestGeneration) {
+                return;
+            }
+            if (requestGeneration > 0) {
+                root.setAttribute(
+                    "data-nagi-reader-override-generation",
+                    String(requestGeneration)
+                );
             }
 
             const previous = document.getElementById(styleID);
@@ -1401,9 +1425,14 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         setupUserScripts userContentController: WKUserContentController
     ) {
         guard publication?.metadata.layout != .fixed else { return }
+        if latestOverrideRequestGeneration == 0 {
+            latestOverrideRequestGeneration = 1
+        }
         userContentController.addUserScript(
             WKUserScript(
-                source: makeReaderOverrideScript(),
+                source: makeReaderOverrideScript(
+                    requestGeneration: latestOverrideRequestGeneration
+                ),
                 injectionTime: .atDocumentEnd,
                 forMainFrameOnly: true
             )

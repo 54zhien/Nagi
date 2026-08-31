@@ -26,8 +26,8 @@ final class GlassSurfaceView: UIView {
         super.init(frame: .zero)
 
         isOpaque = false
-        clipsToBounds = true
         effectView.isUserInteractionEnabled = false
+        effectView.clipsToBounds = true
         effectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         addSubview(effectView)
     }
@@ -46,11 +46,11 @@ final class GlassSurfaceView: UIView {
             effectView: effectView
         )
         currentState = newState
-        layer.cornerRadius = newState.cornerRadius
+        effectView.layer.cornerRadius = newState.cornerRadius
     }
 
     func setCornerRadius(_ radius: CGFloat) {
-        layer.cornerRadius = radius
+        effectView.layer.cornerRadius = radius
     }
 
     override func layoutSubviews() {

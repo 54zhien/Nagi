@@ -82,6 +82,10 @@ final class ReaderSettingsViewController: UIViewController {
         contentView.isOpaque = false
         scrollView.addSubview(contentView)
 
+        indicatorView.alpha = 0
+        indicatorView.isUserInteractionEnabled = false
+        indicatorView.accessibilityElementsHidden = true
+
         contentView.addSubview(topControlGroup)
         contentView.addSubview(indicatorView)
         contentView.addSubview(minimumBrightnessImageView)

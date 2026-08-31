@@ -21,19 +21,20 @@ final class ReaderChromeAnimator {
     func setVisible(
         _ visible: Bool,
         animated: Bool,
-        reduceMotion: Bool
+        reduceMotion: Bool,
+        completion: (() -> Void)? = nil
     ) {
         activeAnimator?.stopAnimation(true)
         activeAnimator = nil
         isVisible = visible
 
-        let targetAlpha: CGFloat = visible ? 1 : 0
         let targetTransform = visible
             ? CGAffineTransform.identity
             : CGAffineTransform(scaleX: 0.94, y: 0.94)
 
         guard animated, !reduceMotion else {
-            apply(alpha: targetAlpha, transform: targetTransform)
+            apply(transform: targetTransform)
+            completion?()
             return
         }
 
@@ -43,20 +44,20 @@ final class ReaderChromeAnimator {
         )
         animator.addAnimations { [targets] in
             for target in targets {
-                target.alpha = targetAlpha
                 target.transform = targetTransform
             }
         }
-        animator.addCompletion { [weak self] _ in
+        animator.addCompletion { [weak self] position in
+            guard position == .end else { return }
             self?.activeAnimator = nil
+            completion?()
         }
         activeAnimator = animator
         animator.startAnimation()
     }
 
-    private func apply(alpha: CGFloat, transform: CGAffineTransform) {
+    private func apply(transform: CGAffineTransform) {
         for target in targets {
-            target.alpha = alpha
             target.transform = transform
         }
     }
