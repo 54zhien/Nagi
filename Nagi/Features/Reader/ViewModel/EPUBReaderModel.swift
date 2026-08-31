@@ -1349,7 +1349,7 @@ final class EPUBReaderModel {
             }
         )
 
-        ReaderFontDiagnostics(
+        return ReaderFontDiagnostics(
             appSelection: fontFamily.label,
             nativeFontFace: resolvedNativeFontFace(),
             nativeFamilyReport: nativeFamilyReport(),
