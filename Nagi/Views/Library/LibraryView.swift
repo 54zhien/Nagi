@@ -629,7 +629,7 @@ private struct BookCardProgressTrack: View {
     }
 
     private var hasVisibleProgress: Bool {
-        Int((clampedProgress * 100).rounded()) > 0
+        clampedProgress > 0
     }
 
     var body: some View {
