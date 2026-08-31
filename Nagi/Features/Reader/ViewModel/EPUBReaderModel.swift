@@ -10,6 +10,7 @@ import Observation
 import ReadiumNavigator
 import ReadiumShared
 import UIKit
+import WebKit
 
 enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
     case light, quiet, sepia, dark
@@ -210,7 +211,7 @@ private extension ReaderFontFamily {
     var readiumFontFamily: FontFamily {
         switch self {
         case .original:
-            return .sansSerif
+            return FontFamily(rawValue: readiumFamilyName ?? "-apple-system")
         case .pingFang, .song, .kai, .yuan:
             return FontFamily(rawValue: readiumFamilyName ?? "sans-serif")
         }
@@ -221,6 +222,26 @@ private extension ReaderFontFamily {
     /// switch below.
     var readiumFontWeight: Double {
         self == .pingFang ? 0.75 : 1.0
+    }
+
+    /// CSS fallback stack used by the small app-owned override below. Readium
+    /// normally applies `fontFamily` through its CSS variables, but the
+    /// override also gives WebKit the exact system face names for Chinese
+    /// system fonts and covers resources that keep an author font on an
+    /// inline element.
+    var webCSSFontStack: String {
+        switch self {
+        case .original:
+            return "-apple-system, system-ui, sans-serif"
+        case .pingFang:
+            return "-apple-system, \"PingFang SC\", system-ui, sans-serif"
+        case .song:
+            return "\"Songti SC\", \"STSongti-SC-Regular\", \"STSong\", serif"
+        case .kai:
+            return "\"Kaiti SC\", \"STKaiti-SC-Regular\", \"STKaiti\", serif"
+        case .yuan:
+            return "\"Yuanti SC\", \"STYuanti-SC-Regular\", \"STYuanti\", sans-serif"
+        }
     }
 }
 
@@ -310,6 +331,7 @@ final class EPUBReaderModel {
     /// 当前 Readium 打开的文件。TXT 会指向派生 EPUB，预览不能再读取原始 TXT。
     private var activePublicationURL: URL?
     private var preferenceUpdateTask: Task<Void, Never>?
+    private var fontOverrideRefreshTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
     private var hasLoaded = false
@@ -458,6 +480,7 @@ final class EPUBReaderModel {
                 return false
             }))
             self.navigator = navigator
+            refreshVisibleFontOverride()
             hasLoaded = true
 
             if currentReadingHref == nil, initialLocation == nil {
@@ -657,6 +680,8 @@ final class EPUBReaderModel {
     func tearDown() {
         preferenceUpdateTask?.cancel()
         preferenceUpdateTask = nil
+        fontOverrideRefreshTask?.cancel()
+        fontOverrideRefreshTask = nil
         previewTask?.cancel()
         previewTask = nil
         navigator?.delegate = nil
@@ -743,6 +768,7 @@ final class EPUBReaderModel {
             try? await Task.sleep(nanoseconds: 140_000_000)
             guard !Task.isCancelled, let self, let navigator = self.navigator else { return }
             navigator.submitPreferences(self.makePreferences())
+            self.refreshVisibleFontOverride()
         }
     }
 
@@ -755,6 +781,7 @@ final class EPUBReaderModel {
         preferenceUpdateTask?.cancel()
         guard let navigator else { return }
         navigator.submitPreferences(makePreferences())
+        refreshVisibleFontOverride()
     }
 
     private func makePreferences() -> EPUBPreferences {
@@ -790,6 +817,68 @@ final class EPUBReaderModel {
             for: wordSpacing
         )
         return preferences
+    }
+
+    /// Readium's CSS preference is the primary path. This second, narrowly
+    /// scoped pass is needed for EPUB resources which keep their own font on
+    /// an inline element or for a resource that was already loaded before the
+    /// preference update. It only changes font-family in reflowable content.
+    private func refreshVisibleFontOverride() {
+        fontOverrideRefreshTask?.cancel()
+        guard
+            let navigator,
+            publication?.metadata.epubLayout == .reflowable
+        else {
+            return
+        }
+
+        let script = makeFontOverrideScript()
+        fontOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
+            guard let self, let navigator else { return }
+
+            await Task.yield()
+            guard !Task.isCancelled else { return }
+            _ = await navigator.evaluateJavaScript(script)
+
+            // A preference update can replace the current spread just after
+            // the first evaluation. Retry once after that replacement settles.
+            do {
+                try await Task.sleep(nanoseconds: 180_000_000)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            _ = await navigator.evaluateJavaScript(script)
+            self.fontOverrideRefreshTask = nil
+        }
+    }
+
+    private func makeFontOverrideScript() -> String {
+        let fontStack = Self.javascriptStringLiteral(fontFamily.webCSSFontStack)
+        return """
+        (() => {
+            const styleID = "nagi-reader-font-override";
+            const previous = document.getElementById(styleID);
+            if (previous) previous.remove();
+
+            const fontStack = \(fontStack);
+            const style = document.createElement("style");
+            style.id = styleID;
+            style.textContent = "html, html * { font-family: " + fontStack + " !important; }";
+            (document.head || document.documentElement).appendChild(style);
+        })();
+        """
+    }
+
+    private static func javascriptStringLiteral(_ value: String) -> String {
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: [value]),
+            let encoded = String(data: data, encoding: .utf8),
+            encoded.count >= 2
+        else {
+            return "\"\""
+        }
+        return String(encoded.dropFirst().dropLast())
     }
 
     private func loadPreviewIfNeeded() {
@@ -985,6 +1074,20 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
 
     func navigator(_ navigator: Navigator, didJumpTo locator: Locator) {
         updateLocation(locator)
+    }
+
+    func navigator(
+        _ navigator: EPUBNavigatorViewController,
+        setupUserScripts userContentController: WKUserContentController
+    ) {
+        guard publication?.metadata.epubLayout == .reflowable else { return }
+        userContentController.addUserScript(
+            WKUserScript(
+                source: makeFontOverrideScript(),
+                injectionTime: .atDocumentEnd,
+                forMainFrameOnly: true
+            )
+        )
     }
 
     func navigator(_ navigator: Navigator, presentError error: NavigatorError) {
