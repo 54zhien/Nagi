@@ -718,12 +718,15 @@ struct ReaderSettingsSheet: View {
 
                     LabeledContent("行间距", value: lineHeight.formatted(.number.precision(.fractionLength(2))))
                     Slider(value: $lineHeight, in: ReaderLayoutMetrics.lineHeightRange, step: 0.05)
+                        .disabled(publisherStyles?.wrappedValue ?? false)
 
                     LabeledContent("字符间距", value: "\(Int(characterSpacing))%")
                     Slider(value: $characterSpacing, in: ReaderLayoutMetrics.characterSpacingRange, step: 1)
+                        .disabled(publisherStyles?.wrappedValue ?? false)
 
                     LabeledContent("词间距", value: "\(Int(wordSpacing))%")
                     Slider(value: $wordSpacing, in: ReaderLayoutMetrics.wordSpacingRange, step: 2)
+                        .disabled(publisherStyles?.wrappedValue ?? false)
                 }
 
                 Section {

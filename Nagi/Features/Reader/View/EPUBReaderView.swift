@@ -858,6 +858,7 @@ private struct CustomReaderSettingsSheet: View {
                     step: 0.05,
                     valueText: String(format: "%.2f", draft.lineHeight)
                 )
+                .disabled(draft.publisherStyles)
 
                 Divider()
 
@@ -880,6 +881,7 @@ private struct CustomReaderSettingsSheet: View {
                     step: 1,
                     valueText: "\(Int(draft.characterSpacing))%"
                 )
+                .disabled(draft.publisherStyles)
 
                 Divider()
 
@@ -891,6 +893,7 @@ private struct CustomReaderSettingsSheet: View {
                     step: 2,
                     valueText: "\(Int(draft.wordSpacing))%"
                 )
+                .disabled(draft.publisherStyles)
 
                 Divider()
 
