@@ -827,7 +827,7 @@ final class EPUBReaderModel {
         fontOverrideRefreshTask?.cancel()
         guard
             let navigator,
-            publication?.metadata.epubLayout == .reflowable
+            publication?.metadata.layout != .fixed
         else {
             return
         }
@@ -1080,7 +1080,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         _ navigator: EPUBNavigatorViewController,
         setupUserScripts userContentController: WKUserContentController
     ) {
-        guard publication?.metadata.epubLayout == .reflowable else { return }
+        guard publication?.metadata.layout != .fixed else { return }
         userContentController.addUserScript(
             WKUserScript(
                 source: makeFontOverrideScript(),
