@@ -70,6 +70,16 @@
 		4A0000000000000000000081 /* NagiSong-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000081 /* NagiSong-Regular.ttf */; };
 		4A0000000000000000000082 /* NagiKai-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000082 /* NagiKai-Regular.ttf */; };
 		4A0000000000000000000083 /* NagiRounded-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000083 /* NagiRounded-Regular.ttf */; };
+		4A0000000000000000000084 /* ReaderControllerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000084 /* ReaderControllerRepresentable.swift */; };
+		4A0000000000000000000085 /* ReaderChromeAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000085 /* ReaderChromeAnimator.swift */; };
+		4A0000000000000000000086 /* ReaderChromeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000086 /* ReaderChromeView.swift */; };
+		4A0000000000000000000087 /* GlassState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000087 /* GlassState.swift */; };
+		4A0000000000000000000088 /* GlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000088 /* GlassRenderer.swift */; };
+		4A0000000000000000000089 /* NativeGlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000089 /* NativeGlassRenderer.swift */; };
+		4A000000000000000000008A /* GlassSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008A /* GlassSurfaceView.swift */; };
+		4A000000000000000000008B /* GlassTouchDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008B /* GlassTouchDriver.swift */; };
+		4A000000000000000000008C /* GlassControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008C /* GlassControlView.swift */; };
+		4A000000000000000000008D /* ReaderViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008D /* ReaderViewController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -133,6 +143,16 @@
 		3A0000000000000000000081 /* NagiSong-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiSong-Regular.ttf; sourceTree = "<group>"; };
 		3A0000000000000000000082 /* NagiKai-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiKai-Regular.ttf; sourceTree = "<group>"; };
 		3A0000000000000000000083 /* NagiRounded-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiRounded-Regular.ttf; sourceTree = "<group>"; };
+		3A0000000000000000000084 /* ReaderControllerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderControllerRepresentable.swift; sourceTree = "<group>"; };
+		3A0000000000000000000085 /* ReaderChromeAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChromeAnimator.swift; sourceTree = "<group>"; };
+		3A0000000000000000000086 /* ReaderChromeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChromeView.swift; sourceTree = "<group>"; };
+		3A0000000000000000000087 /* GlassState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassState.swift; sourceTree = "<group>"; };
+		3A0000000000000000000088 /* GlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassRenderer.swift; sourceTree = "<group>"; };
+		3A0000000000000000000089 /* NativeGlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGlassRenderer.swift; sourceTree = "<group>"; };
+		3A000000000000000000008A /* GlassSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurfaceView.swift; sourceTree = "<group>"; };
+		3A000000000000000000008B /* GlassTouchDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassTouchDriver.swift; sourceTree = "<group>"; };
+		3A000000000000000000008C /* GlassControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlView.swift; sourceTree = "<group>"; };
+		3A000000000000000000008D /* ReaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderViewController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -303,6 +323,9 @@
 				2A0000000000000000000011 /* Engine */,
 				2A0000000000000000000012 /* ViewModel */,
 				2A0000000000000000000013 /* View */,
+				2A0000000000000000000016 /* Controller */,
+				2A0000000000000000000017 /* Chrome */,
+				2A0000000000000000000018 /* Glass */,
 			);
 			path = Reader;
 			sourceTree = "<group>";
@@ -338,6 +361,61 @@
 				3A0000000000000000000072 /* ReadiumNavigatorView.swift */,
 			);
 			path = View;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000016 /* Controller */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000084 /* ReaderControllerRepresentable.swift */,
+				3A000000000000000000008D /* ReaderViewController.swift */,
+			);
+			path = Controller;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000017 /* Chrome */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000085 /* ReaderChromeAnimator.swift */,
+				3A0000000000000000000086 /* ReaderChromeView.swift */,
+			);
+			path = Chrome;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000018 /* Glass */ = {
+			isa = PBXGroup;
+			children = (
+				2A0000000000000000000019 /* Core */,
+				2A000000000000000000001A /* Renderer */,
+				2A000000000000000000001B /* Animation */,
+			);
+			path = Glass;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000019 /* Core */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000087 /* GlassState.swift */,
+				3A000000000000000000008A /* GlassSurfaceView.swift */,
+				3A000000000000000000008C /* GlassControlView.swift */,
+			);
+			path = Core;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000001A /* Renderer */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000088 /* GlassRenderer.swift */,
+				3A0000000000000000000089 /* NativeGlassRenderer.swift */,
+			);
+			path = Renderer;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000001B /* Animation */ = {
+			isa = PBXGroup;
+			children = (
+				3A000000000000000000008B /* GlassTouchDriver.swift */,
+			);
+			path = Animation;
 			sourceTree = "<group>";
 		};
 
@@ -557,6 +635,16 @@
 				4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */,
 				4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */,
 				4A0000000000000000000080 /* EPUBFontResources.swift in Sources */,
+				4A0000000000000000000084 /* ReaderControllerRepresentable.swift in Sources */,
+				4A0000000000000000000085 /* ReaderChromeAnimator.swift in Sources */,
+				4A0000000000000000000086 /* ReaderChromeView.swift in Sources */,
+				4A0000000000000000000087 /* GlassState.swift in Sources */,
+				4A0000000000000000000088 /* GlassRenderer.swift in Sources */,
+				4A0000000000000000000089 /* NativeGlassRenderer.swift in Sources */,
+				4A000000000000000000008A /* GlassSurfaceView.swift in Sources */,
+				4A000000000000000000008B /* GlassTouchDriver.swift in Sources */,
+				4A000000000000000000008C /* GlassControlView.swift in Sources */,
+				4A000000000000000000008D /* ReaderViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

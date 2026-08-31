@@ -520,7 +520,8 @@ protocol ReaderRenderer: AnyObject {
     ) -> AnyView
     func waitForVisualUpdate() async
     func restoreFromForeground(isDark: Bool) async
-    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat)
+    @discardableResult
+    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool
     func apply(preferences: ReaderPreferences)
     func updateSystemAppearance(isDark: Bool)
     func selectPreset(_ preset: ReaderThemePreset)
@@ -620,9 +621,17 @@ final class ReaderEngine {
         synchronizeFromRenderer()
     }
 
-    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
-        renderer.updateViewport(size: size, safeAreaInsets: safeAreaInsets, displayScale: displayScale)
+    @discardableResult
+    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool {
+        guard renderer.updateViewport(
+            size: size,
+            safeAreaInsets: safeAreaInsets,
+            displayScale: displayScale
+        ) else {
+            return false
+        }
         synchronizeFromRenderer()
+        return true
     }
 
     func apply(preferences: ReaderPreferences) {
@@ -722,7 +731,6 @@ final class ReaderViewModel {
         onToggleControls: @escaping () -> Void,
         onSwipeStart: @escaping () -> Void
     ) -> AnyView {
-        _ = stateRevision
         return engine.makeContentView(
             onToggleControls: onToggleControls,
             onSwipeStart: onSwipeStart
@@ -738,9 +746,17 @@ final class ReaderViewModel {
         synchronize()
     }
 
-    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
-        engine.updateViewport(size: size, safeAreaInsets: safeAreaInsets, displayScale: displayScale)
+    @discardableResult
+    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool {
+        guard engine.updateViewport(
+            size: size,
+            safeAreaInsets: safeAreaInsets,
+            displayScale: displayScale
+        ) else {
+            return false
+        }
         synchronize()
+        return true
     }
 
     func setPreference(_ update: (inout ReaderPreferences) -> Void) {

@@ -339,7 +339,8 @@ final class TXTReaderModel {
 
     // MARK: - 分页与排版
 
-    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets) {
+    @discardableResult
+    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets) -> Bool {
         // SwiftUI can report a transient zero-sized geometry while the
         // reader surface is being inserted.  Starting a layout for that
         // value only creates an empty result and makes the real layout race
@@ -349,20 +350,23 @@ final class TXTReaderModel {
                 cancelLayoutTasks()
                 layoutRequestID &+= 1
                 layoutPhase = .waitingForViewport
+                return true
             }
-            return
+            return false
         }
         let sizeChanged = pageSize != size
         let insetsChanged = self.safeAreaInsets != safeAreaInsets
         guard sizeChanged || insetsChanged else {
             if layoutPhase == .waitingForViewport {
                 tryStartLayoutIfReady()
+                return true
             }
-            return
+            return false
         }
         pageSize = size
         self.safeAreaInsets = safeAreaInsets
         tryStartLayoutIfReady()
+        return true
     }
 
     var readerInsets: UIEdgeInsets {

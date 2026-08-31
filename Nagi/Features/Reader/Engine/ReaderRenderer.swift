@@ -94,10 +94,11 @@ final class TextKitRenderer: ReaderRenderer {
         await Task.yield()
     }
 
-    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
-        model.updateViewport(size: size, safeAreaInsets: safeAreaInsets)
+    @discardableResult
+    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool {
+        let changed = model.updateViewport(size: size, safeAreaInsets: safeAreaInsets)
         _ = displayScale
-        onStateChange?()
+        return changed
     }
 
     func apply(preferences: ReaderPreferences) {
@@ -251,10 +252,13 @@ final class ReadiumRenderer: ReaderRenderer {
         onStateChange?()
     }
 
-    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
-        _ = size
-        _ = safeAreaInsets
-        _ = displayScale
+    @discardableResult
+    func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool {
+        return model.updateViewport(
+            size: size,
+            safeAreaInsets: safeAreaInsets,
+            displayScale: displayScale
+        )
     }
 
     func apply(preferences: ReaderPreferences) {

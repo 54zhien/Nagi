@@ -320,6 +320,9 @@ final class EPUBReaderModel {
     private var suppressPreferenceUpdates = false
 
     private var systemIsDark = false
+    private var viewportSize = CGSize.zero
+    private var viewportSafeAreaInsets: UIEdgeInsets?
+    private var viewportDisplayScale: CGFloat = 0
 
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
@@ -1307,11 +1310,36 @@ final class EPUBReaderModel {
 }
 
 extension EPUBReaderModel {
+    /// Receives the host controller's geometry without rebuilding the SwiftUI
+    /// reader surface. Readium still owns the actual content layout; this
+    /// cached viewport only supplies stable safe-area information and causes
+    /// the navigator to relayout when the host geometry really changes.
+    @discardableResult
+    func updateViewport(
+        size: CGSize,
+        safeAreaInsets: UIEdgeInsets,
+        displayScale: CGFloat
+    ) -> Bool {
+        guard viewportSize != size
+            || viewportSafeAreaInsets != safeAreaInsets
+            || viewportDisplayScale != displayScale else {
+            return false
+        }
+
+        viewportSize = size
+        viewportSafeAreaInsets = safeAreaInsets
+        viewportDisplayScale = displayScale
+        navigator?.view.setNeedsLayout()
+        return true
+    }
+
     /// Let Readium reserve only system-protected areas and the visible page
     /// header's own occupied height. Reading clearance is derived from the
     /// current window and chrome instead of an app-wide fixed margin.
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
-        var safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
+        var safeAreaInsets = viewportSafeAreaInsets
+            ?? navigator.view.window?.safeAreaInsets
+            ?? navigator.view.safeAreaInsets
         if showBookTitleInPageHeader {
             safeAreaInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
         }

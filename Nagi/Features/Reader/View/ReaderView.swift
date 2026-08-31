@@ -100,8 +100,6 @@ private struct ReaderSessionView: View {
 
     let model: ReaderViewModel
     @Binding var systemBrightness: Double
-    @State private var showControls = true
-    @State private var interactionRevision = 0
     @State private var showSettings = false
     @State private var showTableOfContents = false
     @State private var showCustomSettings = false
@@ -109,22 +107,41 @@ private struct ReaderSessionView: View {
     @State private var foregroundRestoreRevision = 0
 
     var body: some View {
-        ReaderChrome(
-            title: model.title,
-            titleColor: Color(uiColor: model.headerColor),
-            readerBackground: Color(uiColor: model.backgroundColor),
-            titleFontFamily: model.preferences.fontFamily,
-            showsTitle: model.preferences.showBookTitleInPageHeader,
-            showControls: $showControls,
-            interactionRevision: $interactionRevision,
-            onDismiss: dismissReader,
-            onTableOfContents: { showTableOfContents = true },
-            onSettings: { showSettings = true },
-            onSwipeStart: hideControlsForSwipe,
-            transitionCoordinator: transitionCoordinator
-        ) {
-            content
+        GeometryReader { geometry in
+            ReaderControllerRepresentable(
+                model: model,
+                stateRevision: model.stateRevision,
+                title: model.title,
+                titleColor: model.headerColor,
+                readerBackground: model.backgroundColor,
+                titleFontFamily: model.preferences.fontFamily,
+                showsTitle: model.preferences.showBookTitleInPageHeader,
+                reduceMotion: reduceMotion,
+                cornerInsets: ReaderChromeCornerInsets(
+                    bottomLeading: geometry.containerCornerInsets.bottomLeading,
+                    bottomTrailing: geometry.containerCornerInsets.bottomTrailing
+                ),
+                safeAreaInsets: UIEdgeInsets(
+                    top: geometry.safeAreaInsets.top,
+                    left: geometry.safeAreaInsets.leading,
+                    bottom: geometry.safeAreaInsets.bottom,
+                    right: geometry.safeAreaInsets.trailing
+                ),
+                onDismiss: dismissReader,
+                onTableOfContents: { showTableOfContents = true },
+                onSettings: { showSettings = true },
+                transitionCoordinator: transitionCoordinator
+            )
+            .frame(width: geometry.size.width, height: geometry.size.height)
         }
+        .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
+        .background(
+            Color(uiColor: model.backgroundColor),
+            ignoresSafeAreaEdges: .all
+        )
+        .statusBarHidden(true)
+        .toolbar(.hidden, for: .navigationBar)
+        .toolbar(.hidden, for: .tabBar)
         .onChange(of: colorScheme) { _, newValue in
             guard model.preferences.appearanceMode == .system else { return }
             transitionCoordinator.begin(reduceMotion: reduceMotion)
@@ -162,28 +179,6 @@ private struct ReaderSessionView: View {
                 guard let chapter = model.chapters.first(where: { $0.id == item.id }) else { return }
                 model.selectChapter(at: chapter.index)
             }
-        }
-    }
-
-    @ViewBuilder
-    private var content: some View {
-        model.makeContentView(
-            onToggleControls: toggleControls,
-            onSwipeStart: hideControlsForSwipe
-        )
-        .contentShape(Rectangle())
-        .simultaneousGesture(
-            TapGesture().onEnded {
-                guard model.handlesContentTap else { return }
-                noteInteraction()
-                toggleControls()
-            }
-        )
-        .accessibilityAction(
-            named: Text(showControls ? "隐藏阅读控件" : "显示阅读控件")
-        ) {
-            noteInteraction()
-            toggleControls()
         }
     }
 
@@ -234,23 +229,6 @@ private struct ReaderSessionView: View {
                 onCommit: { model.apply($0) }
             )
         }
-    }
-
-    private func toggleControls() {
-        withAnimation(.easeInOut(duration: 0.18)) {
-            showControls.toggle()
-        }
-    }
-
-    private func hideControlsForSwipe() {
-        guard showControls else { return }
-        withAnimation(.easeOut(duration: 0.16)) {
-            showControls = false
-        }
-    }
-
-    private func noteInteraction() {
-        interactionRevision &+= 1
     }
 
     private func dismissReader() {
