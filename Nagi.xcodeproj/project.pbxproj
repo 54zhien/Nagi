@@ -82,6 +82,12 @@
 		4A000000000000000000008D /* ReaderViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008D /* ReaderViewController.swift */; };
 		4A000000000000000000008E /* GlassContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008E /* GlassContainerView.swift */; };
 		4A000000000000000000008F /* GlassControlGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008F /* GlassControlGroup.swift */; };
+		4A0000000000000000000090 /* ReaderSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000090 /* ReaderSettingsViewController.swift */; };
+		4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000091 /* ReaderMutationScheduler.swift */; };
+		4A0000000000000000000092 /* BackdropGlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000092 /* BackdropGlassRenderer.swift */; };
+		4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000093 /* GlassBackendConfiguration.swift */; };
+		4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */; };
+		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -157,6 +163,12 @@
 		3A000000000000000000008D /* ReaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderViewController.swift; sourceTree = "<group>"; };
 		3A000000000000000000008E /* GlassContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassContainerView.swift; sourceTree = "<group>"; };
 		3A000000000000000000008F /* GlassControlGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlGroup.swift; sourceTree = "<group>"; };
+		3A0000000000000000000090 /* ReaderSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsViewController.swift; sourceTree = "<group>"; };
+		3A0000000000000000000091 /* ReaderMutationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderMutationScheduler.swift; sourceTree = "<group>"; };
+		3A0000000000000000000092 /* BackdropGlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackdropGlassRenderer.swift; sourceTree = "<group>"; };
+		3A0000000000000000000093 /* GlassBackendConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBackendConfiguration.swift; sourceTree = "<group>"; };
+		3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceSignposts.swift; sourceTree = "<group>"; };
+		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -330,6 +342,9 @@
 				2A0000000000000000000016 /* Controller */,
 				2A0000000000000000000017 /* Chrome */,
 				2A0000000000000000000018 /* Glass */,
+				2A000000000000000000001C /* Settings */,
+				2A000000000000000000001D /* Mutation */,
+				2A000000000000000000001F /* Performance */,
 			);
 			path = Reader;
 			sourceTree = "<group>";
@@ -391,6 +406,7 @@
 				2A0000000000000000000019 /* Core */,
 				2A000000000000000000001A /* Renderer */,
 				2A000000000000000000001B /* Animation */,
+				2A000000000000000000001E /* Configuration */,
 			);
 			path = Glass;
 			sourceTree = "<group>";
@@ -412,6 +428,7 @@
 			children = (
 				3A0000000000000000000088 /* GlassRenderer.swift */,
 				3A0000000000000000000089 /* NativeGlassRenderer.swift */,
+				3A0000000000000000000092 /* BackdropGlassRenderer.swift */,
 			);
 			path = Renderer;
 			sourceTree = "<group>";
@@ -422,6 +439,39 @@
 				3A000000000000000000008B /* GlassTouchDriver.swift */,
 			);
 			path = Animation;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000001E /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000093 /* GlassBackendConfiguration.swift */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000001C /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000090 /* ReaderSettingsViewController.swift */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000001D /* Mutation */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000091 /* ReaderMutationScheduler.swift */,
+			);
+			path = Mutation;
+			sourceTree = "<group>";
+		};
+		2A000000000000000000001F /* Performance */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */,
+				3A0000000000000000000095 /* ReaderPerformanceController.swift */,
+			);
+			path = Performance;
 			sourceTree = "<group>";
 		};
 
@@ -653,6 +703,12 @@
 				4A000000000000000000008D /* ReaderViewController.swift in Sources */,
 				4A000000000000000000008E /* GlassContainerView.swift in Sources */,
 				4A000000000000000000008F /* GlassControlGroup.swift in Sources */,
+				4A0000000000000000000090 /* ReaderSettingsViewController.swift in Sources */,
+				4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */,
+				4A0000000000000000000092 /* BackdropGlassRenderer.swift in Sources */,
+				4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */,
+				4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */,
+				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

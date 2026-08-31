@@ -27,28 +27,22 @@ final class NativeGlassRenderer: GlassRenderer {
         previousState: GlassState?,
         effectView: UIVisualEffectView
     ) {
+        _ = effectView
         let tintChanged = previousState?.tint != state.tint
 
         if tintChanged, previousState != nil {
-            let nextEffect = UIGlassEffect(style: .regular)
-            nextEffect.isInteractive = state.isInteractive
-            nextEffect.tintColor = state.tint?.uiColor
-            glassEffect = nextEffect
-
-            // Apple’s UIKit guidance recommends animating the effect property
-            // for material changes so the glass materializes/dematerializes as
-            // a system effect instead of behaving like a fading bitmap.
+            let tintColor = state.tint?.uiColor
             UIView.animate(
                 withDuration: 0.18,
                 delay: 0,
                 options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut]
             ) {
-                effectView.effect = nextEffect
+                self.glassEffect.tintColor = tintColor
             }
-            return
+        } else {
+            glassEffect.tintColor = state.tint?.uiColor
         }
 
         glassEffect.isInteractive = state.isInteractive
-        glassEffect.tintColor = state.tint?.uiColor
     }
 }

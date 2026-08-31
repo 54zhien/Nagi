@@ -14,10 +14,18 @@ import UIKit
 final class GlassContainerView: UIView {
     private let effectView: GlassContainerEffectView
 
-    init(spacing: CGFloat = 0) {
-        let containerEffect = UIGlassContainerEffect()
-        containerEffect.spacing = spacing
-        effectView = GlassContainerEffectView(effect: containerEffect)
+    init(spacing: CGFloat = 0, backend: GlassBackend? = nil) {
+        let resolvedBackend = backend ?? GlassBackendConfiguration.containerBackend
+        switch resolvedBackend {
+        case .native, .hybrid:
+            let containerEffect = UIGlassContainerEffect()
+            containerEffect.spacing = spacing
+            effectView = GlassContainerEffectView(effect: containerEffect)
+        case .backdrop:
+            effectView = GlassContainerEffectView(
+                effect: UIBlurEffect(style: .systemMaterial)
+            )
+        }
         super.init(frame: .zero)
 
         backgroundColor = .clear

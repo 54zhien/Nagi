@@ -28,9 +28,8 @@ final class ReaderChromeView: UIView {
 
     private let exitContainer = UIView()
     private lazy var animator = ReaderChromeAnimator(targets: [
-        exitContainer,
-        bottomControlGroup
-    ])
+        exitContainer
+    ] + bottomControlGroup.itemViews)
 
     private var autoHideTask: Task<Void, Never>?
     private var interactionRevision = 0

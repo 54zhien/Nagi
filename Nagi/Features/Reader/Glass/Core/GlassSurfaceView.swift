@@ -11,11 +11,14 @@ final class GlassSurfaceView: UIView {
     private let renderer: any GlassRenderer
     private var currentState: GlassState?
 
-    init(backend: GlassBackend = .native) {
+    init(backend: GlassBackend? = nil) {
+        let resolvedBackend = backend ?? GlassBackendConfiguration.surfaceBackend
         let resolvedRenderer: any GlassRenderer
-        switch backend {
+        switch resolvedBackend {
         case .native:
             resolvedRenderer = NativeGlassRenderer()
+        case .backdrop, .hybrid:
+            resolvedRenderer = BackdropGlassRenderer()
         }
         let resolvedEffectView = resolvedRenderer.makeEffectView()
         renderer = resolvedRenderer

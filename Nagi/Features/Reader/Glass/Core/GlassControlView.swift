@@ -12,15 +12,22 @@ import UIKit
 final class GlassControlView: UIControl {
     private let surfaceView: GlassSurfaceView
     private let iconView = UIImageView()
+    private let titleLabel = UILabel()
     private let highlightLayer = CAGradientLayer()
     private let touchDriver = GlassTouchDriver()
 
     private var currentState: GlassState?
     private var currentReduceMotion = false
+    private var preferredCornerRadius: CGFloat?
+    private var suppressTouchHighlight = false
 
     override init(frame: CGRect) {
         surfaceView = GlassSurfaceView()
         super.init(frame: frame)
+
+        // Warm the process/thermal observer while the persistent control is
+        // being created, rather than paying that setup cost on touch-down.
+        _ = ReaderPerformanceController.shared
 
         touchDriver.control = self
         isOpaque = false
@@ -45,6 +52,14 @@ final class GlassControlView: UIControl {
         iconView.isUserInteractionEnabled = false
         iconView.accessibilityElementsHidden = true
         addSubview(iconView)
+
+        titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 2
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.font = .preferredFont(forTextStyle: .body)
+        titleLabel.isUserInteractionEnabled = false
+        titleLabel.accessibilityElementsHidden = true
+        addSubview(titleLabel)
     }
 
     @available(*, unavailable)
@@ -57,22 +72,44 @@ final class GlassControlView: UIControl {
         accessibilityLabel: String,
         tintColor: UIColor?,
         isEnabled: Bool,
-        reduceMotion: Bool
+        reduceMotion: Bool,
+        title: String? = nil,
+        isSelected: Bool = false,
+        cornerRadius: CGFloat? = nil,
+        contentColor: UIColor? = nil
     ) {
-        if iconView.image !== image {
+        let imageChanged: Bool
+        if let currentImage = iconView.image {
+            imageChanged = image == nil || !currentImage.isEqual(image)
+        } else {
+            imageChanged = image != nil
+        }
+        if imageChanged {
             iconView.image = image
         }
+        iconView.isHidden = image == nil
+        if titleLabel.text != title {
+            titleLabel.text = title
+        }
+        titleLabel.isHidden = title == nil
+        titleLabel.textColor = contentColor ?? tintColor ?? .label
+        titleLabel.font = .preferredFont(forTextStyle: title == nil ? .body : .subheadline)
+        preferredCornerRadius = cornerRadius
         if self.accessibilityLabel != accessibilityLabel {
             self.accessibilityLabel = accessibilityLabel
         }
 
-        iconView.tintColor = tintColor ?? .label
+        iconView.tintColor = contentColor ?? tintColor ?? .label
         self.isEnabled = isEnabled
-        accessibilityTraits = isEnabled ? .button : [.button, .notEnabled]
+        var traits: UIAccessibilityTraits = isEnabled ? .button : [.button, .notEnabled]
+        if isSelected {
+            traits.insert(.selected)
+        }
+        accessibilityTraits = traits
         currentReduceMotion = reduceMotion
         touchDriver.update(reduceMotion: reduceMotion)
 
-        let radius = max(0, min(bounds.width, bounds.height) / 2)
+        let radius = resolvedCornerRadius
         let state = GlassState(
             tint: tintColor.map(GlassColor.init),
             isEnabled: isEnabled,
@@ -84,6 +121,11 @@ final class GlassControlView: UIControl {
             currentState = state
         }
         alpha = isEnabled ? 1 : 0.45
+    }
+
+    private var resolvedCornerRadius: CGFloat {
+        let fallback = max(0, min(bounds.width, bounds.height) / 2)
+        return preferredCornerRadius ?? (fallback > 0 ? fallback : 24)
     }
 
     override func beginTracking(_ touch: UITouch, with event: UIEvent?) -> Bool {
@@ -127,13 +169,17 @@ final class GlassControlView: UIControl {
     func applyTouchBegan(at point: CGPoint, reduceMotion: Bool) {
         layer.removeAnimation(forKey: "glassTouchSpring")
         layer.removeAnimation(forKey: "glassTouchPress")
+        suppressTouchHighlight = ReaderPerformanceController.shared.shouldReduceNonessentialEffects
 
         var transform = CATransform3DIdentity
         let scale: CGFloat = reduceMotion ? 1.02 : 1.045
         transform.m11 = scale
         transform.m22 = scale
         layer.transform = transform
-        updateHighlight(at: point, opacity: reduceMotion ? 0.45 : 0.9)
+        updateHighlight(
+            at: point,
+            opacity: suppressTouchHighlight ? 0 : (reduceMotion ? 0.45 : 0.9)
+        )
 
         guard !reduceMotion else { return }
 
@@ -151,7 +197,10 @@ final class GlassControlView: UIControl {
     func applyTouchTransform(_ transform: CATransform3D, at point: CGPoint) {
         layer.removeAnimation(forKey: "glassTouchPress")
         layer.transform = transform
-        updateHighlight(at: point, opacity: currentReduceMotion ? 0.45 : 0.9)
+        updateHighlight(
+            at: point,
+            opacity: suppressTouchHighlight ? 0 : (currentReduceMotion ? 0.45 : 0.9)
+        )
     }
 
     func applyTouchEnded(
@@ -164,6 +213,7 @@ final class GlassControlView: UIControl {
         _ = cancelled
         layer.removeAnimation(forKey: "glassTouchPress")
         highlightLayer.opacity = 0
+        suppressTouchHighlight = false
 
         guard !reduceMotion else {
             layer.transform = CATransform3DIdentity
@@ -202,9 +252,30 @@ final class GlassControlView: UIControl {
         surfaceView.frame = bounds
         iconView.frame = bounds
 
-        let radius = max(0, min(bounds.width, bounds.height) / 2)
+        let radius = resolvedCornerRadius
         surfaceView.setCornerRadius(radius)
         highlightLayer.frame = bounds
         highlightLayer.cornerRadius = radius
+
+        if !iconView.isHidden, !titleLabel.isHidden {
+            let iconWidth: CGFloat = 22
+            iconView.frame = CGRect(
+                x: 10,
+                y: 0,
+                width: iconWidth,
+                height: bounds.height
+            )
+            titleLabel.frame = CGRect(
+                x: iconView.frame.maxX + 6,
+                y: 0,
+                width: max(0, bounds.width - iconView.frame.maxX - 12),
+                height: bounds.height
+            )
+        } else if !titleLabel.isHidden {
+            titleLabel.frame = bounds.insetBy(dx: 10, dy: 6)
+        } else {
+            iconView.frame = bounds
+            titleLabel.frame = .zero
+        }
     }
 }

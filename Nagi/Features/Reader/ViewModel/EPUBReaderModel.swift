@@ -312,7 +312,11 @@ final class EPUBReaderModel {
     private var publication: Publication?
     /// 当前 Readium 打开的文件。TXT 会指向派生 EPUB，预览不能再读取原始 TXT。
     private var activePublicationURL: URL?
-    private var preferenceUpdateTask: Task<Void, Never>?
+    private lazy var mutationScheduler = ReaderMutationScheduler<EPUBPreferences>(
+        delayNanoseconds: 16_000_000
+    ) { [weak self] preferences, generation in
+        self?.commitPreferences(preferences, generation: generation)
+    }
     private var readerOverrideRefreshTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
@@ -323,6 +327,7 @@ final class EPUBReaderModel {
     private var viewportSize = CGSize.zero
     private var viewportSafeAreaInsets: UIEdgeInsets?
     private var viewportDisplayScale: CGFloat = 0
+    private var latestPreferenceGeneration: UInt64 = 0
 
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
@@ -492,9 +497,16 @@ final class EPUBReaderModel {
     func waitForVisualUpdate() async {
         guard let navigator, isReflowable else { return }
 
+        _ = await mutationScheduler.waitForPendingCommit()
+        guard !Task.isCancelled else { return }
+
+        let generation = latestPreferenceGeneration
+
         if let overrideTask = readerOverrideRefreshTask {
             await overrideTask.value
         }
+
+        guard generation == latestPreferenceGeneration else { return }
 
         let retryDelays: [UInt64] = [
             0,
@@ -534,13 +546,12 @@ final class EPUBReaderModel {
     /// navigator may need its CSS state restored even when no preference value
     /// changed while the app was inactive.
     func restoreFromForeground(isDark: Bool) async {
-        guard !Task.isCancelled, hasLoaded, let navigator else { return }
+        guard !Task.isCancelled, hasLoaded, navigator != nil else { return }
 
         systemIsDark = isDark
-        preferenceUpdateTask?.cancel()
-        navigator.submitPreferences(makePreferences())
-        applyVisibleReaderBaseAppearance()
-        refreshVisibleReaderOverrides()
+        mutationScheduler.enqueue(makePreferences())
+        mutationScheduler.flush()
+        guard !Task.isCancelled else { return }
 
         if let refreshTask = readerOverrideRefreshTask {
             await refreshTask.value
@@ -596,7 +607,7 @@ final class EPUBReaderModel {
         guard systemIsDark != isDark else { return }
         systemIsDark = isDark
         guard appearanceMode == .system else { return }
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     func selectPageTransition(_ transition: EPUBPageTransitionMode) {
@@ -605,7 +616,7 @@ final class EPUBReaderModel {
             flowMode = transition == .scroll ? .scroll : .paged
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     func selectAppearance(_ appearance: EPUBAppearanceMode) {
@@ -613,7 +624,7 @@ final class EPUBReaderModel {
             appearanceMode = appearance
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     func setFontScale(_ scale: Double) {
@@ -622,7 +633,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     func apply(preset: EPUBReaderPreset) {
@@ -634,7 +645,7 @@ final class EPUBReaderModel {
             brightness = 1
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     func makeDraft() -> EPUBReaderDraft {
@@ -663,7 +674,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     var readerPreferences: ReaderPreferences {
@@ -709,7 +720,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
         onStateChange?()
     }
 
@@ -718,8 +729,7 @@ final class EPUBReaderModel {
     }
 
     func tearDown() {
-        preferenceUpdateTask?.cancel()
-        preferenceUpdateTask = nil
+        mutationScheduler.cancel()
         readerOverrideRefreshTask?.cancel()
         readerOverrideRefreshTask = nil
         previewTask?.cancel()
@@ -743,7 +753,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        submitPreferencesImmediately()
+        schedulePreferencesCommit()
     }
 
     private func loadTableOfContents(from publication: Publication) async {
@@ -801,14 +811,7 @@ final class EPUBReaderModel {
     private func preferencesDidChange() {
         guard !suppressPreferenceUpdates else { return }
         persistPreferences()
-        preferenceUpdateTask?.cancel()
-        preferenceUpdateTask = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: 140_000_000)
-            guard !Task.isCancelled, let self, let navigator = self.navigator else { return }
-            navigator.submitPreferences(self.makePreferences())
-            self.applyVisibleReaderBaseAppearance()
-            self.refreshVisibleReaderOverrides()
-        }
+        enqueuePreferencesMutation()
     }
 
     private func persistPreferencesIfNeeded() {
@@ -816,12 +819,24 @@ final class EPUBReaderModel {
         persistPreferences()
     }
 
-    private func submitPreferencesImmediately() {
-        preferenceUpdateTask?.cancel()
+    private func schedulePreferencesCommit() {
+        enqueuePreferencesMutation()
+    }
+
+    /// Captures the complete Readium preference value before the scheduler
+    /// yields.  The delayed task therefore coalesces immutable snapshots
+    /// instead of consulting this mutable model later.
+    private func enqueuePreferencesMutation() {
+        guard navigator != nil else { return }
+        mutationScheduler.enqueue(makePreferences())
+    }
+
+    private func commitPreferences(_ preferences: EPUBPreferences, generation: UInt64) {
         guard let navigator else { return }
-        navigator.submitPreferences(makePreferences())
+        latestPreferenceGeneration = generation
+        navigator.submitPreferences(preferences)
         applyVisibleReaderBaseAppearance()
-        refreshVisibleReaderOverrides()
+        refreshVisibleReaderOverrides(generation: generation)
     }
 
     private func makePreferences() -> EPUBPreferences {
@@ -868,15 +883,21 @@ final class EPUBReaderModel {
     /// and already preloaded resources. The font rule remains a publisher-CSS
     /// fallback; the bundled @font-face declarations remain the resource
     /// authority.
-    private func refreshVisibleReaderOverrides() {
+    private func refreshVisibleReaderOverrides(generation: UInt64? = nil) {
         readerOverrideRefreshTask?.cancel()
         guard let navigator, isReflowable else { return }
 
         applyVisibleReaderBaseAppearance()
         let script = makeReaderOverrideScript()
-        readerOverrideRefreshTask = Task { @MainActor [weak navigator] in
-            guard let navigator else { return }
+        readerOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
+            guard let self, let navigator else { return }
+            if let generation {
+                guard self.latestPreferenceGeneration == generation else { return }
+            }
             await navigator.applyNagiReaderOverrides(script)
+            if let generation {
+                guard !Task.isCancelled, self.latestPreferenceGeneration == generation else { return }
+            }
         }
     }
 

@@ -58,6 +58,8 @@ struct GlassState: Equatable {
     }
 }
 
-enum GlassBackend: Equatable {
+enum GlassBackend: String, CaseIterable, Equatable {
     case native
+    case backdrop
+    case hybrid
 }

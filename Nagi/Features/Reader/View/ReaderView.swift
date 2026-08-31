@@ -185,16 +185,23 @@ private struct ReaderSessionView: View {
     @ViewBuilder
     private var settingsSheet: some View {
         NavigationStack {
-            MediumReaderSettingsView(
+            ReaderSettingsViewControllerRepresentable(
                 model: model,
-                systemBrightness: $systemBrightness,
+                preferences: model.preferences,
+                systemBrightness: systemBrightness,
+                isDarkAppearance: isDarkAppearance,
+                reduceMotion: reduceMotion,
                 onCustomSettings: {
                     showCustomSettings = true
                 },
-                onBeforeThemeChange: {
+                onBeforeMutation: {
                     transitionCoordinator.begin(reduceMotion: reduceMotion)
+                },
+                onSystemBrightnessChanged: { value in
+                    systemBrightness = value
                 }
             )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .navigationTitle("主题与排版")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -226,8 +233,22 @@ private struct ReaderSessionView: View {
                 previewContentColor: model.contentColor,
                 previewBackgroundColor: model.backgroundColor,
                 isLoadingPreview: model.isLoadingPreview,
-                onCommit: { model.apply($0) }
+                onCommit: {
+                    transitionCoordinator.begin(reduceMotion: reduceMotion)
+                    model.apply($0)
+                }
             )
+        }
+    }
+
+    private var isDarkAppearance: Bool {
+        switch model.preferences.appearanceMode {
+        case .light:
+            return false
+        case .dark:
+            return true
+        case .system:
+            return colorScheme == .dark
         }
     }
 

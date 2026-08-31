@@ -24,6 +24,7 @@ final class GlassTouchDriver {
         guard let control, control.isEnabled else { return }
         startPoint = point
         isTracking = true
+        ReaderPerformanceSignposts.glassTouchBegan()
         control.applyTouchBegan(at: point, reduceMotion: reduceMotion)
     }
 
@@ -62,6 +63,7 @@ final class GlassTouchDriver {
     func end(at point: CGPoint, cancelled: Bool) {
         guard isTracking, let control else { return }
         isTracking = false
+        ReaderPerformanceSignposts.glassTouchEnded()
 
         let currentTransform = control.layer.presentation()?.transform ?? control.layer.transform
         control.applyTouchEnded(

@@ -18,6 +18,10 @@ final class GlassControlGroup<ID: Hashable>: UIView {
         let tintColor: UIColor?
         let isEnabled: Bool
         let reduceMotion: Bool
+        let title: String?
+        let isSelected: Bool
+        let cornerRadius: CGFloat?
+        let contentColor: UIColor?
         let action: (() -> Void)?
 
         init(
@@ -27,6 +31,10 @@ final class GlassControlGroup<ID: Hashable>: UIView {
             tintColor: UIColor?,
             isEnabled: Bool = true,
             reduceMotion: Bool = false,
+            title: String? = nil,
+            isSelected: Bool = false,
+            cornerRadius: CGFloat? = nil,
+            contentColor: UIColor? = nil,
             action: (() -> Void)? = nil
         ) {
             self.id = id
@@ -35,6 +43,10 @@ final class GlassControlGroup<ID: Hashable>: UIView {
             self.tintColor = tintColor
             self.isEnabled = isEnabled
             self.reduceMotion = reduceMotion
+            self.title = title
+            self.isSelected = isSelected
+            self.cornerRadius = cornerRadius
+            self.contentColor = contentColor
             self.action = action
         }
     }
@@ -46,8 +58,8 @@ final class GlassControlGroup<ID: Hashable>: UIView {
     private var itemFrames: [ID: CGRect] = [:]
     private var cachedContainerFrame = CGRect.null
 
-    init(spacing: CGFloat = 0) {
-        containerView = GlassContainerView(spacing: spacing)
+    init(spacing: CGFloat = 0, backend: GlassBackend? = nil) {
+        containerView = GlassContainerView(spacing: spacing, backend: backend)
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -103,7 +115,11 @@ final class GlassControlGroup<ID: Hashable>: UIView {
                 accessibilityLabel: item.accessibilityLabel,
                 tintColor: item.tintColor,
                 isEnabled: item.isEnabled,
-                reduceMotion: item.reduceMotion
+                reduceMotion: item.reduceMotion,
+                title: item.title,
+                isSelected: item.isSelected,
+                cornerRadius: item.cornerRadius,
+                contentColor: item.contentColor
             )
             actionTargets[item.id]?.action = item.action
         }
