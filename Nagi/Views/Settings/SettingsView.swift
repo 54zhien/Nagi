@@ -156,7 +156,7 @@ private struct AppIconView: View {
     }
 
     private static var image: UIImage? {
-        UIImage(named: "Icon")
+        UIImage(named: "AboutAppIcon")
     }
 }
 
