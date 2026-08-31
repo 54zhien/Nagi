@@ -14,11 +14,13 @@ import UIKit
 enum ReaderThemePalette {
     static let originalLightBackground = UIColor.white
     static let originalLightContent = UIColor(red: 18 / 255, green: 18 / 255, blue: 18 / 255, alpha: 1)
-    static let originalDarkBackground = UIColor(white: 0.12, alpha: 1)
+    static let originalDarkBackground = UIColor.black
     static let originalDarkContent = UIColor(red: 242 / 255, green: 242 / 255, blue: 247 / 255, alpha: 1)
 
-    // Reference image 1: quiet theme.
+    // Light quiet palette retained from the existing reader theme.
     static let quietBackground = UIColor(red: 0x4A / 255, green: 0x49 / 255, blue: 0x4E / 255, alpha: 1)
+    // Dark quiet reference: #1C1C1E.
+    static let quietDarkBackground = UIColor(red: 0x1C / 255, green: 0x1C / 255, blue: 0x1E / 255, alpha: 1)
     static let quietContent = UIColor(red: 242 / 255, green: 242 / 255, blue: 247 / 255, alpha: 1)
 
     // Reference image 2: light paper theme.
@@ -80,7 +82,9 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
                 ? ReaderThemePalette.originalDarkBackground
                 : ReaderThemePalette.originalLightBackground
         case .quiet:
-            return ReaderThemePalette.quietBackground
+            return isDarkAppearance
+                ? ReaderThemePalette.quietDarkBackground
+                : ReaderThemePalette.quietBackground
         case .sepia:
             return isDarkAppearance
                 ? ReaderThemePalette.paperDarkBackground

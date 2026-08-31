@@ -87,7 +87,8 @@ struct EPUBReaderView: View {
         if let navigator = model.navigator {
             ReadiumNavigatorView(
                 navigator: navigator,
-                background: Color(uiColor: model.readerBackgroundUIColor)
+                background: Color(uiColor: model.readerBackgroundUIColor),
+                isReflowable: model.isReflowable
             )
         } else if model.isLoading {
             ProgressView("正在打开 EPUB…")
@@ -455,7 +456,7 @@ private struct MediumReaderSettingsView: View {
                     .frame(width: iconPointSize, height: iconPointSize)
             }
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
+                .foregroundStyle(Color("AccentColor"))
                 .frame(minWidth: 62, minHeight: 40)
                 .background(
                     isSelected ? Color.accentColor.opacity(0.16) : Color.clear,

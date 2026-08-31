@@ -45,7 +45,9 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
         case .light:
             return ReaderThemePalette.originalLightBackground
         case .quiet:
-            return ReaderThemePalette.quietBackground
+            return isDarkAppearance
+                ? ReaderThemePalette.quietDarkBackground
+                : ReaderThemePalette.quietBackground
         case .sepia:
             return ReaderThemePalette.paperLightBackground
         case .dark:
@@ -124,11 +126,7 @@ enum EPUBAppearanceMode: String, CaseIterable, Identifiable, Equatable {
         switch self {
         case .light: return "sunrise.fill"
         case .dark: return "sunset.fill"
-        case .system:
-            return ReaderSystemSymbol.name(
-                "activity.move.ring",
-                fallback: "circle.lefthalf.filled"
-            )
+        case .system: return "circle.lefthalf.filled"
         }
     }
 }
@@ -181,12 +179,20 @@ enum EPUBPageTransitionMode: String, CaseIterable, Identifiable, Equatable {
         case .slide:
             return ReaderSystemSymbol.name(
                 "arrow.left.page.on.rectangle",
-                fallback: "inset.filled.lefthalf.arrow.left.rectangle"
+                fallback: "arrow.left.arrow.right"
             )
-        case .pageCurl: return "book.pages"
+        case .pageCurl:
+            return ReaderSystemSymbol.name("book.pages", fallback: "book")
         case .fade:
-            return ReaderSystemSymbol.name("bolt.rectangle", fallback: "bolt.square")
-        case .scroll: return "scroll"
+            return ReaderSystemSymbol.name(
+                "rectangle.on.rectangle.transition",
+                fallback: "rectangle.on.rectangle"
+            )
+        case .scroll:
+            return ReaderSystemSymbol.name(
+                "arrow.up.and.down.text.horizontal",
+                fallback: "arrow.up.and.down"
+            )
         }
     }
 
@@ -294,6 +300,10 @@ final class EPUBReaderModel {
         resolvedTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
     }
 
+    var isReflowable: Bool {
+        publication?.metadata.layout != .fixed
+    }
+
     var onToggleControls: (() -> Void)?
     var onSwipeStart: (() -> Void)?
     var onStateChange: (() -> Void)?
@@ -302,7 +312,7 @@ final class EPUBReaderModel {
     /// 当前 Readium 打开的文件。TXT 会指向派生 EPUB，预览不能再读取原始 TXT。
     private var activePublicationURL: URL?
     private var preferenceUpdateTask: Task<Void, Never>?
-    private var fontOverrideRefreshTask: Task<Void, Never>?
+    private var readerOverrideRefreshTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
     private var hasLoaded = false
@@ -449,7 +459,8 @@ final class EPUBReaderModel {
                 return false
             }))
             self.navigator = navigator
-            refreshVisibleFontOverride()
+            applyVisibleReaderBaseAppearance()
+            refreshVisibleReaderOverrides()
             hasLoaded = true
 
             if currentReadingHref == nil, initialLocation == nil {
@@ -470,51 +481,26 @@ final class EPUBReaderModel {
         }
     }
 
-    /// Best-effort readiness signal for a preference-driven WebKit repaint.
-    /// Readium's public submitPreferences API does not expose a completion
-    /// callback in this version, so query the active document until its DOM,
-    /// layout metrics and effective backgrounds are stable twice in a row. The
-    /// caller adds a short paint-settle interval before removing the visual
-    /// transition cover.
+    /// Waits until the current Readium document reflects the target theme and
+    /// app-owned reflowable overrides. Readium's public submitPreferences API
+    /// does not expose a completion callback in this version, so the document
+    /// state itself is used as the completion signal.
     func waitForVisualUpdate() async {
-        guard let navigator else { return }
+        guard let navigator, isReflowable else { return }
+
+        if let overrideTask = readerOverrideRefreshTask {
+            await overrideTask.value
+        }
 
         let retryDelays: [UInt64] = [
             0,
-            30_000_000,
-            80_000_000,
-            160_000_000,
-            300_000_000,
+            24_000_000,
+            48_000_000,
+            96_000_000,
+            192_000_000,
+            320_000_000,
         ]
-        let script = """
-        (() => {
-            if (
-                document.readyState !== 'complete'
-                || !document.documentElement
-                || !document.body
-            ) {
-                return '';
-            }
-
-            const root = document.documentElement;
-            const body = document.body;
-            const rootStyle = getComputedStyle(root);
-            const bodyStyle = getComputedStyle(body);
-            const fontStatus = document.fonts ? document.fonts.status : '';
-
-            return [
-                Math.round(root.scrollWidth),
-                Math.round(root.scrollHeight),
-                Math.round(body.scrollWidth),
-                Math.round(body.scrollHeight),
-                rootStyle.backgroundColor,
-                bodyStyle.backgroundColor,
-                fontStatus
-            ].join('|');
-        })();
-        """
-        var previousFingerprint: String?
-        var stableSamples = 0
+        let script = makeVisualReadinessScript()
 
         for delay in retryDelays {
             if delay > 0 {
@@ -529,22 +515,13 @@ final class EPUBReaderModel {
 
             let result = await navigator.evaluateJavaScript(script)
             guard case let .success(value) = result,
-                  let fingerprint = value as? String,
-                  !fingerprint.isEmpty
+                  let readiness = value as? String,
+                  readiness == "ready"
             else {
                 continue
             }
 
-            if fingerprint == previousFingerprint {
-                stableSamples += 1
-            } else {
-                previousFingerprint = fingerprint
-                stableSamples = 1
-            }
-
-            if stableSamples >= 2 {
-                return
-            }
+            return
         }
     }
 
@@ -558,9 +535,10 @@ final class EPUBReaderModel {
         systemIsDark = isDark
         preferenceUpdateTask?.cancel()
         navigator.submitPreferences(makePreferences())
-        refreshVisibleFontOverride()
+        applyVisibleReaderBaseAppearance()
+        refreshVisibleReaderOverrides()
 
-        if let refreshTask = fontOverrideRefreshTask {
+        if let refreshTask = readerOverrideRefreshTask {
             await refreshTask.value
         }
         guard !Task.isCancelled else { return }
@@ -738,8 +716,8 @@ final class EPUBReaderModel {
     func tearDown() {
         preferenceUpdateTask?.cancel()
         preferenceUpdateTask = nil
-        fontOverrideRefreshTask?.cancel()
-        fontOverrideRefreshTask = nil
+        readerOverrideRefreshTask?.cancel()
+        readerOverrideRefreshTask = nil
         previewTask?.cancel()
         previewTask = nil
         navigator?.delegate = nil
@@ -824,7 +802,8 @@ final class EPUBReaderModel {
             try? await Task.sleep(nanoseconds: 140_000_000)
             guard !Task.isCancelled, let self, let navigator = self.navigator else { return }
             navigator.submitPreferences(self.makePreferences())
-            self.refreshVisibleFontOverride()
+            self.applyVisibleReaderBaseAppearance()
+            self.refreshVisibleReaderOverrides()
         }
     }
 
@@ -837,20 +816,27 @@ final class EPUBReaderModel {
         preferenceUpdateTask?.cancel()
         guard let navigator else { return }
         navigator.submitPreferences(makePreferences())
-        refreshVisibleFontOverride()
+        applyVisibleReaderBaseAppearance()
+        refreshVisibleReaderOverrides()
     }
 
     private func makePreferences() -> EPUBPreferences {
         let effectiveTheme = resolvedTheme
-        var preferences = EPUBPreferences(
-            backgroundColor: ReadiumNavigator.Color(
+        let navigatorBackgroundColor: ReadiumNavigator.Color? = isReflowable
+            ? nil
+            : ReadiumNavigator.Color(
                 uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
-            ),
+            )
+        var preferences = EPUBPreferences(
+            // ReaderChrome owns the reflowable surface. Leaving this unset
+            // avoids Readium's background preference rule, which clears
+            // publisher backgrounds on descendant elements.
+            backgroundColor: navigatorBackgroundColor,
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
             fontWeight: boldText ? 1.75 : fontFamily.readiumFontWeight,
-            letterSpacing: 0,
-            lineHeight: lineHeight,
+            letterSpacing: nil,
+            lineHeight: nil,
             pageMargins: ReaderLayoutMetrics.pageMarginFactor(for: pageMargins),
             paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             publisherStyles: publisherStyles,
@@ -861,44 +847,54 @@ final class EPUBReaderModel {
             ),
             textNormalization: !publisherStyles,
             theme: effectiveTheme.readiumTheme(isDarkAppearance: isDarkAppearance),
-            wordSpacing: 0
-        )
-        // Set the public properties after initialization so the requested
-        // signed ranges remain intact and are emitted by Readium CSS.
-        preferences.letterSpacing = ReaderLayoutMetrics.readiumLetterSpacing(
-            for: characterSpacing
-        )
-        preferences.wordSpacing = ReaderLayoutMetrics.readiumWordSpacing(
-            for: wordSpacing
+            wordSpacing: nil
         )
         return preferences
     }
 
-    /// Readium's CSS preference and the registered @font-face resource are the
-    /// primary paths. This one-shot pass only keeps an app-owned rule ahead of
-    /// publisher CSS on reflowable resources.
-    private func refreshVisibleFontOverride() {
-        fontOverrideRefreshTask?.cancel()
-        guard
-            let navigator,
-            publication?.metadata.layout != .fixed
-        else {
-            return
-        }
+    private func applyVisibleReaderBaseAppearance() {
+        guard let navigator else { return }
+        navigator.applyNagiReaderBaseAppearance(
+            isReflowable: isReflowable,
+            fallbackBackground: readerBackgroundUIColor
+        )
+    }
 
-        let script = makeFontOverrideScript()
-        fontOverrideRefreshTask = Task { @MainActor [weak navigator] in
+    /// Re-applies all app-owned reflowable rules to the resources currently
+    /// presented by Readium. The font rule remains a publisher-CSS fallback;
+    /// the bundled @font-face declarations remain the resource authority.
+    private func refreshVisibleReaderOverrides() {
+        readerOverrideRefreshTask?.cancel()
+        guard let navigator, isReflowable else { return }
+
+        applyVisibleReaderBaseAppearance()
+        let script = makeReaderOverrideScript()
+        readerOverrideRefreshTask = Task { @MainActor [weak navigator] in
             guard let navigator else { return }
             _ = await navigator.evaluateJavaScript(script)
         }
     }
 
-    private func makeFontOverrideScript() -> String {
+    private func makeReaderOverrideScript() -> String {
         let publisherFontFamily = Self.javascriptStringLiteral(fontFamily.readiumFamilyName)
+        let lineHeightValue = Self.javascriptStringLiteral(
+            Self.cssDecimal(ReaderLayoutMetrics.clampLineHeight(lineHeight))
+        )
+        let letterSpacingValue = Self.javascriptStringLiteral(
+            Self.cssEmSpacing(for: characterSpacing, range: ReaderLayoutMetrics.characterSpacingRange)
+        )
+        let wordSpacingValue = Self.javascriptStringLiteral(
+            Self.cssEmSpacing(for: wordSpacing, range: ReaderLayoutMetrics.wordSpacingRange)
+        )
+        let typographyEnabled = publisherStyles ? "false" : "true"
         return """
         (() => {
-            const styleID = "nagi-reader-font-override";
+            const styleID = "nagi-reader-reader-overrides";
             const publisherFontFamily = \(publisherFontFamily);
+            const lineHeight = \(lineHeightValue);
+            const letterSpacing = \(letterSpacingValue);
+            const wordSpacing = \(wordSpacingValue);
+            const typographyEnabled = \(typographyEnabled);
             const root = document.documentElement;
 
             if (!root) {
@@ -910,17 +906,238 @@ final class EPUBReaderModel {
 
             const style = document.createElement("style");
             style.id = styleID;
-            root.setAttribute("data-nagi-reader-font-override", "true");
-            style.textContent = [
-                ":root[data-nagi-reader-font-override]",
-                ":root[data-nagi-reader-font-override] body",
-                ":root[data-nagi-reader-font-override] body *"
-            ].join(", ") + " { font-family: "
-                + JSON.stringify(publisherFontFamily)
-                + " !important; }";
+            root.setAttribute("data-nagi-reader-overrides", "true");
+
+            const rootSelector = ":root[data-nagi-reader-overrides]";
+            const bodySelector = rootSelector + " body";
+            const fontSelectors = [
+                rootSelector,
+                bodySelector,
+                bodySelector + " *"
+            ];
+            const typographySelectors = [
+                bodySelector,
+                bodySelector + " p",
+                bodySelector + " li",
+                bodySelector + " div",
+                bodySelector + " dt",
+                bodySelector + " dd",
+                bodySelector + " blockquote",
+                bodySelector + " section",
+                bodySelector + " article",
+                bodySelector + " span",
+                bodySelector + " td",
+                bodySelector + " th",
+                bodySelector + " h1",
+                bodySelector + " h2",
+                bodySelector + " h3",
+                bodySelector + " h4",
+                bodySelector + " h5",
+                bodySelector + " h6"
+            ];
+
+            const rules = [
+                [rootSelector, bodySelector].join(", ")
+                    + " { background: transparent !important; }",
+                fontSelectors.join(", ")
+                    + " { font-family: "
+                    + JSON.stringify(publisherFontFamily)
+                    + " !important; }"
+            ];
+
+            if (typographyEnabled) {
+                rules.push(
+                    typographySelectors.join(", ")
+                        + " { line-height: "
+                        + JSON.stringify(lineHeight)
+                        + " !important; letter-spacing: "
+                        + JSON.stringify(letterSpacing)
+                        + " !important; word-spacing: "
+                        + JSON.stringify(wordSpacing)
+                        + " !important; }"
+                );
+            }
+
+            style.textContent = rules.join("\\n");
             (document.head || root).appendChild(style);
         })();
         """
+    }
+
+    private func makeVisualReadinessScript() -> String {
+        let expectedTextColor = Self.javascriptStringLiteral(
+            Self.cssColorLiteral(readerContentUIColor)
+        )
+        let expectedThemeMarker = Self.javascriptStringLiteral(
+            readiumThemeAppearanceMarker ?? ""
+        )
+        let expectedFontFamily = Self.javascriptStringLiteral(fontFamily.readiumFamilyName)
+        let expectedLineHeight = Self.cssDecimal(
+            ReaderLayoutMetrics.clampLineHeight(lineHeight)
+        )
+        let expectedLetterSpacing = Self.cssDecimal(
+            min(max(characterSpacing, ReaderLayoutMetrics.characterSpacingRange.lowerBound),
+                ReaderLayoutMetrics.characterSpacingRange.upperBound) / 100
+        )
+        let expectedWordSpacing = Self.cssDecimal(
+            min(max(wordSpacing, ReaderLayoutMetrics.wordSpacingRange.lowerBound),
+                ReaderLayoutMetrics.wordSpacingRange.upperBound) / 100
+        )
+        let typographyEnabled = publisherStyles ? "false" : "true"
+
+        return """
+        (() => {
+            if (
+                document.readyState !== "complete"
+                || !document.documentElement
+                || !document.body
+            ) {
+                return "";
+            }
+
+            const root = document.documentElement;
+            const body = document.body;
+            const rootStyle = getComputedStyle(root);
+            const bodyStyle = getComputedStyle(body);
+            const sample = body.querySelector(
+                "p, li, div, dt, dd, blockquote, section, article, span, td, th"
+            ) || body;
+            const sampleStyle = getComputedStyle(sample);
+            const styleText = root.getAttribute("style") || "";
+            const expectedThemeMarker = \(expectedThemeMarker);
+            const expectedTextColor = \(expectedTextColor);
+            const expectedFontFamily = \(expectedFontFamily);
+            const expectedLineHeight = \(expectedLineHeight);
+            const expectedLetterSpacing = \(expectedLetterSpacing);
+            const expectedWordSpacing = \(expectedWordSpacing);
+            const typographyEnabled = \(typographyEnabled);
+
+            const isTransparent = (value) => {
+                const normalized = value.replace(/\\s+/g, "").toLowerCase();
+                return normalized === "transparent" || normalized === "rgba(0,0,0,0)";
+            };
+
+            const normalizeColor = (value) => {
+                const probe = document.createElement("span");
+                probe.style.color = value;
+                probe.style.position = "fixed";
+                probe.style.visibility = "hidden";
+                document.body.appendChild(probe);
+                const normalized = getComputedStyle(probe).color;
+                probe.remove();
+                return normalized.replace(/\\s+/g, "").toLowerCase();
+            };
+
+            const approximately = (value, expected, tolerance) => {
+                const number = parseFloat(value);
+                return Number.isFinite(number) && Math.abs(number - expected) <= tolerance;
+            };
+
+            const fontReady = [
+                rootStyle.fontFamily,
+                bodyStyle.fontFamily,
+                sampleStyle.fontFamily
+            ].some(value => value.toLowerCase().includes(expectedFontFamily.toLowerCase()));
+
+            const expectedColor = normalizeColor(expectedTextColor);
+            const textReady = [
+                rootStyle.color,
+                bodyStyle.color,
+                sampleStyle.color
+            ].every(value => normalizeColor(value) === expectedColor);
+
+            const themeReady = expectedThemeMarker.length > 0
+                ? styleText.includes(expectedThemeMarker)
+                : !styleText.includes("readium-night-on")
+                    && !styleText.includes("readium-sepia-on");
+
+            const sampleFontSize = parseFloat(sampleStyle.fontSize)
+                || parseFloat(bodyStyle.fontSize)
+                || 16;
+            const lineHeightReady = approximately(sampleStyle.lineHeight, expectedLineHeight, 0.02)
+                || approximately(
+                    sampleStyle.lineHeight,
+                    expectedLineHeight * sampleFontSize,
+                    0.5
+                );
+            const letterSpacingReady = approximately(
+                sampleStyle.letterSpacing,
+                expectedLetterSpacing * sampleFontSize,
+                0.25
+            );
+            const wordSpacingReady = approximately(
+                sampleStyle.wordSpacing,
+                expectedWordSpacing * sampleFontSize,
+                0.25
+            );
+            const typographyReady = !typographyEnabled
+                || (lineHeightReady && letterSpacingReady && wordSpacingReady);
+
+            return root.getAttribute("data-nagi-reader-overrides") === "true"
+                && themeReady
+                && isTransparent(rootStyle.backgroundColor)
+                && isTransparent(bodyStyle.backgroundColor)
+                && rootStyle.backgroundImage === "none"
+                && bodyStyle.backgroundImage === "none"
+                && fontReady
+                && textReady
+                && typographyReady
+                ? "ready"
+                : "";
+        })();
+        """
+    }
+
+    private var readiumThemeAppearanceMarker: String? {
+        switch resolvedTheme.readiumTheme(isDarkAppearance: isDarkAppearance) {
+        case .light:
+            return nil
+        case .dark:
+            return "readium-night-on"
+        case .sepia:
+            return "readium-sepia-on"
+        }
+    }
+
+    private static func cssDecimal(_ value: Double) -> String {
+        String(format: "%.4f", value).replacingOccurrences(of: ",", with: ".")
+    }
+
+    private static func cssEmSpacing(
+        for value: Double,
+        range: ClosedRange<Double>
+    ) -> String {
+        let clampedValue = min(max(value, range.lowerBound), range.upperBound)
+        return "\(cssDecimal(clampedValue / 100))em"
+    }
+
+    private static func cssColorLiteral(_ color: UIColor) -> String {
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        var alpha: CGFloat = 1
+
+        if color.getRed(&red, green: &green, blue: &blue, alpha: &alpha) {
+            let components = [red, green, blue].map { Int((min(max($0, 0), 1) * 255).rounded()) }
+            let redValue = components[0]
+            let greenValue = components[1]
+            let blueValue = components[2]
+            if alpha >= 0.999 {
+                return "rgb(\(redValue), \(greenValue), \(blueValue))"
+            }
+            return "rgba(\(redValue), \(greenValue), \(blueValue), \(cssDecimal(Double(alpha))))"
+        }
+
+        var white: CGFloat = 0
+        if color.getWhite(&white, alpha: &alpha) {
+            let value = Int((min(max(white, 0), 1) * 255).rounded())
+            if alpha >= 0.999 {
+                return "rgb(\(value), \(value), \(value))"
+            }
+            return "rgba(\(value), \(value), \(value), \(cssDecimal(Double(alpha))))"
+        }
+
+        return "rgb(18, 18, 18)"
     }
 
     private static func javascriptStringLiteral(_ value: String) -> String {
@@ -1116,7 +1333,8 @@ private func normalizedResourceHref(_ href: String) -> String {
 
 extension EPUBReaderModel: EPUBNavigatorDelegate {
     func navigator(_ navigator: VisualNavigator, presentationDidChange presentation: VisualNavigatorPresentation) {
-        refreshVisibleFontOverride()
+        applyVisibleReaderBaseAppearance()
+        refreshVisibleReaderOverrides()
     }
 
     func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
@@ -1134,7 +1352,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         guard publication?.metadata.layout != .fixed else { return }
         userContentController.addUserScript(
             WKUserScript(
-                source: makeFontOverrideScript(),
+                source: makeReaderOverrideScript(),
                 injectionTime: .atDocumentEnd,
                 forMainFrameOnly: true
             )

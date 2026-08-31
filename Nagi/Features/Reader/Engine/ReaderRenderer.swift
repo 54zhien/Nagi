@@ -235,7 +235,8 @@ final class ReadiumRenderer: ReaderRenderer {
         return AnyView(
             ReadiumNavigatorView(
                 navigator: navigator,
-                background: Color(uiColor: backgroundColor)
+                background: Color(uiColor: backgroundColor),
+                isReflowable: model.isReflowable
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         )

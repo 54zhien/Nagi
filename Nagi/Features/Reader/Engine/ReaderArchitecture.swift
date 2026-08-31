@@ -76,19 +76,11 @@ enum ReaderAppearanceMode: String, CaseIterable, Identifiable, Codable, Sendable
         }
     }
 
-    var assetName: String? {
-        self == .system ? "readerAppearanceMatchDevice" : nil
-    }
-
     var systemImage: String {
         switch self {
         case .light: return "sunrise.fill"
         case .dark: return "sunset.fill"
-        case .system:
-            return ReaderSystemSymbol.name(
-                "activity.move.ring",
-                fallback: "circle.lefthalf.filled"
-            )
+        case .system: return "circle.lefthalf.filled"
         }
     }
 }
@@ -110,26 +102,25 @@ enum ReaderPageTransition: String, CaseIterable, Identifiable, Codable, Sendable
         }
     }
 
-    var assetName: String {
-        switch self {
-        case .slide: return "readerPageTransitionSlide"
-        case .pageCurl: return "readerPageTransitionPageCurl"
-        case .fade: return "readerPageTransitionFade"
-        case .scroll: return "readerPageTransitionScroll"
-        }
-    }
-
     var systemImage: String {
         switch self {
         case .slide:
             return ReaderSystemSymbol.name(
                 "arrow.left.page.on.rectangle",
-                fallback: "inset.filled.lefthalf.arrow.left.rectangle"
+                fallback: "arrow.left.arrow.right"
             )
-        case .pageCurl: return "book.pages"
+        case .pageCurl:
+            return ReaderSystemSymbol.name("book.pages", fallback: "book")
         case .fade:
-            return ReaderSystemSymbol.name("bolt.rectangle", fallback: "bolt.square")
-        case .scroll: return "scroll"
+            return ReaderSystemSymbol.name(
+                "rectangle.on.rectangle.transition",
+                fallback: "rectangle.on.rectangle"
+            )
+        case .scroll:
+            return ReaderSystemSymbol.name(
+                "arrow.up.and.down.text.horizontal",
+                fallback: "arrow.up.and.down"
+            )
         }
     }
 }
@@ -166,12 +157,6 @@ enum ReaderThemePreset: String, CaseIterable, Identifiable, Codable, Sendable, H
     }
 
     func backgroundColor(isDarkAppearance: Bool) -> Color {
-        // In dark appearance, keep the quiet card visually aligned with the
-        // original card. This is a settings-card treatment only; the quiet
-        // reading palette remains unchanged in ReaderTheme.
-        if self == .quiet && isDarkAppearance {
-            return Color(uiColor: ReaderThemePalette.originalDarkBackground)
-        }
         return Color(uiColor: paletteTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance))
     }
 

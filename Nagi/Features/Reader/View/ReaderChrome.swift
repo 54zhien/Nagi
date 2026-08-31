@@ -64,15 +64,6 @@ struct ReaderChrome<Content: View>: View {
                     .ignoresSafeArea(.container, edges: .all)
 
                 if let transitionCoordinator {
-                    // The snapshot is part of the reading surface, before the
-                    // fixed header and bottom controls added by the modifiers
-                    // below. It hides the WebView/native repaint gap without
-                    // changing those controls' geometry or hit regions.
-                    ReaderSnapshotLayer(coordinator: transitionCoordinator)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .ignoresSafeArea()
-                        .allowsHitTesting(false)
-
                     ReaderSnapshotAnchor(coordinator: transitionCoordinator)
                         .frame(width: 1, height: 1)
                         .allowsHitTesting(false)
@@ -101,6 +92,20 @@ struct ReaderChrome<Content: View>: View {
                 if showControls {
                     bottomBar(in: geometry)
                         .transition(.opacity)
+                }
+            }
+            // Keep the transition cover above the complete reader surface,
+            // including the chrome, so a WebKit repaint cannot reveal a
+            // second background layer around the content.
+            .overlay {
+                if let transitionCoordinator {
+                    ReaderSnapshotLayer(
+                        coordinator: transitionCoordinator,
+                        fallbackBackground: readerBackground
+                    )
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .ignoresSafeArea(.container, edges: .all)
+                    .allowsHitTesting(false)
                 }
             }
             // UIKit 阅读器会自行处理分页手势；这个 simultaneous 手势只负责统一收起控件。
@@ -302,7 +307,7 @@ final class ReaderTransitionCoordinator {
 
     private weak var captureAnchor: UIView?
     private weak var snapshotHost: ReaderSnapshotHostView?
-    private weak var activeSnapshot: UIView?
+    private var activeCover: UIView?
 
     private var finishTask: Task<Void, Never>?
     private var fallbackTask: Task<Void, Never>?
@@ -328,30 +333,40 @@ final class ReaderTransitionCoordinator {
         self.reduceMotion = reduceMotion
         isTransitionActive = false
 
-        guard
-            let host = snapshotHost,
-            host.bounds.width > 0,
-            host.bounds.height > 0,
-            let source = captureSurface,
-            source.bounds.width > 0,
-            source.bounds.height > 0,
-            let snapshot = source.snapshotView(afterScreenUpdates: false)
-        else {
-            return
+        guard let host = snapshotHost else { return }
+
+        host.layoutIfNeeded()
+        guard host.bounds.width > 0, host.bounds.height > 0 else { return }
+
+        // A solid cover is created first and is therefore guaranteed even on
+        // surfaces such as WKWebView where snapshotView can return nil.
+        let cover = UIView(frame: host.bounds)
+        cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        cover.backgroundColor = host.fallbackBackgroundColor
+        cover.isOpaque = true
+        cover.clipsToBounds = true
+        cover.isUserInteractionEnabled = false
+        cover.accessibilityElementsHidden = true
+        cover.isAccessibilityElement = false
+
+        if let source = captureSurface,
+           source.bounds.width > 0,
+           source.bounds.height > 0 {
+            source.layoutIfNeeded()
+            if let snapshot = source.snapshotView(afterScreenUpdates: false) {
+                snapshot.frame = host.convert(source.bounds, from: source)
+                snapshot.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+                snapshot.isUserInteractionEnabled = false
+                snapshot.accessibilityElementsHidden = true
+                snapshot.isAccessibilityElement = false
+                snapshot.alpha = 1
+                cover.addSubview(snapshot)
+            }
         }
 
-        source.layoutIfNeeded()
-        host.layoutIfNeeded()
-        host.clipsToBounds = false
-        snapshot.frame = host.convert(source.bounds, from: source)
-        snapshot.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        snapshot.isUserInteractionEnabled = false
-        snapshot.accessibilityElementsHidden = true
-        snapshot.isAccessibilityElement = false
-        snapshot.alpha = 1
-        host.addSubview(snapshot)
+        host.addSubview(cover)
 
-        activeSnapshot = snapshot
+        activeCover = cover
         isTransitionActive = true
 
         let token = transitionToken
@@ -437,7 +452,7 @@ final class ReaderTransitionCoordinator {
         fallbackTask = nil
         isTransitionActive = false
 
-        guard let snapshot = activeSnapshot else { return }
+        guard let cover = activeCover else { return }
 
         if reduceMotion {
             removeSnapshot()
@@ -449,11 +464,11 @@ final class ReaderTransitionCoordinator {
             delay: 0,
             options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut]
         ) {
-            snapshot.alpha = 0
-        } completion: { [weak self, weak snapshot] _ in
+            cover.alpha = 0
+        } completion: { [weak self, weak cover] _ in
             guard let self, self.transitionToken == token else { return }
-            snapshot?.removeFromSuperview()
-            self.activeSnapshot = nil
+            cover?.removeFromSuperview()
+            self.activeCover = nil
         }
     }
 
@@ -465,24 +480,29 @@ final class ReaderTransitionCoordinator {
     }
 
     private func removeSnapshot() {
-        activeSnapshot?.removeFromSuperview()
-        activeSnapshot = nil
+        activeCover?.removeFromSuperview()
+        activeCover = nil
     }
 }
 
 struct ReaderSnapshotLayer: UIViewRepresentable {
     let coordinator: ReaderTransitionCoordinator
+    let fallbackBackground: Color
 
     func makeUIView(context: Context) -> ReaderSnapshotHostView {
         let view = ReaderSnapshotHostView()
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
+        view.backgroundColor = .clear
+        view.isOpaque = false
+        view.fallbackBackgroundColor = UIColor(fallbackBackground)
         view.coordinator = coordinator
         coordinator.register(snapshotHost: view)
         return view
     }
 
     func updateUIView(_ uiView: ReaderSnapshotHostView, context: Context) {
+        uiView.fallbackBackgroundColor = UIColor(fallbackBackground)
         uiView.coordinator = coordinator
         coordinator.register(snapshotHost: uiView)
     }
@@ -490,6 +510,7 @@ struct ReaderSnapshotLayer: UIViewRepresentable {
 
 final class ReaderSnapshotHostView: UIView {
     weak var coordinator: ReaderTransitionCoordinator?
+    var fallbackBackgroundColor: UIColor = .clear
 
     override func didMoveToWindow() {
         super.didMoveToWindow()

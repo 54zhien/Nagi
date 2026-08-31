@@ -31,6 +31,10 @@ struct MediumReaderSettingsView: View {
         self.onBeforeThemeChange = onBeforeThemeChange
     }
 
+    private var nagiAccentColor: Color {
+        Color("AccentColor")
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 18) {
@@ -87,15 +91,19 @@ struct MediumReaderSettingsView: View {
     }
 
     private var fontSizeIndicator: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             ForEach(0..<ReaderFontSize.indicatorCount, id: \.self) { index in
                 Circle()
                     .fill(
                         index <= fontSizeIndicatorIndex
-                            ? Color.accentColor
+                            ? nagiAccentColor
                             : Color.secondary.opacity(0.22)
                     )
                     .frame(width: 4, height: 4)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 0.18),
+                        value: fontSizeIndicatorIndex
+                    )
             }
         }
         .frame(maxWidth: .infinity)
@@ -175,7 +183,7 @@ struct MediumReaderSettingsView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: iconPointSize, height: iconPointSize)
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(nagiAccentColor)
             }
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Capsule())
@@ -224,16 +232,10 @@ struct MediumReaderSettingsView: View {
         for transition: ReaderPageTransition,
         pointSize: CGFloat
     ) -> some View {
-        Image(transition.assetName)
-            .renderingMode(.template)
-            .resizable()
-            .interpolation(.high)
-            .scaledToFit()
+        Image(systemName: transition.systemImage)
+            .font(.system(size: pointSize, weight: .regular))
+            .symbolRenderingMode(.monochrome)
             .frame(width: pointSize, height: pointSize)
-            // The supplied PNGs share a canvas but not the same ink bounds.
-            // This preserves the common layout box while equalizing optical
-            // weight against the SF Symbols beside these controls.
-            .scaleEffect(ReaderPageTransitionIconMetrics.scale(for: transition))
             .foregroundStyle(.primary)
     }
 
@@ -274,22 +276,12 @@ struct MediumReaderSettingsView: View {
         )
     }
 
-    @ViewBuilder
     private func appearanceIcon(for mode: ReaderAppearanceMode, size: CGFloat) -> some View {
-        if let assetName = mode.assetName {
-            Image(assetName)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: size, height: size)
-                .foregroundStyle(.primary)
-        } else {
-            Image(systemName: mode.systemImage)
-                .font(.system(size: size * 0.62, weight: .semibold))
-                .symbolRenderingMode(.hierarchical)
-                .frame(width: size, height: size)
-                .foregroundStyle(.primary)
-        }
+        Image(systemName: mode.systemImage)
+            .font(.system(size: size, weight: .regular))
+            .symbolRenderingMode(.monochrome)
+            .frame(width: size, height: size)
+            .foregroundStyle(.primary)
     }
 
     private var brightnessControl: some View {
@@ -348,27 +340,23 @@ struct MediumReaderSettingsView: View {
             }
             .foregroundStyle(
                 isSelected
-                    ? Color.accentColor
+                    ? nagiAccentColor
                     : preset.contentColor(isDarkAppearance: isDarkAppearance)
             )
             .padding(.vertical, 7)
             // 三列卡片继续沿用原三列两行预设网格的比例，并向下延伸一些。
             .frame(maxWidth: .infinity, minHeight: ReaderControlValues.presetGridHeight)
+            .background(cardColor, in: cardShape)
             .overlay {
                 if isSelected {
                     cardShape
-                        .stroke(Color.accentColor.opacity(0.85), lineWidth: 2)
+                        .stroke(nagiAccentColor.opacity(0.85), lineWidth: 2)
                 }
             }
             .contentShape(cardShape)
         }
         .buttonStyle(.plain)
-        .glassEffect(
-            .regular
-                .tint(cardColor)
-                .interactive(),
-            in: cardShape
-        )
+        .glassEffect(.regular.interactive(), in: cardShape)
         .contentShape(cardShape)
         .accessibilityLabel("主题预设：\(preset.label)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -405,15 +393,6 @@ struct MediumReaderSettingsView: View {
     private enum ReaderPageTransitionIconMetrics {
         static let rowPointSize: CGFloat = 22
         static let selectedPointSize: CGFloat = 28
-
-        static func scale(for transition: ReaderPageTransition) -> CGFloat {
-            switch transition {
-            case .slide: return 0.95
-            case .pageCurl: return 1.13
-            case .fade: return 1.14
-            case .scroll: return 0.96
-            }
-        }
     }
 
     private enum ReaderControlValues {
@@ -634,6 +613,7 @@ struct CustomReaderSettingsSheet: View {
                         step: 0.05,
                         text: String(format: "%.2f", draft.lineHeight)
                     )
+                    .disabled(draft.publisherStyles)
 
                     cardDivider
 
@@ -645,6 +625,7 @@ struct CustomReaderSettingsSheet: View {
                         step: 1,
                         text: "\(Int(draft.characterSpacing))%"
                     )
+                    .disabled(draft.publisherStyles)
 
                     cardDivider
 
@@ -656,6 +637,7 @@ struct CustomReaderSettingsSheet: View {
                         step: 2,
                         text: "\(Int(draft.wordSpacing))%"
                     )
+                    .disabled(draft.publisherStyles)
 
                     cardDivider
 
