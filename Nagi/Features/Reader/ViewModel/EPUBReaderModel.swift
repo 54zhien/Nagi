@@ -807,9 +807,8 @@ final class EPUBReaderModel {
             theme: effectiveTheme.readiumTheme(isDarkAppearance: isDarkAppearance),
             wordSpacing: 0
         )
-        // Readium 3.8 clamps only values passed through its initializer.  Set
-        // the public properties after initialization so the requested signed
-        // ranges remain intact and are emitted by Readium CSS.
+        // Set the public properties after initialization so the requested
+        // signed ranges remain intact and are emitted by Readium CSS.
         preferences.letterSpacing = ReaderLayoutMetrics.readiumLetterSpacing(
             for: characterSpacing
         )
@@ -820,9 +819,10 @@ final class EPUBReaderModel {
     }
 
     /// Readium's CSS preference is the primary path. This second, narrowly
-    /// scoped pass is needed for EPUB resources which keep their own font on
-    /// an inline element or for a resource that was already loaded before the
-    /// preference update. It only changes font-family in reflowable content.
+    /// scoped pass keeps an app-owned rule alive in every reflowable resource.
+    /// The rule follows Readium's --USER__fontFamily value, so preloaded
+    /// resources update when Readium submits a new preference instead of
+    /// retaining the font that was captured when their WebView was created.
     ///
     /// The navigator is created before SwiftUI attaches it and before its
     /// first spread exists. Retry only until the current spread is available;
@@ -878,24 +878,91 @@ final class EPUBReaderModel {
 
     private func makeFontOverrideScript() -> String {
         let fontStack = Self.javascriptStringLiteral(fontFamily.webCSSFontStack)
+        let requestedFontFamily = Self.javascriptStringLiteral(
+            fontFamily.readiumFamilyName ?? "-apple-system"
+        )
         return """
         (() => {
             const styleID = "nagi-reader-font-override";
+            const observerKey = "__nagiReaderFontObserver";
+            const fallbackFontStack = \(fontStack);
+            const requestedFontFamily = \(requestedFontFamily);
+            const root = document.documentElement;
+
+            if (!root) {
+                return {
+                    readyState: document.readyState,
+                    overridePresent: false,
+                    reason: "documentElementUnavailable"
+                };
+            }
+
+            if (
+                window[observerKey]
+                && typeof window[observerKey].disconnect === "function"
+            ) {
+                window[observerKey].disconnect();
+            }
+
             const previous = document.getElementById(styleID);
             if (previous) previous.remove();
 
-            const fontStack = \(fontStack);
             const style = document.createElement("style");
             style.id = styleID;
-            style.textContent = "html, html * { font-family: " + fontStack + " !important; }";
-            (document.head || document.documentElement).appendChild(style);
+            let appliedFontStack = "";
+
+            const readReadiumFontStack = () => {
+                const inlineValue = root.style
+                    .getPropertyValue("--USER__fontFamily")
+                    .trim();
+                if (inlineValue) return inlineValue;
+
+                return getComputedStyle(root)
+                    .getPropertyValue("--USER__fontFamily")
+                    .trim();
+            };
+
+            const applyFont = () => {
+                const readiumFontStack = readReadiumFontStack();
+                const nextFontStack = readiumFontStack
+                    ? readiumFontStack + ", " + fallbackFontStack
+                    : fallbackFontStack;
+                if (nextFontStack === appliedFontStack && style.isConnected) return;
+
+                appliedFontStack = nextFontStack;
+                root.setAttribute("data-nagi-reader-font-override", "true");
+                style.textContent = [
+                    ":root[data-nagi-reader-font-override]",
+                    ":root[data-nagi-reader-font-override] body",
+                    ":root[data-nagi-reader-font-override] body *"
+                ].join(", ") + " { font-family: " + nextFontStack + " !important; }";
+                (document.head || root).appendChild(style);
+            };
+
+            applyFont();
+
+            const observer = new MutationObserver(() => {
+                window.requestAnimationFrame(applyFont);
+            });
+            observer.observe(root, { attributes: true, attributeFilter: ["style"] });
+            window[observerKey] = observer;
+
             const body = document.body;
             const paragraph = document.querySelector("p");
+            const paragraphFontFamily = paragraph
+                ? getComputedStyle(paragraph).fontFamily
+                : "";
             return {
                 readyState: document.readyState,
                 overridePresent: !!document.getElementById(styleID),
+                readiumFontFamily: readReadiumFontStack(),
+                requestedFontFamily: requestedFontFamily,
+                appliedFontStack: appliedFontStack,
                 bodyFontFamily: body ? getComputedStyle(body).fontFamily : "",
-                paragraphFontFamily: paragraph ? getComputedStyle(paragraph).fontFamily : ""
+                paragraphFontFamily: paragraphFontFamily,
+                fontAvailable: document.fonts && document.fonts.check
+                    ? document.fonts.check("16px \"" + requestedFontFamily + "\"")
+                    : null
             };
         })();
         """
