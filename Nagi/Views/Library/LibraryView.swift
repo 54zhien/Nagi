@@ -571,6 +571,7 @@ struct BookCard: View {
 
 private enum BookCardProgressMetrics {
     static let height: CGFloat = 8
+    static let minimumVisibleFillWidth: CGFloat = 12
     static let animationDuration: Double = 0.24
 }
 
@@ -595,14 +596,18 @@ private struct BookCardProgressTrack: View {
         min(max(progress, 0), 1)
     }
 
+    private var hasVisibleProgress: Bool {
+        Int((clampedProgress * 100).rounded()) > 0
+    }
+
     var body: some View {
         GeometryReader { geometry in
             ZStack(alignment: .leading) {
                 track
 
-                if clampedProgress > 0 {
+                if hasVisibleProgress {
                     progressFill(
-                        width: geometry.size.width * clampedProgress
+                        width: fillWidth(for: geometry.size.width)
                     )
                 }
             }
@@ -614,6 +619,14 @@ private struct BookCardProgressTrack: View {
                 ? nil
                 : .smooth(duration: BookCardProgressMetrics.animationDuration),
             value: clampedProgress
+        )
+    }
+
+    private func fillWidth(for totalWidth: CGFloat) -> CGFloat {
+        let measuredWidth = totalWidth * clampedProgress
+        return min(
+            totalWidth,
+            max(measuredWidth, BookCardProgressMetrics.minimumVisibleFillWidth)
         )
     }
 
