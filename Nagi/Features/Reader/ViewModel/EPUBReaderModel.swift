@@ -45,9 +45,7 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
         case .light:
             return ReaderThemePalette.originalLightBackground
         case .quiet:
-            return isDarkAppearance
-                ? ReaderThemePalette.quietDarkBackground
-                : ReaderThemePalette.quietBackground
+            return ReaderThemePalette.quietBackground
         case .sepia:
             return ReaderThemePalette.paperLightBackground
         case .dark:
@@ -62,7 +60,9 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
                 ? ReaderThemePalette.originalDarkBackground
                 : ReaderThemePalette.originalLightBackground
         case .quiet:
-            return ReaderThemePalette.quietBackground
+            return isDarkAppearance
+                ? ReaderThemePalette.quietDarkBackground
+                : ReaderThemePalette.quietBackground
         case .sepia:
             return isDarkAppearance
                 ? ReaderThemePalette.paperDarkBackground
