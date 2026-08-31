@@ -400,7 +400,9 @@ struct CustomReaderSettingsSheet: View {
         static let previewHeight: CGFloat = 228
         static let previewMaskHeight: CGFloat = 32
         static let cardCornerRadius: CGFloat = 22
-        static let rowHeight: CGFloat = 52
+        static let rowHeight: CGFloat = 60
+        static let cardHorizontalPadding: CGFloat = 20
+        static let sliderValueWidth: CGFloat = 58
     }
 
     private enum LayoutSymbol {
@@ -422,9 +424,14 @@ struct CustomReaderSettingsSheet: View {
         )
     }
 
-    // A deterministic, public-domain exploration excerpt keeps the preview
-    // independent from whichever book is currently open.
-    private static let previewSampleText = "初三日晨起，果日光灿灿，决策上顶。循涧入，路多迷津，遂谋向国清。"
+    // 朱自清《春》（1933）中的短段落，用于展示字体、行距和页边空白。
+    private static let previewSampleText = """
+    一切都像刚睡醒的样子，欣欣然张开了眼。山朗润起来了，水涨起来了，太阳的脸红起来了。
+
+    小草偷偷地从土里钻出来，嫩嫩的，绿绿的。园子里，田野里，瞧去，一大片一大片满是的。风轻悄悄的，草软绵绵的。
+
+    桃树、杏树、梨树，你不让我，我不让你，都开满了花赶趟儿。红的像火，粉的像霞，白的像雪。花里带着甜味；闭了眼，树上仿佛已经满是桃儿、杏儿、梨儿！
+    """
 
     init(
         initialDraft: ReaderCustomizationDraft,
@@ -451,6 +458,10 @@ struct CustomReaderSettingsSheet: View {
 
     private var isDirty: Bool { draft != initialDraft }
 
+    private var nagiAccentColor: Color {
+        Color("AccentColor")
+    }
+
     var body: some View {
         NavigationStack {
             ZStack(alignment: .top) {
@@ -470,6 +481,12 @@ struct CustomReaderSettingsSheet: View {
                     .background(Color(uiColor: previewBackgroundColor))
                     .overlay(alignment: .bottom) {
                         previewBottomMask
+                    }
+                    .overlay(alignment: .bottom) {
+                        Rectangle()
+                            .fill(Color(uiColor: .separator))
+                            .frame(height: 1)
+                            .allowsHitTesting(false)
                     }
                     .clipped()
                     .allowsHitTesting(false)
@@ -491,12 +508,11 @@ struct CustomReaderSettingsSheet: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                     }
-                    // The toolbar supplies the system glass context. Adding
-                    // a second manual glass effect here creates the visible
-                    // double ring around the control.
-                    .buttonStyle(.glass)
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: Circle())
                     .accessibilityLabel("取消")
                 }
+                .sharedBackgroundVisibility(.hidden)
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: commit) {
                         Image(systemName: "checkmark")
@@ -504,10 +520,17 @@ struct CustomReaderSettingsSheet: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(.accentColor)
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.white)
+                    .glassEffect(
+                        .regular
+                            .tint(nagiAccentColor)
+                            .interactive(),
+                        in: Circle()
+                    )
                     .accessibilityLabel("完成")
                 }
+                .sharedBackgroundVisibility(.hidden)
             }
         }
         .presentationDetents([.large])
@@ -524,7 +547,7 @@ struct CustomReaderSettingsSheet: View {
     }
 
     private var settingsContent: some View {
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 28) {
             settingsSection("文本") {
                 VStack(spacing: 0) {
                     fontMenu
@@ -536,14 +559,15 @@ struct CustomReaderSettingsSheet: View {
                             Image(systemName: "bold")
                                 .font(.system(size: 18, weight: .semibold))
                                 .frame(width: 24, height: 24)
+                                .foregroundStyle(nagiAccentColor)
                         }
                         .font(.body)
                         .foregroundStyle(.primary)
                     }
                         .frame(maxWidth: .infinity, minHeight: Layout.rowHeight)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, Layout.cardHorizontalPadding)
                         .contentShape(Rectangle())
-                        .tint(.accentColor)
+                        .tint(nagiAccentColor)
                 }
                 .background(
                     Color(uiColor: .secondarySystemGroupedBackground),
@@ -555,7 +579,7 @@ struct CustomReaderSettingsSheet: View {
                 VStack(spacing: 0) {
                     Toggle("保留出版方样式", isOn: $draft.publisherStyles)
                         .frame(minHeight: Layout.rowHeight)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, Layout.cardHorizontalPadding)
                         .contentShape(Rectangle())
 
                     cardDivider
@@ -607,10 +631,10 @@ struct CustomReaderSettingsSheet: View {
                     in: RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
                 )
 
-                Text("正文上下边距固定为上 116 pt、下 84 pt；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
+                Text("正文上下留白由系统安全区和页眉实际占用决定；首行缩进固定为 2；页边空白按设置调节。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 4)
+                    .padding(.horizontal, 12)
             }
         }
     }
@@ -620,7 +644,7 @@ struct CustomReaderSettingsSheet: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 10) {
             Text(title)
                 .font(.title3.weight(.semibold))
                 .padding(.horizontal, 12)
@@ -631,7 +655,7 @@ struct CustomReaderSettingsSheet: View {
 
     private var cardDivider: some View {
         Divider()
-            .padding(.leading, 16)
+            .padding(.leading, Layout.cardHorizontalPadding)
     }
 
     private var preview: some View {
@@ -641,15 +665,14 @@ struct CustomReaderSettingsSheet: View {
             .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
             .lineSpacing(CGFloat(draft.lineHeight - 1) * 8)
             .padding(.horizontal, previewPageMarginInset)
-            .lineLimit(7)
             .frame(maxWidth: .infinity, alignment: .topLeading)
-        .foregroundStyle(Color(uiColor: previewContentColor))
-        .padding(.horizontal, 16)
-        .padding(.top, 18)
-        .padding(.bottom, 24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("正文预览")
+            .foregroundStyle(Color(uiColor: previewContentColor))
+            .padding(.horizontal, 16)
+            .padding(.top, 18)
+            .padding(.bottom, 24)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("正文预览")
     }
 
     private var previewColorScheme: ColorScheme {
@@ -714,10 +737,12 @@ struct CustomReaderSettingsSheet: View {
                 Image(systemName: "textformat")
                     .font(.system(size: 19, weight: .medium))
                     .frame(width: 24, height: 24)
+                    .foregroundStyle(nagiAccentColor)
                     .accessibilityHidden(true)
 
                 Text("字体")
                     .font(.body)
+                    .foregroundStyle(.primary)
 
                 Spacer()
                 Text(draft.fontFamily.label)
@@ -732,7 +757,7 @@ struct CustomReaderSettingsSheet: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .padding(.horizontal, 16)
+        .padding(.horizontal, Layout.cardHorizontalPadding)
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
         .accessibilityLabel("字体")
@@ -747,26 +772,30 @@ struct CustomReaderSettingsSheet: View {
         step: Double,
         text: String
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack {
                 Text(title)
                 Spacer()
-                Text(text).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
             }
-            HStack(spacing: 10) {
+            HStack(spacing: 12) {
                 Image(systemName: systemImage)
                     .font(.system(size: 18, weight: .medium))
-                    .frame(width: 24, height: 24)
-                    .foregroundStyle(.primary)
+                    .frame(width: 28, height: 24)
+                    .foregroundStyle(nagiAccentColor)
                     .accessibilityHidden(true)
 
                 Slider(value: value, in: range, step: step)
-                    .tint(.accentColor)
+                    .tint(nagiAccentColor)
+
+                Text(text)
+                    .font(.subheadline.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: Layout.sliderValueWidth, alignment: .trailing)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
+        .padding(.horizontal, Layout.cardHorizontalPadding)
+        .padding(.vertical, 18)
     }
 
     private func cancel() {

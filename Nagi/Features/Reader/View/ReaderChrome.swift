@@ -59,7 +59,7 @@ struct ReaderChrome<Content: View>: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .ignoresSafeArea(.container, edges: .all)
             }
-            // 页眉是正文的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
+            // 页眉保持现有位置；正文的实际安全区由 Readium 与页面内容 inset 统一处理。
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showsTitle {
                     ReaderPageHeader(
@@ -251,7 +251,7 @@ private struct ReaderPageHeader: View {
             .padding(.horizontal, 72)
             .frame(maxWidth: .infinity, alignment: .center)
             // 与右上角退出按钮共用同一高度，使书名基线区域的中心线一致。
-            .frame(height: ReaderControlMetrics.exitDiameter, alignment: .center)
+            .frame(height: CGFloat(ReaderLayoutMetrics.pageHeaderHeight), alignment: .center)
             .allowsHitTesting(false)
             .accessibilityAddTraits(.isHeader)
             .accessibilityLabel("页眉书名：\(title)")

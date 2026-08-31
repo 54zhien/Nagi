@@ -823,6 +823,10 @@ final class EPUBReaderModel {
     /// scoped pass is needed for EPUB resources which keep their own font on
     /// an inline element or for a resource that was already loaded before the
     /// preference update. It only changes font-family in reflowable content.
+    ///
+    /// The navigator is created before SwiftUI attaches it and before its
+    /// first spread exists. Retry only until the current spread is available;
+    /// do not assume that a fixed delay is long enough for every publication.
     private func refreshVisibleFontOverride() {
         fontOverrideRefreshTask?.cancel()
         guard
@@ -836,19 +840,38 @@ final class EPUBReaderModel {
         fontOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
             guard let self, let navigator else { return }
 
-            await Task.yield()
-            guard !Task.isCancelled else { return }
-            _ = await navigator.evaluateJavaScript(script)
+            let retryDelays: [UInt64] = [
+                0,
+                100_000_000,
+                250_000_000,
+                500_000_000,
+                1_000_000_000,
+                2_000_000_000,
+            ]
 
-            // A preference update can replace the current spread just after
-            // the first evaluation. Retry once after that replacement settles.
-            do {
-                try await Task.sleep(nanoseconds: 180_000_000)
-            } catch {
-                return
+            for delay in retryDelays {
+                if delay > 0 {
+                    do {
+                        try await Task.sleep(nanoseconds: delay)
+                    } catch {
+                        return
+                    }
+                }
+                guard !Task.isCancelled else { return }
+
+                let result = await navigator.evaluateJavaScript(script)
+                if case let .success(value) = result {
+                    #if DEBUG
+                    print("[Reader] font override applied: \(value)")
+                    #endif
+                    self.fontOverrideRefreshTask = nil
+                    return
+                }
             }
-            guard !Task.isCancelled else { return }
-            _ = await navigator.evaluateJavaScript(script)
+
+            #if DEBUG
+            print("[Reader] font override was not applied before the retry window ended")
+            #endif
             self.fontOverrideRefreshTask = nil
         }
     }
@@ -866,6 +889,14 @@ final class EPUBReaderModel {
             style.id = styleID;
             style.textContent = "html, html * { font-family: " + fontStack + " !important; }";
             (document.head || document.documentElement).appendChild(style);
+            const body = document.body;
+            const paragraph = document.querySelector("p");
+            return {
+                readyState: document.readyState,
+                overridePresent: !!document.getElementById(styleID),
+                bodyFontFamily: body ? getComputedStyle(body).fontFamily : "",
+                paragraphFontFamily: paragraph ? getComputedStyle(paragraph).fontFamily : ""
+            };
         })();
         """
     }
@@ -1034,25 +1065,18 @@ final class EPUBReaderModel {
 }
 
 extension EPUBReaderModel {
-    /// 让正文边距滑杆在不遮挡刘海、动态岛或 Home Indicator 的前提下生效。
-    /// Readium 会在分页重建及窗口尺寸变化时重新调用该代理方法。
+    /// Let Readium reserve only system-protected areas and the visible page
+    /// header's own occupied height. The former 116/84pt app margins are no
+    /// longer part of the active reading viewport.
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
         var safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
-        // EPUBReaderView's safeAreaInset owns the top system area while the
-        // embedded page header is visible. Do not reserve that same area in
-        // Readium a second time, or the first paragraph gets a large blank
-        // band above it.
-        let topInset: CGFloat
         if showBookTitleInPageHeader {
-            safeAreaInsets.top = 0
-            topInset = 0
-        } else {
-            topInset = CGFloat(ReaderLayoutMetrics.fixedContentTopInset)
+            safeAreaInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
         }
         return ReaderContentInsetResolver.resolve(
             safeAreaInsets: safeAreaInsets,
-            top: topInset,
-            bottom: CGFloat(ReaderLayoutMetrics.fixedContentBottomInset),
+            top: 0,
+            bottom: 0,
             horizontal: 0
         )
     }
@@ -1068,6 +1092,10 @@ private func normalizedResourceHref(_ href: String) -> String {
 }
 
 extension EPUBReaderModel: EPUBNavigatorDelegate {
+    func navigator(_ navigator: VisualNavigator, presentationDidChange presentation: VisualNavigatorPresentation) {
+        refreshVisibleFontOverride()
+    }
+
     func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
         updateLocation(locator)
     }

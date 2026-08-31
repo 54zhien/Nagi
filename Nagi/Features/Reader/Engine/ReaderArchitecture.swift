@@ -196,6 +196,10 @@ enum ReaderFontSize {
 /// invent its own interpretation. `pageMargins` is the horizontal inset, in
 /// points, applied to both sides of the reading content.
 enum ReaderLayoutMetrics {
+    // Shared by the page header and the renderer's content inset. This is the
+    // header's actual occupied height, not an additional user-configurable
+    // reading margin.
+    static let pageHeaderHeight = 48.0
     static let fixedContentTopInset = 116.0
     static let fixedContentBottomInset = 84.0
     static let fixedParagraphIndent = 2.0
