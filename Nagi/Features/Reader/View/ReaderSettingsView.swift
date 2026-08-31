@@ -396,6 +396,13 @@ struct CustomReaderSettingsSheet: View {
     @State private var showDiscardConfirmation = false
     @State private var didFinish = false
 
+    private enum Layout {
+        static let previewHeight: CGFloat = 228
+        static let previewMaskHeight: CGFloat = 32
+        static let cardCornerRadius: CGFloat = 22
+        static let rowHeight: CGFloat = 52
+    }
+
     init(
         initialDraft: ReaderCustomizationDraft,
         previewText: String,
@@ -423,56 +430,63 @@ struct CustomReaderSettingsSheet: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 18) {
-                    preview
-                    fontMenu
-                    Toggle("粗体文本", isOn: $draft.boldText)
-                    slider(
-                        "行间距",
-                        value: $draft.lineHeight,
-                        range: ReaderLayoutMetrics.lineHeightRange,
-                        step: 0.05,
-                        text: String(format: "%.2f", draft.lineHeight)
-                    )
-                    slider(
-                        "页边空白",
-                        value: $draft.pageMargins,
-                        range: ReaderLayoutMetrics.pageMarginsRange,
-                        step: ReaderLayoutMetrics.pageMarginsStep,
-                        text: "\(Int(draft.pageMargins.rounded())) pt"
-                    )
-                    slider(
-                        "字符间距",
-                        value: $draft.characterSpacing,
-                        range: ReaderLayoutMetrics.characterSpacingRange,
-                        step: 1,
-                        text: "\(Int(draft.characterSpacing))%"
-                    )
-                    slider(
-                        "词间距",
-                        value: $draft.wordSpacing,
-                        range: ReaderLayoutMetrics.wordSpacingRange,
-                        step: 2,
-                        text: "\(Int(draft.wordSpacing))%"
-                    )
-                    Text("正文上下边距固定为上 116 pt、下 84 pt；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 4)
-                    Toggle("保留出版方样式", isOn: $draft.publisherStyles)
+            ZStack(alignment: .top) {
+                ScrollView {
+                    settingsContent
+                        .padding(.horizontal, 16)
+                        // Reserve the initial preview space, then let the cards
+                        // scroll beneath the fixed preview overlay.
+                        .padding(.top, Layout.previewHeight + 18)
+                        .padding(.bottom, 28)
                 }
-                .padding(16)
+                .scrollIndicators(.hidden)
+
+                preview
+                    .frame(maxWidth: .infinity)
+                    .frame(height: Layout.previewHeight, alignment: .topLeading)
+                    .background(Color(uiColor: previewBackgroundColor))
+                    .overlay(alignment: .bottom) {
+                        previewBottomMask
+                    }
+                    .clipped()
+                    .allowsHitTesting(false)
+                    .zIndex(1)
             }
-            .navigationTitle("自定义")
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("自定义主题")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("取消", action: cancel) }
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(action: cancel) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 20, weight: .medium))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel("取消")
+                }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("完成", action: commit).fontWeight(.semibold)
+                    Button(action: commit) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 20, weight: .semibold))
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(Color(uiColor: .systemBackground))
+                    .glassEffect(
+                        .regular
+                            .tint(Color.primary)
+                            .interactive(),
+                        in: Circle()
+                    )
+                    .accessibilityLabel("完成")
                 }
             }
         }
+        .presentationDetents([.large])
         .interactiveDismissDisabled(isDirty && !didFinish)
         .confirmationDialog("放弃修改？", isPresented: $showDiscardConfirmation, titleVisibility: .visible) {
             Button("放弃修改", role: .destructive) {
@@ -485,22 +499,109 @@ struct CustomReaderSettingsSheet: View {
         }
     }
 
-    private var preview: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("实时预览", systemImage: "eye")
-                    .font(.subheadline.weight(.semibold))
-                Spacer()
-                Text(previewChapterTitle.isEmpty ? bookTitle : previewChapterTitle)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+    private var settingsContent: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            settingsSection("文本") {
+                VStack(spacing: 0) {
+                    fontMenu
+                    cardDivider
+                    Toggle("粗体文本", isOn: $draft.boldText)
+                        .frame(minHeight: Layout.rowHeight)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+                }
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
+                )
             }
 
+            settingsSection("布局选项") {
+                VStack(spacing: 0) {
+                    Toggle("保留出版方样式", isOn: $draft.publisherStyles)
+                        .frame(minHeight: Layout.rowHeight)
+                        .padding(.horizontal, 16)
+                        .contentShape(Rectangle())
+
+                    cardDivider
+
+                    slider(
+                        "行间距",
+                        value: $draft.lineHeight,
+                        range: ReaderLayoutMetrics.lineHeightRange,
+                        step: 0.05,
+                        text: String(format: "%.2f", draft.lineHeight)
+                    )
+
+                    cardDivider
+
+                    slider(
+                        "字符间距",
+                        value: $draft.characterSpacing,
+                        range: ReaderLayoutMetrics.characterSpacingRange,
+                        step: 1,
+                        text: "\(Int(draft.characterSpacing))%"
+                    )
+
+                    cardDivider
+
+                    slider(
+                        "词间距",
+                        value: $draft.wordSpacing,
+                        range: ReaderLayoutMetrics.wordSpacingRange,
+                        step: 2,
+                        text: "\(Int(draft.wordSpacing))%"
+                    )
+
+                    cardDivider
+
+                    slider(
+                        "页边空白",
+                        value: $draft.pageMargins,
+                        range: ReaderLayoutMetrics.pageMarginsRange,
+                        step: ReaderLayoutMetrics.pageMarginsStep,
+                        text: "\(Int(draft.pageMargins.rounded())) pt"
+                    )
+                }
+                .background(
+                    Color(uiColor: .secondarySystemGroupedBackground),
+                    in: RoundedRectangle(cornerRadius: Layout.cardCornerRadius, style: .continuous)
+                )
+
+                Text("正文上下边距固定为上 116 pt、下 84 pt；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func settingsSection<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.title3.weight(.semibold))
+                .padding(.horizontal, 4)
+
+            content()
+        }
+    }
+
+    private var cardDivider: some View {
+        Divider()
+            .padding(.leading, 16)
+    }
+
+    private var preview: some View {
+        Group {
             if isLoadingPreview && previewText.isEmpty {
                 ProgressView("正在载入正文…")
             } else if previewText.isEmpty {
-                Text("暂时无法载入正文预览").foregroundStyle(.secondary)
+                Text("暂时无法载入正文预览")
+                    .foregroundStyle(.secondary)
             } else {
                 Text(previewText)
                     .font(previewFont)
@@ -509,15 +610,30 @@ struct CustomReaderSettingsSheet: View {
                     .lineSpacing(CGFloat(draft.lineHeight - 1) * 8)
                     .padding(.horizontal, previewPageMarginInset)
                     .lineLimit(7)
+                    .frame(maxWidth: .infinity, alignment: .topLeading)
             }
         }
         .foregroundStyle(Color(uiColor: previewContentColor))
-        .padding(16)
-        .frame(maxWidth: .infinity, minHeight: 190, alignment: .topLeading)
-        .background(
-            Color(uiColor: previewBackgroundColor),
-            in: RoundedRectangle(cornerRadius: 22, style: .continuous)
+        .padding(.horizontal, 16)
+        .padding(.top, 18)
+        .padding(.bottom, 24)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("正文预览")
+    }
+
+    private var previewBottomMask: some View {
+        LinearGradient(
+            stops: [
+                .init(color: Color(uiColor: previewBackgroundColor), location: 0),
+                .init(color: Color(uiColor: previewBackgroundColor).opacity(0.92), location: 0.55),
+                .init(color: Color(uiColor: previewBackgroundColor).opacity(0), location: 1)
+            ],
+            startPoint: .top,
+            endPoint: .bottom
         )
+        .frame(height: Layout.previewMaskHeight)
+        .allowsHitTesting(false)
     }
 
     private var previewPageMarginInset: CGFloat {
@@ -546,25 +662,33 @@ struct CustomReaderSettingsSheet: View {
                 .accessibilityLabel(family.label)
             }
         } label: {
-            HStack {
-                Label("字体", systemImage: "textformat")
+            HStack(spacing: 12) {
+                HStack(alignment: .firstTextBaseline, spacing: 0) {
+                    Text("大")
+                        .font(draft.fontFamily.swiftUIFont(ofSize: 23))
+                    Text("小")
+                        .font(draft.fontFamily.swiftUIFont(ofSize: 13))
+                }
+                .frame(width: 50, alignment: .leading)
+                .accessibilityHidden(true)
+
+                Text("字体")
+                    .font(.body)
+
                 Spacer()
                 Text(draft.fontFamily.label)
                     .font(draft.fontFamily.swiftUIFont(ofSize: 16))
                     .foregroundStyle(.secondary)
-                Image(systemName: "chevron.up.chevron.down")
+                Image(systemName: "chevron.right")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
-            .frame(minHeight: 48)
+            .frame(maxWidth: .infinity, minHeight: Layout.rowHeight, alignment: .leading)
+            .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
-        .glassEffect(
-            .regular,
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
-        )
         .accessibilityLabel("字体")
         .accessibilityValue(draft.fontFamily.label)
     }
@@ -584,7 +708,9 @@ struct CustomReaderSettingsSheet: View {
             }
             Slider(value: value, in: range, step: step).tint(.accentColor)
         }
-        .padding(.horizontal, 4)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
     }
 
     private func cancel() {
