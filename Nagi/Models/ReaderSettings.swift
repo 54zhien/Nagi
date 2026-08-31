@@ -174,38 +174,60 @@ enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Se
         }
     }
 
-    /// PostScript names used by UIKit and SwiftUI for the bundled/system
-    /// regular faces.  These are not the user-facing labels.
-    var uiFontName: String? {
+    /// Known system face names used by UIKit and SwiftUI.  The first name in
+    /// each list is the current face name; the remaining names keep older
+    /// supported OS releases on a safe system-font fallback path.
+    var uiFontNames: [String] {
         switch self {
-        case .original: return nil
-        case .pingFang: return "PingFangSC-Regular"
-        case .song: return "STSongti-Regular-SC"
-        case .kai: return "STKaiti"
-        case .yuan: return "STYuanti-SC-Regular"
+        case .original, .pingFang:
+            return []
+        case .song:
+            return [
+                "STSongti-SC-Regular",
+                "STSongtiSC-Regular",
+                "STSong"
+            ]
+        case .kai:
+            return [
+                "STKaiti-SC-Regular",
+                "STKaitiSC-Regular",
+                "STKaiti"
+            ]
+        case .yuan:
+            return [
+                "STYuanti-SC-Regular",
+                "STYuantiSC-Regular"
+            ]
         }
     }
 
-    /// The resource name used by Readium's HTML font declarations.  The
-    /// extension is intentionally omitted for `Bundle.url` lookup.
-    var bundledFontResourceName: String? {
+    /// The system family names used only as a targeted fallback when a
+    /// particular OS exposes a different regular-face alias.
+    private var uiFontFamilyName: String? {
         switch self {
         case .original, .pingFang: return nil
-        case .song: return "NagiSong-Regular"
-        case .kai: return "NagiKaiti-Regular"
-        case .yuan: return "NagiYuanti-Regular"
+        case .song: return "Songti SC"
+        case .kai: return "Kaiti SC"
+        case .yuan: return "Yuanti SC"
         }
     }
 
-    /// The CSS family aliases used inside the EPUB Navigator.  Aliases keep
-    /// the web renderer independent from the internal names in the TTF files.
+    /// The system font used for the light-weight PingFang choice.  The
+    /// remaining cases use a named system face above and regular is only the
+    /// final fallback when that face is unavailable on an older OS.
+    var systemFontWeight: UIFont.Weight {
+        self == .pingFang ? .light : .regular
+    }
+
+    /// CSS family names used inside the EPUB Navigator.  These are deliberately
+    /// separate from UIKit's PostScript face names because Readium emits CSS.
     var readiumFamilyName: String? {
         switch self {
         case .original: return nil
-        case .pingFang: return "PingFang SC"
-        case .song: return "Nagi Song"
-        case .kai: return "Nagi Kaiti"
-        case .yuan: return "Nagi Yuanti"
+        case .pingFang: return "-apple-system"
+        case .song: return "Songti SC"
+        case .kai: return "Kaiti SC"
+        case .yuan: return "Yuanti SC"
         }
     }
 
@@ -241,16 +263,36 @@ enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Se
         try container.encode(rawValue)
     }
 
+    private func resolvedUIFont(at size: CGFloat) -> UIFont? {
+        for name in uiFontNames {
+            if let font = UIFont(name: name, size: size) {
+                return font
+            }
+        }
+
+        guard let familyName = uiFontFamilyName else { return nil }
+        let regularName = UIFont.fontNames(forFamilyName: familyName)
+            .first { $0.localizedCaseInsensitiveContains("regular") }
+        return regularName.flatMap { UIFont(name: $0, size: size) }
+    }
+
+    private func resolvedUIFontName(at size: CGFloat) -> String? {
+        resolvedUIFont(at: size)?.fontName
+    }
+
     func uiFont(ofSize size: CGFloat) -> UIFont {
-        let baseFont = uiFontName.flatMap { UIFont(name: $0, size: size) }
-            ?? UIFont.systemFont(ofSize: size)
+        let baseFont = resolvedUIFont(at: size)
+            ?? UIFont.systemFont(ofSize: size, weight: systemFontWeight)
         return UIFontMetrics(forTextStyle: .body).scaledFont(for: baseFont)
     }
 
     /// Font used by the SwiftUI settings preview and each menu item.
     func swiftUIFont(ofSize size: CGFloat) -> Font {
-        guard let uiFontName else {
-            return .system(size: size)
+        if self == .pingFang {
+            return .system(size: size, weight: .light)
+        }
+        guard let uiFontName = resolvedUIFontName(at: size) else {
+            return .system(size: size, weight: .regular)
         }
         return .custom(uiFontName, size: size)
     }

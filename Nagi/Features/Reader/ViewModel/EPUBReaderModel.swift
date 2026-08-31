@@ -215,32 +215,12 @@ private extension ReaderFontFamily {
             return FontFamily(rawValue: readiumFamilyName ?? "sans-serif")
         }
     }
-}
 
-private enum ReaderEmbeddedFontDeclarations {
-    static let all: [AnyHTMLFontFamilyDeclaration] = ReaderFontFamily.options.compactMap { family in
-        guard let resourceName = family.bundledFontResourceName,
-              let familyName = family.readiumFamilyName,
-              let resourceURL = Bundle.main.url(
-                  forResource: resourceName,
-                  withExtension: "ttf"
-              ),
-              let file = FileURL(url: resourceURL)
-        else {
-            return nil
-        }
-
-        let fontFamily = FontFamily(rawValue: familyName)
-        return CSSFontFamilyDeclaration(
-            fontFamily: fontFamily,
-            fontFaces: [
-                CSSFontFace(
-                    file: file,
-                    style: .normal,
-                    weight: .standard(.normal)
-                )
-            ]
-        ).eraseToAnyHTMLFontFamilyDeclaration()
+    /// Readium converts 1.0 to CSS 400 and 1.75 to CSS 700.  Use CSS 300 for
+    /// the lighter system-font choice while preserving the existing bold
+    /// switch below.
+    var readiumFontWeight: Double {
+        self == .pingFang ? 0.75 : 1.0
     }
 }
 
@@ -467,7 +447,6 @@ final class EPUBReaderModel {
                     disablePageTurnsWhileScrolling: true,
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6,
-                    fontFamilyDeclarations: ReaderEmbeddedFontDeclarations.all,
                     readiumCSSRSProperties: CSSRSProperties(
                         pageGutter: CSSPxLength(ReaderLayoutMetrics.pageMarginBase)
                     )
@@ -786,7 +765,7 @@ final class EPUBReaderModel {
             ),
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
-            fontWeight: boldText ? 1.75 : 1.0,
+            fontWeight: boldText ? 1.75 : fontFamily.readiumFontWeight,
             letterSpacing: 0,
             lineHeight: lineHeight,
             pageMargins: ReaderLayoutMetrics.pageMarginFactor(for: pageMargins),

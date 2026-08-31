@@ -15,9 +15,6 @@
 		4A0000000000000000000005 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000005 /* SearchView.swift */; };
 		4A0000000000000000000006 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000006 /* Assets.xcassets */; };
 		4A0000000000000000000007 /* AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000008 /* AppIcon.icon */; };
-		4A0000000000000000000080 /* NagiSong-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000080 /* NagiSong-Regular.ttf */; };
-		4A0000000000000000000081 /* NagiKaiti-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000081 /* NagiKaiti-Regular.ttf */; };
-		4A0000000000000000000082 /* NagiYuanti-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000082 /* NagiYuanti-Regular.ttf */; };
 		4A0000000000000000000008 /* FileImportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000009 /* FileImportService.swift */; };
 		4A0000000000000000000009 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000000A /* Book.swift */; };
 		4A000000000000000000000A /* ModelContainer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000000B /* ModelContainer.swift */; };
@@ -81,9 +78,6 @@
 		3A0000000000000000000006 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		3A0000000000000000000007 /* Nagi.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Nagi.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		3A0000000000000000000008 /* AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = wrapper.icon; path = AppIcon.icon; sourceTree = "<group>"; };
-		3A0000000000000000000080 /* NagiSong-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiSong-Regular.ttf; sourceTree = "<group>"; };
-		3A0000000000000000000081 /* NagiKaiti-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiKaiti-Regular.ttf; sourceTree = "<group>"; };
-		3A0000000000000000000082 /* NagiYuanti-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiYuanti-Regular.ttf; sourceTree = "<group>"; };
 		3A0000000000000000000009 /* FileImportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FileImportService.swift; sourceTree = "<group>"; };
 		3A000000000000000000000A /* Book.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Book.swift; sourceTree = "<group>"; };
 		3A000000000000000000000B /* ModelContainer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelContainer.swift; sourceTree = "<group>"; };
@@ -197,19 +191,8 @@
 		2A0000000000000000000014 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
-				2A0000000000000000000015 /* Fonts */,
 			);
 			path = Resources;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000015 /* Fonts */ = {
-			isa = PBXGroup;
-			children = (
-				3A0000000000000000000080 /* NagiSong-Regular.ttf */,
-				3A0000000000000000000081 /* NagiKaiti-Regular.ttf */,
-				3A0000000000000000000082 /* NagiYuanti-Regular.ttf */,
-			);
-			path = Fonts;
 			sourceTree = "<group>";
 		};
 		2A0000000000000000000005 /* Home */ = {
@@ -487,9 +470,6 @@
 			files = (
 				4A0000000000000000000006 /* Assets.xcassets in Resources */,
 				4A0000000000000000000007 /* AppIcon.icon in Resources */,
-				4A0000000000000000000080 /* NagiSong-Regular.ttf in Resources */,
-				4A0000000000000000000081 /* NagiKaiti-Regular.ttf in Resources */,
-				4A0000000000000000000082 /* NagiYuanti-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
