@@ -85,6 +85,10 @@ final class TextKitRenderer: ReaderRenderer {
         )
     }
 
+    func waitForVisualUpdate() async {
+        await Task.yield()
+    }
+
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
         model.updateViewport(size: size, safeAreaInsets: safeAreaInsets)
         _ = displayScale
@@ -236,6 +240,10 @@ final class ReadiumRenderer: ReaderRenderer {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         )
+    }
+
+    func waitForVisualUpdate() async {
+        await model.waitForVisualUpdate()
     }
 
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {

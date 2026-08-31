@@ -267,6 +267,7 @@ struct EPUBReaderDraft: Equatable {
 struct ReaderFontDiagnostics: Equatable {
     let appSelection: String
     let nativeFontFace: String
+    let nativeFamilyReport: String
     let requestedCSSFamily: String
     let readiumPreference: String
     let rootCSSFamily: String
@@ -278,6 +279,7 @@ struct ReaderFontDiagnostics: Equatable {
     let resourceURL: String
     let fontFaceCount: Int?
     let fontChecks: [String: Bool?]
+    let publisherFontRuleReport: String
     let errorMessage: String?
 }
 #endif
@@ -513,6 +515,84 @@ final class EPUBReaderModel {
         } catch {
             let formatName = book.format == .txt ? "TXT" : "EPUB"
             errorMessage = "无法打开 \(formatName)：\(error.localizedDescription)"
+        }
+    }
+
+    /// Best-effort readiness signal for a preference-driven WebKit repaint.
+    /// Readium's public submitPreferences API does not expose a completion
+    /// callback in this version, so query the active document until its DOM,
+    /// layout metrics and effective backgrounds are stable twice in a row. The
+    /// caller adds a short paint-settle interval before removing the visual
+    /// transition cover.
+    func waitForVisualUpdate() async {
+        guard let navigator else { return }
+
+        let retryDelays: [UInt64] = [
+            0,
+            30_000_000,
+            80_000_000,
+            160_000_000,
+            300_000_000,
+        ]
+        let script = """
+        (() => {
+            if (
+                document.readyState !== 'complete'
+                || !document.documentElement
+                || !document.body
+            ) {
+                return '';
+            }
+
+            const root = document.documentElement;
+            const body = document.body;
+            const rootStyle = getComputedStyle(root);
+            const bodyStyle = getComputedStyle(body);
+            const fontStatus = document.fonts ? document.fonts.status : '';
+
+            return [
+                Math.round(root.scrollWidth),
+                Math.round(root.scrollHeight),
+                Math.round(body.scrollWidth),
+                Math.round(body.scrollHeight),
+                rootStyle.backgroundColor,
+                bodyStyle.backgroundColor,
+                fontStatus
+            ].join('|');
+        })();
+        """
+        var previousFingerprint: String?
+        var stableSamples = 0
+
+        for delay in retryDelays {
+            if delay > 0 {
+                do {
+                    try await Task.sleep(nanoseconds: delay)
+                } catch {
+                    return
+                }
+            }
+
+            guard !Task.isCancelled else { return }
+
+            let result = await navigator.evaluateJavaScript(script)
+            guard case let .success(value) = result,
+                  let fingerprint = value as? String,
+                  !fingerprint.isEmpty
+            else {
+                continue
+            }
+
+            if fingerprint == previousFingerprint {
+                stableSamples += 1
+            } else {
+                previousFingerprint = fingerprint
+                stableSamples = 1
+            }
+
+            if stableSamples >= 2 {
+                return
+            }
         }
     }
 
@@ -1019,6 +1099,39 @@ final class EPUBReaderModel {
         "Yuanti SC",
     ]
 
+    private static let diagnosticUIFontFamilies = [
+        "PingFang SC",
+        "Songti SC",
+        "Kaiti SC",
+        "Yuanti SC",
+    ]
+
+    private func nativeFamilyReport() -> String {
+        Self.diagnosticUIFontFamilies.map { expectedFamily in
+            let matches = UIFont.familyNames
+                .filter { familyName in
+                    familyName.compare(
+                        expectedFamily,
+                        options: [.caseInsensitive, .diacriticInsensitive]
+                    ) == .orderedSame
+                    || familyName.localizedCaseInsensitiveContains(expectedFamily)
+                }
+                .sorted()
+
+            guard !matches.isEmpty else {
+                return "\(expectedFamily)：未找到 UIKit family"
+            }
+
+            let faces = matches.map { familyName in
+                let fontNames = UIFont.fontNames(forFamilyName: familyName).sorted()
+                let faceList = fontNames.isEmpty ? "未找到 face" : fontNames.joined(separator: ", ")
+                return "  \(familyName) → \(faceList)"
+            }
+            return "\(expectedFamily)：\n" + faces.joined(separator: "\n")
+        }
+        .joined(separator: "\n")
+    }
+
     private func makeFontDiagnosticsScript(readiumPreference: String?) -> String {
         let families = Self.diagnosticFontFamilies
             .map(Self.javascriptStringLiteral)
@@ -1052,6 +1165,125 @@ final class EPUBReaderModel {
                     : null;
             }
 
+            const probeTargets = [
+                ["html", root],
+                ["body", body],
+                [element ? element.tagName.toLowerCase() : "element", element]
+            ];
+            const publisherFontRules = [];
+            let blockedStylesheetCount = 0;
+
+            const selectorMatchesProbe = (selector) => {
+                if (!selector) return false;
+
+                for (const [, target] of probeTargets) {
+                    if (!target) continue;
+                    try {
+                        if (target.matches(selector)) return true;
+                    } catch (_) {
+                        // Some EPUB selectors are not accepted by Element.matches.
+                    }
+                }
+                return false;
+            };
+
+            const appendPublisherFontRule = (
+                source,
+                selector,
+                family,
+                priority,
+                appliesTo
+            ) => {
+                const readiumOwned = /readium|nagi-reader-font-override/i.test(
+                    [source, selector, family].join(" ")
+                );
+                if (readiumOwned) return;
+
+                publisherFontRules.push(
+                    appliesTo + " | " + source + " | " + selector + " | " + family
+                    + (priority ? " !important" : "")
+                );
+            };
+
+            const scanRules = (rules, source) => {
+                for (const rule of Array.from(rules || [])) {
+                    if (rule.style && rule.style.getPropertyValue) {
+                        const family = rule.style.getPropertyValue("font-family").trim();
+                        if (family) {
+                            const selector = rule.selectorText
+                                || (rule.type === 5
+                                    ? "@font-face"
+                                    : ((rule.cssText || "").split("{")[0] || "(unknown)").trim());
+                            const priority = rule.style.getPropertyPriority("font-family");
+                            const appliesTo = rule.type === 5
+                                ? "@font-face"
+                                : (selectorMatchesProbe(rule.selectorText)
+                                    ? "匹配正文"
+                                    : "未匹配正文");
+                            appendPublisherFontRule(
+                                source,
+                                selector,
+                                family,
+                                priority,
+                                appliesTo
+                            );
+                        }
+                    }
+
+                    if (rule.cssRules) {
+                        scanRules(rule.cssRules, source);
+                    }
+
+                    if (rule.styleSheet) {
+                        try {
+                            scanRules(
+                                rule.styleSheet.cssRules,
+                                rule.styleSheet.href || source
+                            );
+                        } catch (_) {
+                            blockedStylesheetCount += 1;
+                        }
+                    }
+                }
+            };
+
+            const appendInlinePublisherRule = (label, target) => {
+                if (!target || !target.style) return;
+                const family = target.style.getPropertyValue("font-family").trim();
+                if (!family) return;
+
+                appendPublisherFontRule(
+                    "inline style",
+                    label,
+                    family,
+                    target.style.getPropertyPriority("font-family"),
+                    "内联"
+                );
+            };
+
+            for (const [label, target] of probeTargets) {
+                appendInlinePublisherRule(label, target);
+            }
+
+            for (const sheet of Array.from(document.styleSheets || [])) {
+                const ownerNode = sheet.ownerNode;
+                const ownerID = ownerNode && ownerNode.id ? "#" + ownerNode.id : "";
+                const source = (sheet.href || "inline<style>") + ownerID;
+
+                try {
+                    scanRules(sheet.cssRules, source);
+                } catch (_) {
+                    blockedStylesheetCount += 1;
+                }
+            }
+
+            const publisherFontRuleReport = publisherFontRules.length
+                ? publisherFontRules.slice(0, 80).join("\\n")
+                : "未发现非 Readium font-family 规则";
+            const stylesheetWarning = blockedStylesheetCount > 0
+                ? "\\n扫描提示：有 " + blockedStylesheetCount + " 个 stylesheet 无法读取"
+                : "";
+
             return {
                 requestedFontFamily: \(requestedFontFamily),
                 readiumPreference: \(appliedReadiumPreference),
@@ -1063,7 +1295,8 @@ final class EPUBReaderModel {
                 readyState: document.readyState,
                 resourceURL: location.href,
                 fontFaceCount: document.fonts ? document.fonts.size : null,
-                fontChecks: fontChecks
+                fontChecks: fontChecks,
+                publisherFontRuleReport: publisherFontRuleReport + stylesheetWarning
             };
         })();
         """
@@ -1083,6 +1316,7 @@ final class EPUBReaderModel {
         return ReaderFontDiagnostics(
             appSelection: fontFamily.label,
             nativeFontFace: nativeFontFace,
+            nativeFamilyReport: nativeFamilyReport(),
             requestedCSSFamily: Self.stringValue(
                 dictionary["requestedFontFamily"],
                 fallback: fallbackCSSFamily
@@ -1100,6 +1334,10 @@ final class EPUBReaderModel {
             resourceURL: Self.stringValue(dictionary["resourceURL"]),
             fontFaceCount: Self.intValue(dictionary["fontFaceCount"]),
             fontChecks: fontChecks,
+            publisherFontRuleReport: Self.stringValue(
+                dictionary["publisherFontRuleReport"],
+                fallback: "当前资源没有返回 publisher CSS 扫描结果"
+            ),
             errorMessage: nil
         )
     }
@@ -1114,6 +1352,7 @@ final class EPUBReaderModel {
         ReaderFontDiagnostics(
             appSelection: fontFamily.label,
             nativeFontFace: resolvedNativeFontFace(),
+            nativeFamilyReport: nativeFamilyReport(),
             requestedCSSFamily: fontFamily.readiumFamilyName ?? "-apple-system",
             readiumPreference: fontFamily.readiumFontFamily.rawValue,
             rootCSSFamily: "",
@@ -1125,6 +1364,7 @@ final class EPUBReaderModel {
             resourceURL: "",
             fontFaceCount: nil,
             fontChecks: unknownChecks,
+            publisherFontRuleReport: "当前未连接到 EPUB 正文，无法扫描 publisher CSS",
             errorMessage: error
         )
     }

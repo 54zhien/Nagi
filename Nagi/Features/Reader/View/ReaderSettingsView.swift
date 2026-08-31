@@ -11,6 +11,7 @@ import UIKit
 struct MediumReaderSettingsView: View {
     let model: ReaderViewModel
     let onCustomSettings: () -> Void
+    let onBeforeThemeChange: () -> Void
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -25,11 +26,13 @@ struct MediumReaderSettingsView: View {
     init(
         model: ReaderViewModel,
         systemBrightness: Binding<Double>,
-        onCustomSettings: @escaping () -> Void
+        onCustomSettings: @escaping () -> Void,
+        onBeforeThemeChange: @escaping () -> Void = {}
     ) {
         self.model = model
         self._systemBrightness = systemBrightness
         self.onCustomSettings = onCustomSettings
+        self.onBeforeThemeChange = onBeforeThemeChange
     }
 
     var body: some View {
@@ -251,7 +254,7 @@ struct MediumReaderSettingsView: View {
 
     private var appearanceMenu: some View {
         Menu {
-            Picker("外观模式", selection: model.binding(\ReaderPreferences.appearanceMode)) {
+            Picker("外观模式", selection: appearanceSelection) {
                 ForEach(ReaderAppearanceMode.allCases) { mode in
                     Label {
                         Text(mode.label)
@@ -273,6 +276,17 @@ struct MediumReaderSettingsView: View {
         .glassEffect(.regular.interactive(), in: Capsule())
         .accessibilityLabel("外观模式")
         .accessibilityValue(model.preferences.appearanceMode.label)
+    }
+
+    private var appearanceSelection: Binding<ReaderAppearanceMode> {
+        Binding(
+            get: { model.preferences.appearanceMode },
+            set: { newValue in
+                guard newValue != model.preferences.appearanceMode else { return }
+                onBeforeThemeChange()
+                model.setAppearance(newValue)
+            }
+        )
     }
 
     @ViewBuilder
@@ -327,6 +341,8 @@ struct MediumReaderSettingsView: View {
         let cardShape = RoundedRectangle(cornerRadius: 18, style: .continuous)
 
         return Button {
+            guard model.preferences.themePreset != preset else { return }
+            onBeforeThemeChange()
             model.selectPreset(preset)
         } label: {
             ZStack(alignment: .topTrailing) {
@@ -909,6 +925,8 @@ private struct FontDiagnosticsView: View {
         }
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
+        diagnosticBlock("UIKit Family / Face 扫描", diagnostics.nativeFamilyReport)
+
         VStack(alignment: .leading, spacing: 0) {
             Text("WebKit Font Check")
                 .font(.headline)
@@ -927,6 +945,11 @@ private struct FontDiagnosticsView: View {
             }
         }
         .background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+        diagnosticBlock(
+            "EPUB Publisher CSS font-family",
+            diagnostics.publisherFontRuleReport
+        )
 
         if let errorMessage = diagnostics.errorMessage {
             Text(errorMessage)
@@ -948,6 +971,20 @@ private struct FontDiagnosticsView: View {
                     .textSelection(.enabled)
             }
         }
+    }
+
+    private func diagnosticBlock(_ title: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+            Text(value.isEmpty ? "—" : value)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .padding(16)
+        .background(.quaternary, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 
     private func diagnosticRow(_ title: String, _ value: String, detail: String? = nil) -> some View {

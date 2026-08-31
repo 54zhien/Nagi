@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import UIKit
 
 struct ReaderChrome<Content: View>: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,6 +23,7 @@ struct ReaderChrome<Content: View>: View {
     let onTableOfContents: () -> Void
     let onSettings: () -> Void
     let onSwipeStart: (() -> Void)?
+    let transitionCoordinator: ReaderTransitionCoordinator?
 
     init(
         title: String,
@@ -35,6 +37,7 @@ struct ReaderChrome<Content: View>: View {
         onTableOfContents: @escaping () -> Void,
         onSettings: @escaping () -> Void,
         onSwipeStart: (() -> Void)? = nil,
+        transitionCoordinator: ReaderTransitionCoordinator? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.content = content()
@@ -49,6 +52,7 @@ struct ReaderChrome<Content: View>: View {
         self.onTableOfContents = onTableOfContents
         self.onSettings = onSettings
         self.onSwipeStart = onSwipeStart
+        self.transitionCoordinator = transitionCoordinator
     }
 
     var body: some View {
@@ -58,6 +62,22 @@ struct ReaderChrome<Content: View>: View {
                 content
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .ignoresSafeArea(.container, edges: .all)
+
+                if let transitionCoordinator {
+                    // The snapshot is part of the reading surface, before the
+                    // fixed header and bottom controls added by the modifiers
+                    // below. It hides the WebView/native repaint gap without
+                    // changing those controls' geometry or hit regions.
+                    ReaderSnapshotLayer(coordinator: transitionCoordinator)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+
+                    ReaderSnapshotAnchor(coordinator: transitionCoordinator)
+                        .frame(width: 1, height: 1)
+                        .allowsHitTesting(false)
+                        .accessibilityHidden(true)
+                }
             }
             // 页眉保持现有位置；正文的实际安全区由 Readium 与页面内容 inset 统一处理。
             .safeAreaInset(edge: .top, spacing: 0) {
@@ -269,6 +289,244 @@ private enum ReaderControlMetrics {
     static let swipeMinimumDistance: CGFloat = 10
     // 计时任务以 showControls 变为 true 的状态更新为起点，显示 7 秒后自动收起。
     static let autoHideNanoseconds: UInt64 = 7_000_000_000
+}
+
+/// Owns the short-lived reader snapshot used while Readium applies a visual
+/// preference. The object deliberately lives outside the reader model: the
+/// snapshot is presentation state, not a reading preference or persisted data.
+@MainActor
+final class ReaderTransitionCoordinator {
+    private static let settleNanoseconds: UInt64 = 80_000_000
+    private static let maximumTransitionNanoseconds: UInt64 = 900_000_000
+    private static let fadeDuration: TimeInterval = 0.15
+
+    private weak var captureAnchor: UIView?
+    private weak var snapshotHost: ReaderSnapshotHostView?
+    private weak var activeSnapshot: UIView?
+
+    private var finishTask: Task<Void, Never>?
+    private var fallbackTask: Task<Void, Never>?
+    private var transitionToken = 0
+    private var isTransitionActive = false
+    private var reduceMotion = false
+
+    func register(captureAnchor: UIView) {
+        self.captureAnchor = captureAnchor
+    }
+
+    func register(snapshotHost: ReaderSnapshotHostView) {
+        self.snapshotHost = snapshotHost
+    }
+
+    /// Captures the visible reader before the model submits the new theme.
+    /// Replacing an in-flight snapshot keeps rapid theme taps deterministic.
+    func begin(reduceMotion: Bool) {
+        transitionToken &+= 1
+        cancelTasks()
+        removeSnapshot()
+
+        self.reduceMotion = reduceMotion
+        isTransitionActive = false
+
+        guard
+            let host = snapshotHost,
+            host.bounds.width > 0,
+            host.bounds.height > 0,
+            let source = captureSurface,
+            source.bounds.width > 0,
+            source.bounds.height > 0,
+            let snapshot = source.snapshotView(afterScreenUpdates: false)
+        else {
+            return
+        }
+
+        source.layoutIfNeeded()
+        host.layoutIfNeeded()
+        host.clipsToBounds = false
+        snapshot.frame = host.convert(source.bounds, from: source)
+        snapshot.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        snapshot.isUserInteractionEnabled = false
+        snapshot.accessibilityElementsHidden = true
+        snapshot.isAccessibilityElement = false
+        snapshot.alpha = 1
+        host.addSubview(snapshot)
+
+        activeSnapshot = snapshot
+        isTransitionActive = true
+
+        let token = transitionToken
+        fallbackTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: Self.maximumTransitionNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            self?.finish(token: token)
+        }
+    }
+
+    /// Called after the model has synchronized its new native state. The
+    /// supplied async check waits for Readium's current document to become
+    /// available again, then one more short interval lets WebKit paint it.
+    func readerStateDidUpdate(
+        waitForContent: @escaping @MainActor () async -> Void
+    ) {
+        guard isTransitionActive else { return }
+
+        finishTask?.cancel()
+        let token = transitionToken
+        finishTask = Task { @MainActor [weak self] in
+            await waitForContent()
+
+            guard !Task.isCancelled else { return }
+
+            do {
+                try await Task.sleep(nanoseconds: Self.settleNanoseconds)
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            self?.finish(token: token)
+        }
+    }
+
+    func cancel() {
+        transitionToken &+= 1
+        cancelTasks()
+        isTransitionActive = false
+        removeSnapshot()
+    }
+
+    private var captureSurface: UIView? {
+        guard let captureAnchor else { return nil }
+
+        var fallback: UIView?
+        var current = captureAnchor.superview
+        let windowSize = captureAnchor.window?.bounds.size
+
+        while let view = current, !(view is UIWindow) {
+            let size = view.bounds.size
+            guard size.width > 40, size.height > 40 else {
+                current = view.superview
+                continue
+            }
+
+            fallback = view
+
+            if let windowSize,
+               size.width >= windowSize.width * 0.75,
+               size.height >= windowSize.height * 0.75 {
+                return view
+            }
+
+            current = view.superview
+        }
+
+        return fallback
+    }
+
+    private func finish(token: Int) {
+        guard token == transitionToken, isTransitionActive else { return }
+
+        finishTask?.cancel()
+        finishTask = nil
+        fallbackTask?.cancel()
+        fallbackTask = nil
+        isTransitionActive = false
+
+        guard let snapshot = activeSnapshot else { return }
+
+        if reduceMotion {
+            removeSnapshot()
+            return
+        }
+
+        UIView.animate(
+            withDuration: Self.fadeDuration,
+            delay: 0,
+            options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut]
+        ) {
+            snapshot.alpha = 0
+        } completion: { [weak self, weak snapshot] _ in
+            guard let self, self.transitionToken == token else { return }
+            snapshot?.removeFromSuperview()
+            self.activeSnapshot = nil
+        }
+    }
+
+    private func cancelTasks() {
+        finishTask?.cancel()
+        finishTask = nil
+        fallbackTask?.cancel()
+        fallbackTask = nil
+    }
+
+    private func removeSnapshot() {
+        activeSnapshot?.removeFromSuperview()
+        activeSnapshot = nil
+    }
+}
+
+struct ReaderSnapshotLayer: UIViewRepresentable {
+    let coordinator: ReaderTransitionCoordinator
+
+    func makeUIView(context: Context) -> ReaderSnapshotHostView {
+        let view = ReaderSnapshotHostView()
+        view.isUserInteractionEnabled = false
+        view.accessibilityElementsHidden = true
+        view.coordinator = coordinator
+        coordinator.register(snapshotHost: view)
+        return view
+    }
+
+    func updateUIView(_ uiView: ReaderSnapshotHostView, context: Context) {
+        uiView.coordinator = coordinator
+        coordinator.register(snapshotHost: uiView)
+    }
+}
+
+final class ReaderSnapshotHostView: UIView {
+    weak var coordinator: ReaderTransitionCoordinator?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        coordinator?.register(snapshotHost: self)
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        coordinator?.register(snapshotHost: self)
+    }
+}
+
+struct ReaderSnapshotAnchor: UIViewRepresentable {
+    let coordinator: ReaderTransitionCoordinator
+
+    func makeUIView(context: Context) -> ReaderSnapshotAnchorView {
+        let view = ReaderSnapshotAnchorView()
+        view.isUserInteractionEnabled = false
+        view.accessibilityElementsHidden = true
+        view.coordinator = coordinator
+        coordinator.register(captureAnchor: view)
+        return view
+    }
+
+    func updateUIView(_ uiView: ReaderSnapshotAnchorView, context: Context) {
+        uiView.coordinator = coordinator
+        coordinator.register(captureAnchor: uiView)
+    }
+}
+
+final class ReaderSnapshotAnchorView: UIView {
+    weak var coordinator: ReaderTransitionCoordinator?
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        coordinator?.register(captureAnchor: self)
+    }
 }
 
 struct ReaderTOCItem: Identifiable, Hashable {

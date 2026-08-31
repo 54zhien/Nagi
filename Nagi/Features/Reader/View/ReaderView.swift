@@ -93,6 +93,7 @@ private struct ReaderLoadingView: View {
 
 private struct ReaderSessionView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
 
@@ -103,6 +104,7 @@ private struct ReaderSessionView: View {
     @State private var showSettings = false
     @State private var showTableOfContents = false
     @State private var showCustomSettings = false
+    @State private var transitionCoordinator = ReaderTransitionCoordinator()
 
     var body: some View {
         ReaderChrome(
@@ -116,14 +118,23 @@ private struct ReaderSessionView: View {
             onDismiss: dismissReader,
             onTableOfContents: { showTableOfContents = true },
             onSettings: { showSettings = true },
-            onSwipeStart: hideControlsForSwipe
+            onSwipeStart: hideControlsForSwipe,
+            transitionCoordinator: transitionCoordinator
         ) {
             content
         }
         .onChange(of: colorScheme) { _, newValue in
+            guard model.preferences.appearanceMode == .system else { return }
+            transitionCoordinator.begin(reduceMotion: reduceMotion)
             model.updateSystemAppearance(isDark: newValue == .dark)
         }
+        .onChange(of: model.stateRevision) { _, _ in
+            transitionCoordinator.readerStateDidUpdate {
+                await model.waitForVisualUpdate()
+            }
+        }
         .onDisappear {
+            transitionCoordinator.cancel()
             model.saveProgress()
             try? modelContext.save()
             model.tearDown()
@@ -174,6 +185,9 @@ private struct ReaderSessionView: View {
                 systemBrightness: $systemBrightness,
                 onCustomSettings: {
                     showCustomSettings = true
+                },
+                onBeforeThemeChange: {
+                    transitionCoordinator.begin(reduceMotion: reduceMotion)
                 }
             )
             .navigationTitle("主题与排版")
