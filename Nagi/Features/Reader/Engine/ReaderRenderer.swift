@@ -98,6 +98,9 @@ final class TextKitRenderer: ReaderRenderer {
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool {
         let changed = model.updateViewport(size: size, safeAreaInsets: safeAreaInsets)
         _ = displayScale
+        if changed {
+            onStateChange?()
+        }
         return changed
     }
 

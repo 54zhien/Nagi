@@ -39,6 +39,7 @@ final class ReaderChromeView: UIView {
     private var externalSafeAreaInsets: UIEdgeInsets?
     private var currentControlTint: UIColor?
     private var currentControlReduceMotion = false
+    private var accessibilityActionName: String?
 
     private var cachedBounds = CGRect.null
     private var cachedSafeAreaInsets = UIEdgeInsets.zero
@@ -399,11 +400,15 @@ final class ReaderChromeView: UIView {
     }
 
     private func updateAccessibilityActions() {
+        let actionName = isControlsVisible ? "隐藏阅读控件" : "显示阅读控件"
+        guard accessibilityActionName != actionName else { return }
+
+        accessibilityActionName = actionName
         accessibilityCustomActions = [
             UIAccessibilityCustomAction(
-                name: isControlsVisible ? "隐藏阅读控件" : "显示阅读控件",
+                name: actionName,
                 target: self,
-                selector: #selector(accessibilityToggleControls)
+                selector: #selector(accessibilityToggleControls(_:))
             )
         ]
     }

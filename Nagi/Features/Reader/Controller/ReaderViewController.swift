@@ -258,7 +258,18 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         _ gestureRecognizer: UIGestureRecognizer,
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
-        true
+        let isManagedGesture = gestureRecognizer === panGestureRecognizer
+            || gestureRecognizer === tapGestureRecognizer
+        let isOtherManagedGesture = otherGestureRecognizer === panGestureRecognizer
+            || otherGestureRecognizer === tapGestureRecognizer
+        guard isManagedGesture || isOtherManagedGesture,
+              let contentView = contentHostController?.view else {
+            return false
+        }
+
+        let peer = isManagedGesture ? otherGestureRecognizer : gestureRecognizer
+        guard let peerView = peer.view else { return false }
+        return peerView === contentView || peerView.isDescendant(of: contentView)
     }
 
     private func updateChrome() {
