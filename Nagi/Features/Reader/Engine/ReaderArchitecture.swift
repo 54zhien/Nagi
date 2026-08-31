@@ -196,12 +196,10 @@ enum ReaderFontSize {
 /// invent its own interpretation. `pageMargins` is the horizontal inset, in
 /// points, applied to both sides of the reading content.
 enum ReaderLayoutMetrics {
-    // Shared by the page header and the renderer's content inset. This is the
-    // header's actual occupied height, not an additional user-configurable
-    // reading margin.
+    // The page header's actual occupied height. Vertical reading clearance is
+    // resolved from the system safe area and the active reader chrome rather
+    // than from a fixed app-wide margin.
     static let pageHeaderHeight = 48.0
-    static let fixedContentTopInset = 116.0
-    static let fixedContentBottomInset = 84.0
     static let fixedParagraphIndent = 2.0
 
     static let pageMarginBase = 24.0
@@ -288,10 +286,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     /// Absolute horizontal page blank in points, applied to both sides.
     var pageMargins: Double
     /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
-    var contentTopInset: Double
-    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
-    var contentBottomInset: Double
-    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
     var paragraphIndent: Double
     var characterSpacing: Double
     var wordSpacing: Double
@@ -311,8 +305,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         lineHeight: Double = ReaderLayoutMetrics.defaultLineHeight,
         paragraphSpacing: Double = 10,
         pageMargins: Double = ReaderLayoutMetrics.defaultPageMargins,
-        contentTopInset: Double = ReaderLayoutMetrics.fixedContentTopInset,
-        contentBottomInset: Double = ReaderLayoutMetrics.fixedContentBottomInset,
         paragraphIndent: Double = ReaderLayoutMetrics.fixedParagraphIndent,
         characterSpacing: Double = ReaderLayoutMetrics.defaultCharacterSpacing,
         wordSpacing: Double = ReaderLayoutMetrics.defaultWordSpacing,
@@ -323,8 +315,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         pageTransition: ReaderPageTransition = .slide,
         showBookTitleInPageHeader: Bool = false
     ) {
-        _ = contentTopInset
-        _ = contentBottomInset
         _ = paragraphIndent
         self.fontSize = fontSize
         self.fontFamily = fontFamily
@@ -332,8 +322,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         self.lineHeight = ReaderLayoutMetrics.clampLineHeight(lineHeight)
         self.paragraphSpacing = paragraphSpacing
         self.pageMargins = ReaderLayoutMetrics.clampPageMargins(pageMargins)
-        self.contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-        self.contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
         self.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
         self.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(characterSpacing)
         self.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(wordSpacing)
@@ -353,8 +341,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case lineHeight
         case paragraphSpacing
         case pageMargins
-        case contentTopInset
-        case contentBottomInset
         case paragraphIndent
         case characterSpacing
         case wordSpacing
@@ -366,7 +352,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case showBookTitleInPageHeader
     }
 
-    private static let currentStorageVersion = 3
+    private static let currentStorageVersion = 4
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -411,8 +397,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         try container.encode(lineHeight, forKey: .lineHeight)
         try container.encode(paragraphSpacing, forKey: .paragraphSpacing)
         try container.encode(pageMargins, forKey: .pageMargins)
-        try container.encode(contentTopInset, forKey: .contentTopInset)
-        try container.encode(contentBottomInset, forKey: .contentBottomInset)
         try container.encode(paragraphIndent, forKey: .paragraphIndent)
         try container.encode(characterSpacing, forKey: .characterSpacing)
         try container.encode(wordSpacing, forKey: .wordSpacing)
@@ -467,8 +451,6 @@ struct ReaderCustomizationDraft: Equatable, Sendable {
     var fontFamily: ReaderFontFamily
     var boldText: Bool
     var lineHeight: Double
-    var contentTopInset: Double
-    var contentBottomInset: Double
     var pageMargins: Double
     var paragraphIndent: Double
     var characterSpacing: Double
@@ -673,6 +655,15 @@ final class ReaderEngine {
         synchronizeFromRenderer()
     }
 
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    func refreshFontDiagnostics() async {
+        if let renderer = renderer as? ReadiumRenderer {
+            await renderer.refreshFontDiagnostics()
+        }
+        synchronizeFromRenderer()
+    }
+#endif
+
     func goForward() {
         renderer.goForward()
     }
@@ -716,6 +707,10 @@ final class ReaderViewModel {
     private(set) var isLoadingPreview = false
     private(set) var preferences: ReaderPreferences
     private(set) var stateRevision = 0
+
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    private(set) var fontDiagnostics: ReaderFontDiagnostics?
+#endif
 
     init(book: Book) {
         self.book = book
@@ -807,8 +802,6 @@ final class ReaderViewModel {
             fontFamily: preferences.fontFamily,
             boldText: preferences.boldText,
             lineHeight: preferences.lineHeight,
-            contentTopInset: ReaderLayoutMetrics.fixedContentTopInset,
-            contentBottomInset: ReaderLayoutMetrics.fixedContentBottomInset,
             pageMargins: preferences.pageMargins,
             paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             characterSpacing: preferences.characterSpacing,
@@ -822,8 +815,6 @@ final class ReaderViewModel {
             preferences.fontFamily = draft.fontFamily
             preferences.boldText = draft.boldText
             preferences.lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
-            preferences.contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-            preferences.contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
             preferences.pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
             preferences.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
             preferences.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
@@ -857,6 +848,13 @@ final class ReaderViewModel {
         synchronize()
     }
 
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    func refreshFontDiagnostics() async {
+        await engine.refreshFontDiagnostics()
+        synchronize()
+    }
+#endif
+
     private func synchronize() {
         let renderer = engine.renderer
         document = engine.document ?? renderer.document
@@ -870,6 +868,11 @@ final class ReaderViewModel {
         previewChapterTitle = renderer.previewChapterTitle
         isLoadingPreview = renderer.isLoadingPreview
         preferences = renderer.preferences
+
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+        fontDiagnostics = (renderer as? ReadiumRenderer)?.fontDiagnostics
+#endif
+
         stateRevision &+= 1
     }
 }

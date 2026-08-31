@@ -256,14 +256,31 @@ struct EPUBReaderDraft: Equatable {
     var fontFamily: EPUBFontFamily
     var boldText: Bool
     var lineHeight: Double
-    var contentTopInset: Double
-    var contentBottomInset: Double
     var pageMargins: Double
     var paragraphIndent: Double
     var characterSpacing: Double
     var wordSpacing: Double
     var publisherStyles: Bool
 }
+
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+struct ReaderFontDiagnostics: Equatable {
+    let appSelection: String
+    let nativeFontFace: String
+    let requestedCSSFamily: String
+    let readiumPreference: String
+    let rootCSSFamily: String
+    let bodyFontFamily: String
+    let elementFontFamily: String
+    let elementTag: String
+    let overridePresent: Bool
+    let readyState: String
+    let resourceURL: String
+    let fontFaceCount: Int?
+    let fontChecks: [String: Bool?]
+    let errorMessage: String?
+}
+#endif
 
 @MainActor
 @Observable
@@ -294,8 +311,6 @@ final class EPUBReaderModel {
     var lineHeight: Double { didSet { preferencesDidChange() } }
     var pageMargins: Double { didSet { preferencesDidChange() } }
     var paragraphIndent: Double { didSet { preferencesDidChange() } }
-    var contentTopInset: Double { didSet { preferencesDidChange() } }
-    var contentBottomInset: Double { didSet { preferencesDidChange() } }
     var characterSpacing: Double { didSet { preferencesDidChange() } }
     var wordSpacing: Double { didSet { preferencesDidChange() } }
     var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
@@ -336,6 +351,10 @@ final class EPUBReaderModel {
     private var previewResourceHref: String?
     private var hasLoaded = false
     private var suppressPreferenceUpdates = false
+
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    var fontDiagnostics: ReaderFontDiagnostics?
+#endif
     private var systemIsDark = false
 
     private enum PreferenceKey {
@@ -347,8 +366,6 @@ final class EPUBReaderModel {
         static let pageMarginAdjustment = "reader.epub.pageMarginAdjustment"
         static let pageMarginPoints = "reader.epub.pageMarginPoints"
         static let paragraphIndent = "reader.epub.paragraphIndent"
-        static let contentTopInset = "reader.epub.contentTopInset"
-        static let contentBottomInset = "reader.epub.contentBottomInset"
         static let characterSpacing = "reader.epub.characterSpacing"
         static let wordSpacing = "reader.epub.wordSpacing"
         static let theme = "reader.epub.theme"
@@ -397,8 +414,6 @@ final class EPUBReaderModel {
             )
         }
         paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
-        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
         characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(
             defaults.object(forKey: PreferenceKey.characterSpacing) as? Double
                 ?? ReaderLayoutMetrics.defaultCharacterSpacing
@@ -594,8 +609,6 @@ final class EPUBReaderModel {
             fontFamily: fontFamily,
             boldText: boldText,
             lineHeight: lineHeight,
-            contentTopInset: contentTopInset,
-            contentBottomInset: contentBottomInset,
             pageMargins: pageMargins,
             paragraphIndent: paragraphIndent,
             characterSpacing: characterSpacing,
@@ -609,8 +622,6 @@ final class EPUBReaderModel {
             fontFamily = draft.fontFamily
             boldText = draft.boldText
             lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
-            contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-            contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
             pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
             paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
             characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
@@ -630,8 +641,6 @@ final class EPUBReaderModel {
             lineHeight: lineHeight,
             paragraphSpacing: 10,
             pageMargins: pageMargins,
-            contentTopInset: ReaderLayoutMetrics.fixedContentTopInset,
-            contentBottomInset: ReaderLayoutMetrics.fixedContentBottomInset,
             paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             characterSpacing: characterSpacing,
             wordSpacing: wordSpacing,
@@ -655,8 +664,6 @@ final class EPUBReaderModel {
             lineHeight = ReaderLayoutMetrics.clampLineHeight(preferences.lineHeight)
             pageMargins = ReaderLayoutMetrics.clampPageMargins(preferences.pageMargins)
             paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
-            contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-            contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
             characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(preferences.characterSpacing)
             wordSpacing = ReaderLayoutMetrics.clampWordSpacing(preferences.wordSpacing)
             publisherStyles = preferences.publisherStyles
@@ -689,6 +696,32 @@ final class EPUBReaderModel {
         onSwipeStart = nil
     }
 
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    func refreshFontDiagnostics() async {
+        guard let navigator else {
+            fontDiagnostics = makeUnavailableFontDiagnostics("Readium Navigator 尚未创建")
+            return
+        }
+
+        guard publication?.metadata.layout != .fixed else {
+            fontDiagnostics = makeUnavailableFontDiagnostics("固定版 EPUB 不使用可重排正文字体")
+            return
+        }
+
+        let result = await navigator.evaluateJavaScript(
+            makeFontDiagnosticsScript(
+                readiumPreference: navigator.settings.fontFamily?.rawValue
+            )
+        )
+        switch result {
+        case let .success(value):
+            fontDiagnostics = makeFontDiagnostics(from: value)
+        case let .failure(error):
+            fontDiagnostics = makeUnavailableFontDiagnostics(error.localizedDescription)
+        }
+    }
+#endif
+
     func resetTypography() {
         withPreferenceUpdatesSuspended {
             fontScale = 1.0
@@ -697,8 +730,6 @@ final class EPUBReaderModel {
             lineHeight = ReaderLayoutMetrics.defaultLineHeight
             pageMargins = ReaderLayoutMetrics.defaultPageMargins
             paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
-            contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-            contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
             characterSpacing = ReaderLayoutMetrics.defaultCharacterSpacing
             wordSpacing = ReaderLayoutMetrics.defaultWordSpacing
             publisherStyles = false
@@ -979,6 +1010,177 @@ final class EPUBReaderModel {
         return String(encoded.dropFirst().dropLast())
     }
 
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    private static let diagnosticFontFamilies = [
+        "-apple-system",
+        "PingFang SC",
+        "Songti SC",
+        "Kaiti SC",
+        "Yuanti SC",
+    ]
+
+    private func makeFontDiagnosticsScript(readiumPreference: String?) -> String {
+        let families = Self.diagnosticFontFamilies
+            .map(Self.javascriptStringLiteral)
+            .joined(separator: ", ")
+        let requestedFontFamily = Self.javascriptStringLiteral(
+            fontFamily.readiumFamilyName ?? "-apple-system"
+        )
+        let appliedReadiumPreference = Self.javascriptStringLiteral(
+            readiumPreference ?? "(nil)"
+        )
+
+        return """
+        (() => {
+            const root = document.documentElement;
+            const body = document.body;
+            const element = document.querySelector("p")
+                || document.querySelector("main")
+                || body;
+            const readiumInlineFont = root
+                ? root.style.getPropertyValue("--USER__fontFamily").trim()
+                : "";
+            const readiumComputedFont = root
+                ? getComputedStyle(root).getPropertyValue("--USER__fontFamily").trim()
+                : "";
+            const fontChecks = {};
+            const families = [\(families)];
+
+            for (const family of families) {
+                fontChecks[family] = document.fonts && document.fonts.check
+                    ? document.fonts.check("16px " + JSON.stringify(family))
+                    : null;
+            }
+
+            return {
+                requestedFontFamily: \(requestedFontFamily),
+                readiumPreference: \(appliedReadiumPreference),
+                rootCSSFamily: readiumInlineFont || readiumComputedFont,
+                bodyFontFamily: body ? getComputedStyle(body).fontFamily : "",
+                elementFontFamily: element ? getComputedStyle(element).fontFamily : "",
+                elementTag: element ? element.tagName.toLowerCase() : "",
+                overridePresent: !!document.getElementById("nagi-reader-font-override"),
+                readyState: document.readyState,
+                resourceURL: location.href,
+                fontFaceCount: document.fonts ? document.fonts.size : null,
+                fontChecks: fontChecks
+            };
+        })();
+        """
+    }
+
+    private func makeFontDiagnostics(from value: Any) -> ReaderFontDiagnostics {
+        let dictionary = Self.dictionary(from: value)
+        let checks = Self.dictionary(from: dictionary["fontChecks"])
+        let fallbackCSSFamily = fontFamily.readiumFamilyName ?? "-apple-system"
+        let nativeFontFace = resolvedNativeFontFace()
+        var fontChecks: [String: Bool?] = [:]
+
+        for family in Self.diagnosticFontFamilies {
+            fontChecks[family] = Self.optionalBool(checks[family])
+        }
+
+        return ReaderFontDiagnostics(
+            appSelection: fontFamily.label,
+            nativeFontFace: nativeFontFace,
+            requestedCSSFamily: Self.stringValue(
+                dictionary["requestedFontFamily"],
+                fallback: fallbackCSSFamily
+            ),
+            readiumPreference: Self.stringValue(
+                dictionary["readiumPreference"],
+                fallback: fontFamily.readiumFontFamily.rawValue
+            ),
+            rootCSSFamily: Self.stringValue(dictionary["rootCSSFamily"]),
+            bodyFontFamily: Self.stringValue(dictionary["bodyFontFamily"]),
+            elementFontFamily: Self.stringValue(dictionary["elementFontFamily"]),
+            elementTag: Self.stringValue(dictionary["elementTag"]),
+            overridePresent: Self.boolValue(dictionary["overridePresent"]),
+            readyState: Self.stringValue(dictionary["readyState"]),
+            resourceURL: Self.stringValue(dictionary["resourceURL"]),
+            fontFaceCount: Self.intValue(dictionary["fontFaceCount"]),
+            fontChecks: fontChecks,
+            errorMessage: nil
+        )
+    }
+
+    private func makeUnavailableFontDiagnostics(_ error: String) -> ReaderFontDiagnostics {
+        let unknownChecks = Dictionary<String, Bool?>(
+            uniqueKeysWithValues: Self.diagnosticFontFamilies.map { family in
+                (family, Optional<Bool>.none)
+            }
+        )
+
+        ReaderFontDiagnostics(
+            appSelection: fontFamily.label,
+            nativeFontFace: resolvedNativeFontFace(),
+            requestedCSSFamily: fontFamily.readiumFamilyName ?? "-apple-system",
+            readiumPreference: fontFamily.readiumFontFamily.rawValue,
+            rootCSSFamily: "",
+            bodyFontFamily: "",
+            elementFontFamily: "",
+            elementTag: "",
+            overridePresent: false,
+            readyState: "",
+            resourceURL: "",
+            fontFaceCount: nil,
+            fontChecks: unknownChecks,
+            errorMessage: error
+        )
+    }
+
+    private func resolvedNativeFontFace() -> String {
+        if fontFamily == .pingFang {
+            return UIFont.systemFont(ofSize: 16, weight: .light).fontName
+        }
+
+        for name in fontFamily.uiFontNames where UIFont(name: name, size: 16) != nil {
+            return name
+        }
+
+        return "未解析（UIKit 将回退到系统默认）"
+    }
+
+    private static func dictionary(from value: Any?) -> [String: Any] {
+        if let dictionary = value as? [String: Any] {
+            return dictionary
+        }
+
+        guard let dictionary = value as? NSDictionary else { return [:] }
+        var result: [String: Any] = [:]
+        for (key, value) in dictionary {
+            if let key = key as? String {
+                result[key] = value
+            }
+        }
+        return result
+    }
+
+    private static func stringValue(_ value: Any?, fallback: String = "") -> String {
+        guard let value, !(value is NSNull) else { return fallback }
+        return value as? String ?? String(describing: value)
+    }
+
+    private static func boolValue(_ value: Any?) -> Bool {
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.boolValue }
+        return false
+    }
+
+    private static func optionalBool(_ value: Any?) -> Bool? {
+        guard let value, !(value is NSNull) else { return nil }
+        if let value = value as? Bool { return value }
+        if let value = value as? NSNumber { return value.boolValue }
+        return nil
+    }
+
+    private static func intValue(_ value: Any?) -> Int? {
+        if let value = value as? Int { return value }
+        if let value = value as? NSNumber { return value.intValue }
+        return nil
+    }
+#endif
+
     private func loadPreviewIfNeeded() {
         let fallbackHref = publication?.readingOrder.first?.href
         guard let href = currentReadingHref ?? fallbackHref else {
@@ -1032,8 +1234,6 @@ final class EPUBReaderModel {
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
         defaults.set(pageMargins, forKey: PreferenceKey.pageMarginPoints)
         defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
-        defaults.set(ReaderLayoutMetrics.fixedContentTopInset, forKey: PreferenceKey.contentTopInset)
-        defaults.set(ReaderLayoutMetrics.fixedContentBottomInset, forKey: PreferenceKey.contentBottomInset)
         defaults.set(characterSpacing, forKey: PreferenceKey.characterSpacing)
         defaults.set(wordSpacing, forKey: PreferenceKey.wordSpacing)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
@@ -1135,8 +1335,8 @@ final class EPUBReaderModel {
 
 extension EPUBReaderModel {
     /// Let Readium reserve only system-protected areas and the visible page
-    /// header's own occupied height. The former 116/84pt app margins are no
-    /// longer part of the active reading viewport.
+    /// header's own occupied height. Reading clearance is derived from the
+    /// current window and chrome instead of an app-wide fixed margin.
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
         var safeAreaInsets = navigator.view.window?.safeAreaInsets ?? navigator.view.safeAreaInsets
         if showBookTitleInPageHeader {

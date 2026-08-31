@@ -87,8 +87,6 @@ final class TXTReaderModel {
     var lineHeight: Double { didSet { styleDidChange() } }
     var paragraphIndent: Double { didSet { styleDidChange() } }
     var pageMargins: Double { didSet { styleDidChange() } }
-    var contentTopInset: Double { didSet { styleDidChange() } }
-    var contentBottomInset: Double { didSet { styleDidChange() } }
     var characterSpacing: Double { didSet { styleDidChange() } }
     var wordSpacing: Double { didSet { styleDidChange() } }
     var theme: ReaderTheme { didSet { styleDidChange() } }
@@ -144,8 +142,6 @@ final class TXTReaderModel {
         static let pageMargins = "reader.txt.pageMargins"
         static let pageMarginAdjustment = "reader.txt.pageMarginAdjustment"
         static let pageMarginPoints = "reader.txt.pageMarginPoints"
-        static let contentTopInset = "reader.txt.contentTopInset"
-        static let contentBottomInset = "reader.txt.contentBottomInset"
         static let characterSpacing = "reader.txt.characterSpacing"
         static let wordSpacing = "reader.txt.wordSpacing"
         static let theme = "reader.txt.theme"
@@ -184,8 +180,6 @@ final class TXTReaderModel {
                 defaults.object(forKey: PreferenceKey.pageMargins) as? Double
             )
         }
-        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
         characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(
             defaults.object(forKey: PreferenceKey.characterSpacing) as? Double
                 ?? ReaderLayoutMetrics.defaultCharacterSpacing
@@ -374,8 +368,8 @@ final class TXTReaderModel {
     var readerInsets: UIEdgeInsets {
         ReaderContentInsetResolver.resolve(
             safeAreaInsets: safeAreaInsets,
-            top: CGFloat(ReaderLayoutMetrics.fixedContentTopInset),
-            bottom: CGFloat(ReaderLayoutMetrics.fixedContentBottomInset),
+            top: 0,
+            bottom: 0,
             horizontal: ReaderLayoutMetrics.pageBlankInset(for: pageMargins)
         )
     }
@@ -1020,8 +1014,6 @@ final class TXTReaderModel {
         lineHeight = ReaderLayoutMetrics.clampLineHeight(preferences.lineHeight)
         paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
         pageMargins = ReaderLayoutMetrics.clampPageMargins(preferences.pageMargins)
-        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
         characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(preferences.characterSpacing)
         wordSpacing = ReaderLayoutMetrics.clampWordSpacing(preferences.wordSpacing)
         appearanceMode = preferences.appearanceMode
@@ -1057,8 +1049,6 @@ final class TXTReaderModel {
             lineHeight: lineHeight,
             paragraphSpacing: 10,
             pageMargins: pageMargins,
-            contentTopInset: ReaderLayoutMetrics.fixedContentTopInset,
-            contentBottomInset: ReaderLayoutMetrics.fixedContentBottomInset,
             paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             characterSpacing: characterSpacing,
             wordSpacing: wordSpacing,
@@ -1336,8 +1326,6 @@ final class TXTReaderModel {
         lineHeight = ReaderLayoutMetrics.defaultLineHeight
         paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
         pageMargins = ReaderLayoutMetrics.defaultPageMargins
-        contentTopInset = ReaderLayoutMetrics.fixedContentTopInset
-        contentBottomInset = ReaderLayoutMetrics.fixedContentBottomInset
         characterSpacing = ReaderLayoutMetrics.defaultCharacterSpacing
         wordSpacing = ReaderLayoutMetrics.defaultWordSpacing
         theme = .light
@@ -1362,8 +1350,6 @@ final class TXTReaderModel {
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
         defaults.set(pageMargins, forKey: PreferenceKey.pageMarginPoints)
         defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
-        defaults.set(ReaderLayoutMetrics.fixedContentTopInset, forKey: PreferenceKey.contentTopInset)
-        defaults.set(ReaderLayoutMetrics.fixedContentBottomInset, forKey: PreferenceKey.contentBottomInset)
         defaults.set(characterSpacing, forKey: PreferenceKey.characterSpacing)
         defaults.set(wordSpacing, forKey: PreferenceKey.wordSpacing)
         defaults.set(theme.rawValue, forKey: PreferenceKey.theme)

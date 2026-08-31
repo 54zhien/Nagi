@@ -189,6 +189,12 @@ final class ReadiumRenderer: ReaderRenderer {
         onStateChange?()
     }
 
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    func refreshFontDiagnostics() async {
+        await model.refreshFontDiagnostics()
+    }
+#endif
+
     func makeContentView(
         onToggleControls: @escaping () -> Void,
         onSwipeStart: @escaping () -> Void

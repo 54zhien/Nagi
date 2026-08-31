@@ -731,8 +731,7 @@ private struct CustomReaderSettingsSheet: View {
             .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
             .lineSpacing(CGFloat(draft.lineHeight - 1.0) * 8)
             .padding(.horizontal, previewHorizontalPadding)
-            .padding(.top, previewTopPadding)
-            .padding(.bottom, previewBottomPadding)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(16)
@@ -751,14 +750,6 @@ private struct CustomReaderSettingsSheet: View {
 
     private var previewHorizontalPadding: CGFloat {
         max(ReaderLayoutMetrics.pageBlankInset(for: draft.pageMargins) - 16, 0)
-    }
-
-    private var previewTopPadding: CGFloat {
-        CGFloat(ReaderLayoutMetrics.fixedContentTopInset * 0.1)
-    }
-
-    private var previewBottomPadding: CGFloat {
-        CGFloat(ReaderLayoutMetrics.fixedContentBottomInset * 0.1)
     }
 
     @ViewBuilder
@@ -915,7 +906,7 @@ private struct CustomReaderSettingsSheet: View {
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
 
-            Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。开启出版方样式后，部分自定义排版可能由书籍本身覆盖。")
+            Text("正文上下留白由系统安全区、页眉和阅读控件动态决定；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。开启出版方样式后，部分自定义排版可能由书籍本身覆盖。")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)

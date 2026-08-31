@@ -355,8 +355,6 @@ struct ReaderSettingsSheet: View {
     @Binding var lineHeight: Double
     @Binding var paragraphIndent: Double
     @Binding var pageMargins: Double
-    @Binding var contentTopInset: Double
-    @Binding var contentBottomInset: Double
     @Binding var characterSpacing: Double
     @Binding var wordSpacing: Double
     @Binding var theme: ReaderTheme
@@ -374,8 +372,6 @@ struct ReaderSettingsSheet: View {
         lineHeight: Binding<Double>,
         paragraphIndent: Binding<Double>,
         pageMargins: Binding<Double>,
-        contentTopInset: Binding<Double>,
-        contentBottomInset: Binding<Double>,
         characterSpacing: Binding<Double>,
         wordSpacing: Binding<Double>,
         theme: Binding<ReaderTheme>,
@@ -391,8 +387,6 @@ struct ReaderSettingsSheet: View {
         self._lineHeight = lineHeight
         self._paragraphIndent = paragraphIndent
         self._pageMargins = pageMargins
-        self._contentTopInset = contentTopInset
-        self._contentBottomInset = contentBottomInset
         self._characterSpacing = characterSpacing
         self._wordSpacing = wordSpacing
         self._theme = theme
@@ -463,7 +457,7 @@ struct ReaderSettingsSheet: View {
                 } header: {
                     Text("页面与正文间距")
                 } footer: {
-                    Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
+                    Text("正文上下留白由系统安全区、页眉和阅读控件动态决定；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
                 }
 
                 Section("背景色") {
