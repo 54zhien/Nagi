@@ -188,7 +188,7 @@ struct LibraryView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(BookCardPressFeedbackStyle())
+                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .modifier(
                                     BookCardSurfaceModifier(
@@ -419,7 +419,7 @@ struct BookCardSurfaceModifier: ViewModifier {
     func body(content: Content) -> some View {
         if isLiquidGlassEnabled {
             content.glassEffect(
-                .regular,
+                .regular.interactive(),
                 in: BookCardMetrics.cardShape
             )
         } else {
@@ -428,71 +428,6 @@ struct BookCardSurfaceModifier: ViewModifier {
                 in: BookCardMetrics.cardShape
             )
         }
-    }
-}
-
-private enum BookCardInteractionMetrics {
-    // 与 SwiftUI onLongPressGesture 的默认识别时长保持一致。
-    static let longPressNanoseconds: UInt64 = 500_000_000
-    static let pressedScale: CGFloat = 0.98
-    static let animationDuration: Double = 0.16
-}
-
-/// 使用 Button 的原生按压状态提供长按确认反馈，不接管点击或系统 contextMenu。
-struct BookCardPressFeedbackStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        BookCardPressFeedbackView(configuration: configuration)
-    }
-}
-
-private struct BookCardPressFeedbackView: View {
-    let configuration: ButtonStyleConfiguration
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isLongPressActive = false
-    @State private var pressAttemptID = 0
-
-    var body: some View {
-        configuration.label
-            .scaleEffect(
-                isLongPressActive && !reduceMotion
-                    ? BookCardInteractionMetrics.pressedScale
-                    : 1
-            )
-            .animation(
-                reduceMotion
-                    ? nil
-                    : .smooth(duration: BookCardInteractionMetrics.animationDuration),
-                value: isLongPressActive
-            )
-            .sensoryFeedback(
-                .selection,
-                trigger: isLongPressActive,
-                condition: { previous, current in
-                    !previous && current
-                }
-            )
-            .onChange(of: configuration.isPressed, initial: true) { _, _ in
-                pressAttemptID += 1
-                isLongPressActive = false
-            }
-            .onDisappear {
-                isLongPressActive = false
-            }
-            .task(id: pressAttemptID) {
-                guard configuration.isPressed else { return }
-
-                do {
-                    try await Task.sleep(
-                        nanoseconds: BookCardInteractionMetrics.longPressNanoseconds
-                    )
-                } catch {
-                    return
-                }
-
-                guard !Task.isCancelled, configuration.isPressed else { return }
-                isLongPressActive = true
-            }
     }
 }
 

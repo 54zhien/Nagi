@@ -42,7 +42,7 @@ struct HomeView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(BookCardPressFeedbackStyle())
+                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .modifier(
                                     BookCardSurfaceModifier(
