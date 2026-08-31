@@ -186,6 +186,10 @@ final class ReadiumRenderer: ReaderRenderer {
     var canGoNext: Bool { model.navigator != nil }
     var canGoPrevious: Bool { model.navigator != nil }
 
+#if DEBUG || NAGI_FONT_DIAGNOSTICS
+    var fontDiagnostics: ReaderFontDiagnostics? { model.fontDiagnostics }
+#endif
+
     func load() async {
         model.onStateChange = { [weak self] in self?.onStateChange?() }
         await model.loadIfNeeded()
