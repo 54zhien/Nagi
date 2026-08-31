@@ -176,9 +176,6 @@ struct MediumReaderSettingsView: View {
                     .scaledToFit()
                     .frame(width: iconPointSize, height: iconPointSize)
                     .foregroundStyle(.primary)
-
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
             }
                 .frame(maxWidth: .infinity, minHeight: 44)
                 .contentShape(Capsule())
@@ -198,23 +195,19 @@ struct MediumReaderSettingsView: View {
                     Label {
                         Text(transition.label)
                     } icon: {
-                        Image(transition.assetName)
-                            .renderingMode(.template)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 22, height: 22)
-                            .foregroundStyle(.primary)
+                        pageTransitionIcon(
+                            for: transition,
+                            pointSize: ReaderPageTransitionIconMetrics.rowPointSize
+                        )
                     }
                         .tag(transition)
                 }
             }
         } label: {
-            Image(model.preferences.pageTransition.assetName)
-                .renderingMode(.template)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 28, height: 28)
-                .foregroundStyle(.primary)
+            pageTransitionIcon(
+                for: model.preferences.pageTransition,
+                pointSize: ReaderPageTransitionIconMetrics.selectedPointSize
+            )
                 .frame(width: 44, height: 44)
                 .contentShape(Rectangle())
         }
@@ -225,6 +218,23 @@ struct MediumReaderSettingsView: View {
         .glassEffect(.regular.interactive(), in: Capsule())
         .accessibilityLabel("翻页方式")
         .accessibilityValue(model.preferences.pageTransition.label)
+    }
+
+    private func pageTransitionIcon(
+        for transition: ReaderPageTransition,
+        pointSize: CGFloat
+    ) -> some View {
+        Image(transition.assetName)
+            .renderingMode(.template)
+            .resizable()
+            .interpolation(.high)
+            .scaledToFit()
+            .frame(width: pointSize, height: pointSize)
+            // The supplied PNGs share a canvas but not the same ink bounds.
+            // This preserves the common layout box while equalizing optical
+            // weight against the SF Symbols beside these controls.
+            .scaleEffect(ReaderPageTransitionIconMetrics.scale(for: transition))
+            .foregroundStyle(.primary)
     }
 
     private var appearanceMenu: some View {
@@ -389,6 +399,20 @@ struct MediumReaderSettingsView: View {
             return true
         case .system:
             return colorScheme == .dark
+        }
+    }
+
+    private enum ReaderPageTransitionIconMetrics {
+        static let rowPointSize: CGFloat = 22
+        static let selectedPointSize: CGFloat = 28
+
+        static func scale(for transition: ReaderPageTransition) -> CGFloat {
+            switch transition {
+            case .slide: return 0.95
+            case .pageCurl: return 1.13
+            case .fade: return 1.14
+            case .scroll: return 0.96
+            }
         }
     }
 

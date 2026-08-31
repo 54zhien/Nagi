@@ -453,8 +453,6 @@ private struct MediumReaderSettingsView: View {
                     .resizable()
                     .scaledToFit()
                     .frame(width: iconPointSize, height: iconPointSize)
-
-                Text(title)
             }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
@@ -465,7 +463,7 @@ private struct MediumReaderSettingsView: View {
                 )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("字号(title)")
+        .accessibilityLabel("字号\(title)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
