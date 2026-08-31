@@ -312,6 +312,7 @@ final class EPUBReaderModel {
     private var publication: Publication?
     /// 当前 Readium 打开的文件。TXT 会指向派生 EPUB，预览不能再读取原始 TXT。
     private var activePublicationURL: URL?
+    @ObservationIgnored
     private lazy var mutationScheduler = ReaderMutationScheduler<EPUBPreferences>(
         delayNanoseconds: 16_000_000
     ) { [weak self] preferences, generation in

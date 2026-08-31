@@ -341,7 +341,7 @@ final class ReaderSettingsViewController: UIViewController {
                 ? accentColor
                 : UIColor.secondaryLabel.withAlphaComponent(0.22)
         }
-        setNeedsLayout()
+        view.setNeedsLayout()
     }
 
     private func layoutIndicatorDots() {

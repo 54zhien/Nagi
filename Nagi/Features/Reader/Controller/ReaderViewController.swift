@@ -12,7 +12,7 @@ import UIKit
 @MainActor
 final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate {
     private let model: ReaderViewModel
-    private let transitionCoordinator: ReaderTransitionCoordinator
+    private let readerTransitionCoordinator: ReaderTransitionCoordinator
 
     private let chromeView = ReaderChromeView()
     private let snapshotHostView = ReaderSnapshotHostView()
@@ -54,7 +54,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         transitionCoordinator: ReaderTransitionCoordinator
     ) {
         self.model = model
-        self.transitionCoordinator = transitionCoordinator
+        self.readerTransitionCoordinator = transitionCoordinator
         latestTitle = title
         latestTitleColor = titleColor
         latestReaderBackground = readerBackground
@@ -112,8 +112,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         snapshotHostView.fallbackBackgroundColor = latestReaderBackground
         view.addSubview(snapshotHostView)
 
-        transitionCoordinator.register(captureAnchor: contentController.view)
-        transitionCoordinator.register(snapshotHost: snapshotHostView)
+        readerTransitionCoordinator.register(captureAnchor: contentController.view)
+        readerTransitionCoordinator.register(snapshotHost: snapshotHostView)
 
         let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
         pan.minimumNumberOfTouches = 1
@@ -214,7 +214,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         panGestureRecognizer = nil
         tapGestureRecognizer = nil
 
-        transitionCoordinator.cancel()
+        readerTransitionCoordinator.cancel()
         chromeView.onDismiss = nil
         chromeView.onTableOfContents = nil
         chromeView.onSettings = nil
