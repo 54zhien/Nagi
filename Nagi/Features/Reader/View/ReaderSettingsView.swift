@@ -403,6 +403,29 @@ struct CustomReaderSettingsSheet: View {
         static let rowHeight: CGFloat = 52
     }
 
+    private enum LayoutSymbol {
+        static let lineSpacing = ReaderSystemSymbol.name(
+            "arrow.up.and.down.text.horizontal",
+            fallback: "arrow.up.and.down"
+        )
+        static let characterSpacing = ReaderSystemSymbol.name(
+            "textformat.abc",
+            fallback: "character"
+        )
+        static let wordSpacing = ReaderSystemSymbol.name(
+            "text.word.spacing",
+            fallback: "text.alignleft"
+        )
+        static let pageMargins = ReaderSystemSymbol.name(
+            "rectangle.portrait.inset.filled",
+            fallback: "rectangle.portrait"
+        )
+    }
+
+    // A deterministic, public-domain exploration excerpt keeps the preview
+    // independent from whichever book is currently open.
+    private static let previewSampleText = "初三日晨起，果日光灿灿，决策上顶。循涧入，路多迷津，遂谋向国清。"
+
     init(
         initialDraft: ReaderCustomizationDraft,
         previewText: String,
@@ -455,6 +478,11 @@ struct CustomReaderSettingsSheet: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("自定义主题")
             .navigationBarTitleDisplayMode(.inline)
+            // Keep the system navigation-bar surface continuous with the
+            // fixed preview surface below it.
+            .toolbarBackground(Color(uiColor: previewBackgroundColor), for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
+            .toolbarColorScheme(previewColorScheme, for: .navigationBar)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(action: cancel) {
@@ -463,8 +491,10 @@ struct CustomReaderSettingsSheet: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                     }
-                    .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    // The toolbar supplies the system glass context. Adding
+                    // a second manual glass effect here creates the visible
+                    // double ring around the control.
+                    .buttonStyle(.glass)
                     .accessibilityLabel("取消")
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -474,14 +504,8 @@ struct CustomReaderSettingsSheet: View {
                             .frame(width: 44, height: 44)
                             .contentShape(Circle())
                     }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color(uiColor: .systemBackground))
-                    .glassEffect(
-                        .regular
-                            .tint(Color.primary)
-                            .interactive(),
-                        in: Circle()
-                    )
+                    .buttonStyle(.glassProminent)
+                    .tint(.accentColor)
                     .accessibilityLabel("完成")
                 }
             }
@@ -505,10 +529,21 @@ struct CustomReaderSettingsSheet: View {
                 VStack(spacing: 0) {
                     fontMenu
                     cardDivider
-                    Toggle("粗体文本", isOn: $draft.boldText)
-                        .frame(minHeight: Layout.rowHeight)
+                    Toggle(isOn: $draft.boldText) {
+                        Label {
+                            Text("粗体文本")
+                        } icon: {
+                            Image(systemName: "bold")
+                                .font(.system(size: 18, weight: .semibold))
+                                .frame(width: 24, height: 24)
+                        }
+                        .font(.body)
+                        .foregroundStyle(.primary)
+                    }
+                        .frame(maxWidth: .infinity, minHeight: Layout.rowHeight)
                         .padding(.horizontal, 16)
                         .contentShape(Rectangle())
+                        .tint(.accentColor)
                 }
                 .background(
                     Color(uiColor: .secondarySystemGroupedBackground),
@@ -527,6 +562,7 @@ struct CustomReaderSettingsSheet: View {
 
                     slider(
                         "行间距",
+                        systemImage: LayoutSymbol.lineSpacing,
                         value: $draft.lineHeight,
                         range: ReaderLayoutMetrics.lineHeightRange,
                         step: 0.05,
@@ -537,6 +573,7 @@ struct CustomReaderSettingsSheet: View {
 
                     slider(
                         "字符间距",
+                        systemImage: LayoutSymbol.characterSpacing,
                         value: $draft.characterSpacing,
                         range: ReaderLayoutMetrics.characterSpacingRange,
                         step: 1,
@@ -547,6 +584,7 @@ struct CustomReaderSettingsSheet: View {
 
                     slider(
                         "词间距",
+                        systemImage: LayoutSymbol.wordSpacing,
                         value: $draft.wordSpacing,
                         range: ReaderLayoutMetrics.wordSpacingRange,
                         step: 2,
@@ -557,6 +595,7 @@ struct CustomReaderSettingsSheet: View {
 
                     slider(
                         "页边空白",
+                        systemImage: LayoutSymbol.pageMargins,
                         value: $draft.pageMargins,
                         range: ReaderLayoutMetrics.pageMarginsRange,
                         step: ReaderLayoutMetrics.pageMarginsStep,
@@ -584,7 +623,7 @@ struct CustomReaderSettingsSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title)
                 .font(.title3.weight(.semibold))
-                .padding(.horizontal, 4)
+                .padding(.horizontal, 12)
 
             content()
         }
@@ -596,23 +635,14 @@ struct CustomReaderSettingsSheet: View {
     }
 
     private var preview: some View {
-        Group {
-            if isLoadingPreview && previewText.isEmpty {
-                ProgressView("正在载入正文…")
-            } else if previewText.isEmpty {
-                Text("暂时无法载入正文预览")
-                    .foregroundStyle(.secondary)
-            } else {
-                Text(previewText)
-                    .font(previewFont)
-                    .fontWeight(draft.boldText ? .bold : .regular)
-                    .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
-                    .lineSpacing(CGFloat(draft.lineHeight - 1) * 8)
-                    .padding(.horizontal, previewPageMarginInset)
-                    .lineLimit(7)
-                    .frame(maxWidth: .infinity, alignment: .topLeading)
-            }
-        }
+        Text(Self.previewSampleText)
+            .font(previewFont)
+            .fontWeight(draft.boldText ? .bold : .regular)
+            .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
+            .lineSpacing(CGFloat(draft.lineHeight - 1) * 8)
+            .padding(.horizontal, previewPageMarginInset)
+            .lineLimit(7)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         .foregroundStyle(Color(uiColor: previewContentColor))
         .padding(.horizontal, 16)
         .padding(.top, 18)
@@ -620,6 +650,24 @@ struct CustomReaderSettingsSheet: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("正文预览")
+    }
+
+    private var previewColorScheme: ColorScheme {
+        var white: CGFloat = 0
+        var alpha: CGFloat = 0
+        if previewBackgroundColor.getWhite(&white, alpha: &alpha) {
+            return white < 0.5 ? .dark : .light
+        }
+
+        var red: CGFloat = 0
+        var green: CGFloat = 0
+        var blue: CGFloat = 0
+        guard previewBackgroundColor.getRed(&red, green: &green, blue: &blue, alpha: &alpha) else {
+            return .light
+        }
+
+        let luminance = (0.2126 * red) + (0.7152 * green) + (0.0722 * blue)
+        return luminance < 0.5 ? .dark : .light
     }
 
     private var previewBottomMask: some View {
@@ -663,14 +711,10 @@ struct CustomReaderSettingsSheet: View {
             }
         } label: {
             HStack(spacing: 12) {
-                HStack(alignment: .firstTextBaseline, spacing: 0) {
-                    Text("大")
-                        .font(draft.fontFamily.swiftUIFont(ofSize: 23))
-                    Text("小")
-                        .font(draft.fontFamily.swiftUIFont(ofSize: 13))
-                }
-                .frame(width: 50, alignment: .leading)
-                .accessibilityHidden(true)
+                Image(systemName: "textformat")
+                    .font(.system(size: 19, weight: .medium))
+                    .frame(width: 24, height: 24)
+                    .accessibilityHidden(true)
 
                 Text("字体")
                     .font(.body)
@@ -689,12 +733,15 @@ struct CustomReaderSettingsSheet: View {
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
         .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
         .accessibilityLabel("字体")
         .accessibilityValue(draft.fontFamily.label)
     }
 
     private func slider(
         _ title: String,
+        systemImage: String,
         value: Binding<Double>,
         range: ClosedRange<Double>,
         step: Double,
@@ -706,7 +753,16 @@ struct CustomReaderSettingsSheet: View {
                 Spacer()
                 Text(text).font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
             }
-            Slider(value: value, in: range, step: step).tint(.accentColor)
+            HStack(spacing: 10) {
+                Image(systemName: systemImage)
+                    .font(.system(size: 18, weight: .medium))
+                    .frame(width: 24, height: 24)
+                    .foregroundStyle(.primary)
+                    .accessibilityHidden(true)
+
+                Slider(value: value, in: range, step: step)
+                    .tint(.accentColor)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, 16)
