@@ -301,7 +301,8 @@ final class EPUBReaderModel {
     }
 
     var isReflowable: Bool {
-        publication?.metadata.layout != .fixed
+        guard let publication else { return false }
+        return publication.metadata.layout != .fixed
     }
 
     var onToggleControls: (() -> Void)?
@@ -827,7 +828,7 @@ final class EPUBReaderModel {
             : ReadiumNavigator.Color(
                 uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
             )
-        var preferences = EPUBPreferences(
+        let preferences = EPUBPreferences(
             // ReaderChrome owns the reflowable surface. Leaving this unset
             // avoids Readium's background preference rule, which clears
             // publisher backgrounds on descendant elements.
@@ -860,9 +861,10 @@ final class EPUBReaderModel {
         )
     }
 
-    /// Re-applies all app-owned reflowable rules to the resources currently
-    /// presented by Readium. The font rule remains a publisher-CSS fallback;
-    /// the bundled @font-face declarations remain the resource authority.
+    /// Re-applies all app-owned reflowable rules to the currently presented
+    /// and already preloaded resources. The font rule remains a publisher-CSS
+    /// fallback; the bundled @font-face declarations remain the resource
+    /// authority.
     private func refreshVisibleReaderOverrides() {
         readerOverrideRefreshTask?.cancel()
         guard let navigator, isReflowable else { return }
@@ -871,7 +873,7 @@ final class EPUBReaderModel {
         let script = makeReaderOverrideScript()
         readerOverrideRefreshTask = Task { @MainActor [weak navigator] in
             guard let navigator else { return }
-            _ = await navigator.evaluateJavaScript(script)
+            await navigator.applyNagiReaderOverrides(script)
         }
     }
 
