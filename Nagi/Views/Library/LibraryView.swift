@@ -36,6 +36,7 @@ struct NagiPageHeader: View {
     let actionIcon: String?
     let actionAccessibilityLabel: String?
     let action: (() -> Void)?
+    let secondaryAction: AnyView?
 
     init(
         title: String,
@@ -43,7 +44,8 @@ struct NagiPageHeader: View {
         isHeaderHidden: Bool = false,
         actionIcon: String? = nil,
         actionAccessibilityLabel: String? = nil,
-        action: (() -> Void)? = nil
+        action: (() -> Void)? = nil,
+        secondaryAction: AnyView? = nil
     ) {
         self.title = title
         self.transitionProgress = transitionProgress
@@ -51,6 +53,7 @@ struct NagiPageHeader: View {
         self.actionIcon = actionIcon
         self.actionAccessibilityLabel = actionAccessibilityLabel
         self.action = action
+        self.secondaryAction = secondaryAction
     }
 
     var body: some View {
@@ -66,23 +69,35 @@ struct NagiPageHeader: View {
 
             Spacer(minLength: 12)
 
-            if let action, let actionIcon {
-                Button(action: action) {
-                    Image(systemName: actionIcon)
-                        .font(.title2.weight(.medium))
-                        .blur(radius: iconBlurRadius)
-                        .frame(
-                            width: NagiPageHeaderMetrics.controlSize,
-                            height: NagiPageHeaderMetrics.controlSize
-                        )
+            if secondaryAction != nil || (action != nil && actionIcon != nil) {
+                HStack(spacing: 8) {
+                    if let secondaryAction {
+                        secondaryAction
+                            .blur(radius: buttonBlurRadius)
+                            .opacity(buttonOpacity)
+                            .allowsHitTesting(!isHeaderHidden)
+                            .accessibilityHidden(isHeaderHidden)
+                    }
+
+                    if let action, let actionIcon {
+                        Button(action: action) {
+                            Image(systemName: actionIcon)
+                                .font(.title2.weight(.medium))
+                                .blur(radius: iconBlurRadius)
+                                .frame(
+                                    width: NagiPageHeaderMetrics.controlSize,
+                                    height: NagiPageHeaderMetrics.controlSize
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .glassEffect(.regular.interactive(), in: Circle())
+                        .blur(radius: buttonBlurRadius)
+                        .opacity(buttonOpacity)
+                        .allowsHitTesting(!isHeaderHidden)
+                        .accessibilityHidden(isHeaderHidden)
+                        .accessibilityLabel(actionAccessibilityLabel ?? actionIcon)
+                    }
                 }
-                .buttonStyle(.plain)
-                .glassEffect(.regular.interactive(), in: Circle())
-                .blur(radius: buttonBlurRadius)
-                .opacity(buttonOpacity)
-                .allowsHitTesting(!isHeaderHidden)
-                .accessibilityHidden(isHeaderHidden)
-                .accessibilityLabel(actionAccessibilityLabel ?? actionIcon)
             }
         }
         .padding(.horizontal, NagiPageHeaderMetrics.horizontalPadding)
@@ -117,11 +132,29 @@ struct NagiPageHeader: View {
     }
 }
 
+private enum LibrarySortOption: String, CaseIterable, Identifiable, Hashable {
+    case addedAt
+    case title
+
+    var id: Self { self }
+
+    var title: String {
+        switch self {
+        case .addedAt:
+            return "导入时间"
+        case .title:
+            return "名称"
+        }
+    }
+}
+
 struct LibraryView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
     @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
     private var bookCardsUseLiquidGlass = true
+    @AppStorage("Nagi.library.sortOption")
+    private var storedSortOption = LibrarySortOption.addedAt.rawValue
     @Query(sort: \Book.addedAt, order: .reverse) private var books: [Book]
     @State private var viewModel = LibraryViewModel()
     @State private var pickerCoordinator: DocumentPickerCoordinator?
@@ -145,7 +178,7 @@ struct LibraryView: View {
                 } else {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 16) {
-                            ForEach(books) { book in
+                            ForEach(sortedBooks) { book in
                                 Button {
                                     selectedBook = book
                                 } label: {
@@ -253,8 +286,72 @@ struct LibraryView: View {
             isHeaderHidden: isHeaderHidden,
             actionIcon: "plus",
             actionAccessibilityLabel: "导入小说",
-            action: presentImportPicker
+            action: presentImportPicker,
+            secondaryAction: AnyView(librarySortMenu)
         )
+    }
+
+    private var sortOption: LibrarySortOption {
+        LibrarySortOption(rawValue: storedSortOption) ?? .addedAt
+    }
+
+    private var sortedBooks: [Book] {
+        guard sortOption == .title else { return books }
+
+        return books.sorted { left, right in
+            let titleComparison = left.title.localizedStandardCompare(right.title)
+            if titleComparison != .orderedSame {
+                return titleComparison == .orderedAscending
+            }
+
+            if left.addedAt != right.addedAt {
+                return left.addedAt > right.addedAt
+            }
+
+            return left.id.uuidString < right.id.uuidString
+        }
+    }
+
+    private var librarySortMenu: some View {
+        Menu {
+            Section("排序方式") {
+                ForEach(LibrarySortOption.allCases) { option in
+                    Button {
+                        selectSortOption(option)
+                    } label: {
+                        if sortOption == option {
+                            Label(option.title, systemImage: "checkmark")
+                        } else {
+                            Text(option.title)
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down")
+                .font(.title2.weight(.medium))
+                .frame(
+                    width: NagiPageHeaderMetrics.controlSize,
+                    height: NagiPageHeaderMetrics.controlSize
+                )
+        }
+        .buttonStyle(.plain)
+        .glassEffect(.regular.interactive(), in: Circle())
+        .disabled(books.isEmpty)
+        .accessibilityLabel("排序方式")
+        .accessibilityValue(Text(sortOption.title))
+    }
+
+    private func selectSortOption(_ option: LibrarySortOption) {
+        guard option != sortOption else { return }
+
+        if reduceMotion {
+            storedSortOption = option.rawValue
+        } else {
+            withAnimation(.snappy(duration: 0.25)) {
+                storedSortOption = option.rawValue
+            }
+        }
     }
 
     private func updateHeaderVisibility(for rawScrollOffset: CGFloat) {
