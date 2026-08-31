@@ -93,6 +93,7 @@ private struct ReaderLoadingView: View {
 
 private struct ReaderSessionView: View {
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var modelContext
@@ -105,6 +106,7 @@ private struct ReaderSessionView: View {
     @State private var showTableOfContents = false
     @State private var showCustomSettings = false
     @State private var transitionCoordinator = ReaderTransitionCoordinator()
+    @State private var foregroundRestoreRevision = 0
 
     var body: some View {
         ReaderChrome(
@@ -127,6 +129,14 @@ private struct ReaderSessionView: View {
             guard model.preferences.appearanceMode == .system else { return }
             transitionCoordinator.begin(reduceMotion: reduceMotion)
             model.updateSystemAppearance(isDark: newValue == .dark)
+        }
+        .onChange(of: scenePhase) { _, newValue in
+            guard newValue == .active else { return }
+            foregroundRestoreRevision &+= 1
+        }
+        .task(id: foregroundRestoreRevision) {
+            guard foregroundRestoreRevision > 0 else { return }
+            await model.restoreFromForeground(isDark: colorScheme == .dark)
         }
         .onChange(of: model.stateRevision) { _, _ in
             transitionCoordinator.readerStateDidUpdate {

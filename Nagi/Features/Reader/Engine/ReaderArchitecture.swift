@@ -534,6 +534,7 @@ protocol ReaderRenderer: AnyObject {
         onSwipeStart: @escaping () -> Void
     ) -> AnyView
     func waitForVisualUpdate() async
+    func restoreFromForeground(isDark: Bool) async
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat)
     func apply(preferences: ReaderPreferences)
     func updateSystemAppearance(isDark: Bool)
@@ -627,6 +628,11 @@ final class ReaderEngine {
 
     func waitForVisualUpdate() async {
         await renderer.waitForVisualUpdate()
+    }
+
+    func restoreFromForeground(isDark: Bool) async {
+        await renderer.restoreFromForeground(isDark: isDark)
+        synchronizeFromRenderer()
     }
 
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
@@ -740,6 +746,11 @@ final class ReaderViewModel {
 
     func waitForVisualUpdate() async {
         await engine.waitForVisualUpdate()
+    }
+
+    func restoreFromForeground(isDark: Bool) async {
+        await engine.restoreFromForeground(isDark: isDark)
+        synchronize()
     }
 
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {

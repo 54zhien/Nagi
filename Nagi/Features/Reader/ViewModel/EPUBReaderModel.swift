@@ -548,6 +548,25 @@ final class EPUBReaderModel {
         }
     }
 
+    /// Re-applies the complete Readium preference set after WebKit returns
+    /// from the background. This path is intentionally unconditional: the
+    /// navigator may need its CSS state restored even when no preference value
+    /// changed while the app was inactive.
+    func restoreFromForeground(isDark: Bool) async {
+        guard !Task.isCancelled, hasLoaded, let navigator else { return }
+
+        systemIsDark = isDark
+        preferenceUpdateTask?.cancel()
+        navigator.submitPreferences(makePreferences())
+        refreshVisibleFontOverride()
+
+        if let refreshTask = fontOverrideRefreshTask {
+            await refreshTask.value
+        }
+        guard !Task.isCancelled else { return }
+        await waitForVisualUpdate()
+    }
+
     /// Commits the latest in-memory EPUB location before the reader is
     /// dismissed.  The view owns the SwiftData save because this model also
     /// handles Readium state and should not own a ModelContext.

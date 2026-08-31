@@ -89,6 +89,11 @@ final class TextKitRenderer: ReaderRenderer {
         await Task.yield()
     }
 
+    func restoreFromForeground(isDark: Bool) async {
+        _ = isDark
+        await Task.yield()
+    }
+
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
         model.updateViewport(size: size, safeAreaInsets: safeAreaInsets)
         _ = displayScale
@@ -238,6 +243,11 @@ final class ReadiumRenderer: ReaderRenderer {
 
     func waitForVisualUpdate() async {
         await model.waitForVisualUpdate()
+    }
+
+    func restoreFromForeground(isDark: Bool) async {
+        await model.restoreFromForeground(isDark: isDark)
+        onStateChange?()
     }
 
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) {
