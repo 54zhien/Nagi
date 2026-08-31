@@ -367,7 +367,7 @@ final class EPUBReaderModel {
         chapterTitle = book.currentChapterTitle ?? ""
         if let locatorJSON = book.readerLocatorJSON,
            let locator = try? Locator(jsonString: locatorJSON) {
-            currentLocatorJSON = locator.jsonString()
+            currentLocatorJSON = try? locator.jsonString()
         } else {
             // Older TXT versions stored a different location payload in this
             // field.  Keep it out of the Readium position channel.
@@ -1097,8 +1097,10 @@ final class EPUBReaderModel {
             progress = min(max(totalProgression, 0), 1)
         }
         loadPreviewIfNeeded()
-        currentLocatorJSON = locator.jsonString()
-        book.readerLocatorJSON = locator.jsonString()
+        if let locatorJSON = try? locator.jsonString() {
+            currentLocatorJSON = locatorJSON
+            book.readerLocatorJSON = locatorJSON
+        }
         synchronizeStoredChapterMetadata(preferredTitle: locatorTitle)
         book.progressPercent = progress
         book.lastReadAt = .now
