@@ -63,9 +63,13 @@
 		4A000000000000000000007C /* BookImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007C /* BookImportParser.swift */; };
 		4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007D /* EPUBReadingContentProvider.swift */; };
 		4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007E /* TXTReaderAssetService.swift */; };
+		4A0000000000000000000080 /* EPUBFontResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000080 /* EPUBFontResources.swift */; };
 		4A0000000000000000000074 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
 		4A0000000000000000000075 /* ReadiumStreamer in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000075 /* ReadiumStreamer */; };
 		4A0000000000000000000076 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
+		4A0000000000000000000081 /* NagiSong-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000081 /* NagiSong-Regular.ttf */; };
+		4A0000000000000000000082 /* NagiKai-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000082 /* NagiKai-Regular.ttf */; };
+		4A0000000000000000000083 /* NagiRounded-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000083 /* NagiRounded-Regular.ttf */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -125,6 +129,10 @@
 		3A000000000000000000007C /* BookImportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookImportParser.swift; sourceTree = "<group>"; };
 		3A000000000000000000007D /* EPUBReadingContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReadingContentProvider.swift; sourceTree = "<group>"; };
 		3A000000000000000000007E /* TXTReaderAssetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderAssetService.swift; sourceTree = "<group>"; };
+		3A0000000000000000000080 /* EPUBFontResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBFontResources.swift; sourceTree = "<group>"; };
+		3A0000000000000000000081 /* NagiSong-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiSong-Regular.ttf; sourceTree = "<group>"; };
+		3A0000000000000000000082 /* NagiKai-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiKai-Regular.ttf; sourceTree = "<group>"; };
+		3A0000000000000000000083 /* NagiRounded-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiRounded-Regular.ttf; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -191,8 +199,19 @@
 		2A0000000000000000000014 /* Resources */ = {
 			isa = PBXGroup;
 			children = (
+				2A0000000000000000000015 /* EPUBFonts */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		2A0000000000000000000015 /* EPUBFonts */ = {
+			isa = PBXGroup;
+			children = (
+				3A0000000000000000000081 /* NagiSong-Regular.ttf */,
+				3A0000000000000000000082 /* NagiKai-Regular.ttf */,
+				3A0000000000000000000083 /* NagiRounded-Regular.ttf */,
+			);
+			path = EPUBFonts;
 			sourceTree = "<group>";
 		};
 		2A0000000000000000000005 /* Home */ = {
@@ -239,6 +258,7 @@
 				3A000000000000000000007D /* EPUBReadingContentProvider.swift */,
 				3A000000000000000000007E /* TXTReaderAssetService.swift */,
 				3A0000000000000000000070 /* ReadiumService.swift */,
+				3A0000000000000000000080 /* EPUBFontResources.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -470,6 +490,9 @@
 			files = (
 				4A0000000000000000000006 /* Assets.xcassets in Resources */,
 				4A0000000000000000000007 /* AppIcon.icon in Resources */,
+				4A0000000000000000000081 /* NagiSong-Regular.ttf in Resources */,
+				4A0000000000000000000082 /* NagiKai-Regular.ttf in Resources */,
+				4A0000000000000000000083 /* NagiRounded-Regular.ttf in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -533,6 +556,7 @@
 				4A000000000000000000007C /* BookImportParser.swift in Sources */,
 				4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */,
 				4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */,
+				4A0000000000000000000080 /* EPUBFontResources.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

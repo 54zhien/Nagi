@@ -209,12 +209,7 @@ typealias EPUBFontFamily = ReaderFontFamily
 
 private extension ReaderFontFamily {
     var readiumFontFamily: FontFamily {
-        switch self {
-        case .original:
-            return FontFamily(rawValue: readiumFamilyName ?? "-apple-system")
-        case .pingFang, .song, .kai, .yuan:
-            return FontFamily(rawValue: readiumFamilyName ?? "sans-serif")
-        }
+        FontFamily(rawValue: readiumFamilyName)
     }
 
     /// Readium converts 1.0 to CSS 400 and 1.75 to CSS 700.  Use CSS 300 for
@@ -222,26 +217,6 @@ private extension ReaderFontFamily {
     /// switch below.
     var readiumFontWeight: Double {
         self == .pingFang ? 0.75 : 1.0
-    }
-
-    /// CSS fallback stack used by the small app-owned override below. Readium
-    /// normally applies `fontFamily` through its CSS variables, but the
-    /// override also gives WebKit the exact system face names for Chinese
-    /// system fonts and covers resources that keep an author font on an
-    /// inline element.
-    var webCSSFontStack: String {
-        switch self {
-        case .original:
-            return "-apple-system, system-ui, sans-serif"
-        case .pingFang:
-            return "-apple-system, \"PingFang SC\", system-ui, sans-serif"
-        case .song:
-            return "\"Songti SC\", \"STSongti-SC-Regular\", \"STSong\", serif"
-        case .kai:
-            return "\"Kaiti SC\", \"STKaiti-SC-Regular\", \"STKaiti\", serif"
-        case .yuan:
-            return "\"Yuanti SC\", \"STYuanti-SC-Regular\", \"STYuanti\", sans-serif"
-        }
     }
 }
 
@@ -462,6 +437,7 @@ final class EPUBReaderModel {
                     disablePageTurnsWhileScrolling: true,
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6,
+                    fontFamilyDeclarations: EPUBFontResources.declarations(),
                     readiumCSSRSProperties: CSSRSProperties(
                         pageGutter: CSSPxLength(ReaderLayoutMetrics.pageMarginBase)
                     )
@@ -879,15 +855,9 @@ final class EPUBReaderModel {
         return preferences
     }
 
-    /// Readium's CSS preference is the primary path. This second, narrowly
-    /// scoped pass keeps an app-owned rule alive in every reflowable resource.
-    /// The rule follows Readium's --USER__fontFamily value, so preloaded
-    /// resources update when Readium submits a new preference instead of
-    /// retaining the font that was captured when their WebView was created.
-    ///
-    /// The navigator is created before SwiftUI attaches it and before its
-    /// first spread exists. Retry only until the current spread is available;
-    /// do not assume that a fixed delay is long enough for every publication.
+    /// Readium's CSS preference and the registered @font-face resource are the
+    /// primary paths. This one-shot pass only keeps an app-owned rule ahead of
+    /// publisher CSS on reflowable resources.
     private func refreshVisibleFontOverride() {
         fontOverrideRefreshTask?.cancel()
         guard
@@ -898,71 +868,22 @@ final class EPUBReaderModel {
         }
 
         let script = makeFontOverrideScript()
-        fontOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
-            guard let self, let navigator else { return }
-
-            let retryDelays: [UInt64] = [
-                0,
-                100_000_000,
-                250_000_000,
-                500_000_000,
-                1_000_000_000,
-                2_000_000_000,
-            ]
-
-            for delay in retryDelays {
-                if delay > 0 {
-                    do {
-                        try await Task.sleep(nanoseconds: delay)
-                    } catch {
-                        return
-                    }
-                }
-                guard !Task.isCancelled else { return }
-
-                let result = await navigator.evaluateJavaScript(script)
-                if case let .success(value) = result {
-                    #if DEBUG
-                    print("[Reader] font override applied: \(value)")
-                    #endif
-                    self.fontOverrideRefreshTask = nil
-                    return
-                }
-            }
-
-            #if DEBUG
-            print("[Reader] font override was not applied before the retry window ended")
-            #endif
-            self.fontOverrideRefreshTask = nil
+        fontOverrideRefreshTask = Task { @MainActor [weak navigator] in
+            guard let navigator else { return }
+            _ = await navigator.evaluateJavaScript(script)
         }
     }
 
     private func makeFontOverrideScript() -> String {
-        let fontStack = Self.javascriptStringLiteral(fontFamily.webCSSFontStack)
-        let requestedFontFamily = Self.javascriptStringLiteral(
-            fontFamily.readiumFamilyName ?? "-apple-system"
-        )
+        let publisherFontFamily = Self.javascriptStringLiteral(fontFamily.readiumFamilyName)
         return """
         (() => {
             const styleID = "nagi-reader-font-override";
-            const observerKey = "__nagiReaderFontObserver";
-            const fallbackFontStack = \(fontStack);
-            const requestedFontFamily = \(requestedFontFamily);
+            const publisherFontFamily = \(publisherFontFamily);
             const root = document.documentElement;
 
             if (!root) {
-                return {
-                    readyState: document.readyState,
-                    overridePresent: false,
-                    reason: "documentElementUnavailable"
-                };
-            }
-
-            if (
-                window[observerKey]
-                && typeof window[observerKey].disconnect === "function"
-            ) {
-                window[observerKey].disconnect();
+                return;
             }
 
             const previous = document.getElementById(styleID);
@@ -970,61 +891,15 @@ final class EPUBReaderModel {
 
             const style = document.createElement("style");
             style.id = styleID;
-            let appliedFontStack = "";
-
-            const readReadiumFontStack = () => {
-                const inlineValue = root.style
-                    .getPropertyValue("--USER__fontFamily")
-                    .trim();
-                if (inlineValue) return inlineValue;
-
-                return getComputedStyle(root)
-                    .getPropertyValue("--USER__fontFamily")
-                    .trim();
-            };
-
-            const applyFont = () => {
-                const readiumFontStack = readReadiumFontStack();
-                const nextFontStack = readiumFontStack
-                    ? readiumFontStack + ", " + fallbackFontStack
-                    : fallbackFontStack;
-                if (nextFontStack === appliedFontStack && style.isConnected) return;
-
-                appliedFontStack = nextFontStack;
-                root.setAttribute("data-nagi-reader-font-override", "true");
-                style.textContent = [
-                    ":root[data-nagi-reader-font-override]",
-                    ":root[data-nagi-reader-font-override] body",
-                    ":root[data-nagi-reader-font-override] body *"
-                ].join(", ") + " { font-family: " + nextFontStack + " !important; }";
-                (document.head || root).appendChild(style);
-            };
-
-            applyFont();
-
-            const observer = new MutationObserver(() => {
-                window.requestAnimationFrame(applyFont);
-            });
-            observer.observe(root, { attributes: true, attributeFilter: ["style"] });
-            window[observerKey] = observer;
-
-            const body = document.body;
-            const paragraph = document.querySelector("p");
-            const paragraphFontFamily = paragraph
-                ? getComputedStyle(paragraph).fontFamily
-                : "";
-            return {
-                readyState: document.readyState,
-                overridePresent: !!document.getElementById(styleID),
-                readiumFontFamily: readReadiumFontStack(),
-                requestedFontFamily: requestedFontFamily,
-                appliedFontStack: appliedFontStack,
-                bodyFontFamily: body ? getComputedStyle(body).fontFamily : "",
-                paragraphFontFamily: paragraphFontFamily,
-                fontAvailable: document.fonts && document.fonts.check
-                    ? document.fonts.check("16px \"" + requestedFontFamily + "\"")
-                    : null
-            };
+            root.setAttribute("data-nagi-reader-font-override", "true");
+            style.textContent = [
+                ":root[data-nagi-reader-font-override]",
+                ":root[data-nagi-reader-font-override] body",
+                ":root[data-nagi-reader-font-override] body *"
+            ].join(", ") + " { font-family: "
+                + JSON.stringify(publisherFontFamily)
+                + " !important; }";
+            (document.head || root).appendChild(style);
         })();
         """
     }

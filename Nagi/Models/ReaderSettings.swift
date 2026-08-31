@@ -174,9 +174,10 @@ enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Se
         }
     }
 
-    /// Known system face names used by UIKit and SwiftUI.  The first name in
-    /// each list is the current face name; the remaining names keep older
-    /// supported OS releases on a safe system-font fallback path.
+    /// Known system face names used by the native/TXT renderer and the
+    /// SwiftUI settings preview. The first name in each list is the current
+    /// face name; the remaining names keep older supported OS releases on a
+    /// safe system-font fallback path.
     var uiFontNames: [String] {
         switch self {
         case .original, .pingFang:
@@ -219,15 +220,16 @@ enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Se
         self == .pingFang ? .light : .regular
     }
 
-    /// CSS family names used inside the EPUB Navigator.  These are deliberately
-    /// separate from UIKit's PostScript face names because Readium emits CSS.
-    var readiumFamilyName: String? {
+    /// CSS family names used inside the EPUB Navigator.  The bundled Chinese
+    /// fonts use app-owned aliases so Readium can register their resources
+    /// independently from UIKit's PostScript face names.
+    var readiumFamilyName: String {
         switch self {
-        case .original: return nil
+        case .original: return "-apple-system"
         case .pingFang: return "-apple-system"
-        case .song: return "Songti SC"
-        case .kai: return "Kaiti SC"
-        case .yuan: return "Yuanti SC"
+        case .song: return "Nagi Song"
+        case .kai: return "Nagi Kai"
+        case .yuan: return "Nagi Rounded"
         }
     }
 
