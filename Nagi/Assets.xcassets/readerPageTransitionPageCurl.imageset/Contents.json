@@ -2,7 +2,18 @@
   "images" : [
     {
       "filename" : "readerPageTransitionPageCurl.png",
-      "idiom" : "universal"
+      "idiom" : "universal",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "readerPageTransitionPageCurl@2x.png",
+      "idiom" : "universal",
+      "scale" : "2x"
+    },
+    {
+      "filename" : "readerPageTransitionPageCurl@3x.png",
+      "idiom" : "universal",
+      "scale" : "3x"
     }
   ],
   "info" : {

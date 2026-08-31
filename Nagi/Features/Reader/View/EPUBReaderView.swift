@@ -412,7 +412,8 @@ private struct MediumReaderSettingsView: View {
             HStack(spacing: 0) {
                 fontSizeButton(
                     title: "小",
-                    systemImage: "textformat.size.smaller",
+                    assetName: "readerFontSizeSmaller",
+                    iconPointSize: 20,
                     scale: ReaderControlValues.smallFontScale
                 )
 
@@ -422,7 +423,8 @@ private struct MediumReaderSettingsView: View {
 
                 fontSizeButton(
                     title: "大",
-                    systemImage: "textformat.size.larger",
+                    assetName: "readerFontSizeLarger",
+                    iconPointSize: 28,
                     scale: ReaderControlValues.largeFontScale
                 )
             }
@@ -436,7 +438,8 @@ private struct MediumReaderSettingsView: View {
 
     private func fontSizeButton(
         title: String,
-        systemImage: String,
+        assetName: String,
+        iconPointSize: CGFloat,
         scale: Double
     ) -> some View {
         let isSelected = abs(model.fontScale - scale) < 0.01
@@ -444,8 +447,15 @@ private struct MediumReaderSettingsView: View {
         return Button {
             model.setFontScale(scale)
         } label: {
-            Label(title, systemImage: systemImage)
-                .labelStyle(.titleAndIcon)
+            HStack(spacing: 8) {
+                Image(assetName)
+                    .renderingMode(.template)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: iconPointSize, height: iconPointSize)
+
+                Text(title)
+            }
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(isSelected ? Color.accentColor : Color.primary)
                 .frame(minWidth: 62, minHeight: 40)
