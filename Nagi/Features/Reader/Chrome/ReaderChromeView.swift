@@ -10,25 +10,26 @@ import UIKit
 
 @MainActor
 final class ReaderChromeView: UIView {
+    private enum BottomControlID: Hashable {
+        case tableOfContents
+        case settings
+    }
+
     var onDismiss: (() -> Void)?
     var onTableOfContents: (() -> Void)?
     var onSettings: (() -> Void)?
 
     private let titleLabel = UILabel()
     private let exitControl = GlassControlView()
-    private let tableOfContentsControl = GlassControlView()
-    private let settingsControl = GlassControlView()
+    private let bottomControlGroup = GlassControlGroup<BottomControlID>()
     private let exitImage: UIImage?
     private let tableOfContentsImage: UIImage?
     private let settingsImage: UIImage?
 
     private let exitContainer = UIView()
-    private let tableOfContentsContainer = UIView()
-    private let settingsContainer = UIView()
     private lazy var animator = ReaderChromeAnimator(targets: [
         exitContainer,
-        tableOfContentsContainer,
-        settingsContainer
+        bottomControlGroup
     ])
 
     private var autoHideTask: Task<Void, Never>?
@@ -73,21 +74,32 @@ final class ReaderChromeView: UIView {
         titleLabel.adjustsFontForContentSizeCategory = true
 
         configureContainer(exitContainer, with: exitControl)
-        configureContainer(tableOfContentsContainer, with: tableOfContentsControl)
-        configureContainer(settingsContainer, with: settingsControl)
 
         addSubview(titleLabel)
         addSubview(exitContainer)
-        addSubview(tableOfContentsContainer)
-        addSubview(settingsContainer)
+        addSubview(bottomControlGroup)
 
         exitControl.addTarget(self, action: #selector(didTapExit), for: .primaryActionTriggered)
-        tableOfContentsControl.addTarget(
+        bottomControlGroup.update(items: [
+            .init(
+                id: .tableOfContents,
+                image: tableOfContentsImage,
+                accessibilityLabel: "目录",
+                tintColor: .label
+            ),
+            .init(
+                id: .settings,
+                image: settingsImage,
+                accessibilityLabel: "主题与排版",
+                tintColor: .label
+            )
+        ])
+        bottomControlGroup.control(for: .tableOfContents)?.addTarget(
             self,
             action: #selector(didTapTableOfContents),
             for: .primaryActionTriggered
         )
-        settingsControl.addTarget(
+        bottomControlGroup.control(for: .settings)?.addTarget(
             self,
             action: #selector(didTapSettings),
             for: .primaryActionTriggered
@@ -100,21 +112,6 @@ final class ReaderChromeView: UIView {
             isEnabled: true,
             reduceMotion: false
         )
-        tableOfContentsControl.update(
-            image: tableOfContentsImage,
-            accessibilityLabel: "目录",
-            tintColor: .label,
-            isEnabled: true,
-            reduceMotion: false
-        )
-        settingsControl.update(
-            image: settingsImage,
-            accessibilityLabel: "主题与排版",
-            tintColor: .label,
-            isEnabled: true,
-            reduceMotion: false
-        )
-
         setControlsVisible(true, animated: false, reduceMotion: false)
     }
 
@@ -171,20 +168,22 @@ final class ReaderChromeView: UIView {
                 isEnabled: true,
                 reduceMotion: reduceMotion
             )
-            tableOfContentsControl.update(
-                image: tableOfContentsImage,
-                accessibilityLabel: "目录",
-                tintColor: titleColor,
-                isEnabled: true,
-                reduceMotion: reduceMotion
-            )
-            settingsControl.update(
-                image: settingsImage,
-                accessibilityLabel: "主题与排版",
-                tintColor: titleColor,
-                isEnabled: true,
-                reduceMotion: reduceMotion
-            )
+            bottomControlGroup.update(items: [
+                .init(
+                    id: .tableOfContents,
+                    image: tableOfContentsImage,
+                    accessibilityLabel: "目录",
+                    tintColor: titleColor,
+                    reduceMotion: reduceMotion
+                ),
+                .init(
+                    id: .settings,
+                    image: settingsImage,
+                    accessibilityLabel: "主题与排版",
+                    tintColor: titleColor,
+                    reduceMotion: reduceMotion
+                )
+            ])
             currentControlTint = titleColor
             currentControlReduceMotion = reduceMotion
         }
@@ -226,14 +225,10 @@ final class ReaderChromeView: UIView {
         autoHideTask = nil
 
         exitControl.isUserInteractionEnabled = visible
-        tableOfContentsControl.isUserInteractionEnabled = visible
-        settingsControl.isUserInteractionEnabled = visible
+        bottomControlGroup.isUserInteractionEnabled = visible
         exitContainer.isUserInteractionEnabled = visible
-        tableOfContentsContainer.isUserInteractionEnabled = visible
-        settingsContainer.isUserInteractionEnabled = visible
         exitContainer.accessibilityElementsHidden = !visible
-        tableOfContentsContainer.accessibilityElementsHidden = !visible
-        settingsContainer.accessibilityElementsHidden = !visible
+        bottomControlGroup.accessibilityElementsHidden = !visible
 
         guard visibilityChanged else {
             updateAccessibilityActions()
@@ -347,10 +342,11 @@ final class ReaderChromeView: UIView {
             x: currentBounds.width - trailingDistance,
             y: currentBounds.height - trailingBottomDistance
         )
-        tableOfContentsContainer.frame = controlFrame(center: leadingCenter, in: currentBounds)
-        settingsContainer.frame = controlFrame(center: trailingCenter, in: currentBounds)
-        tableOfContentsControl.frame = tableOfContentsContainer.bounds
-        settingsControl.frame = settingsContainer.bounds
+        bottomControlGroup.frame = currentBounds
+        bottomControlGroup.setItemFrames([
+            .tableOfContents: controlFrame(center: leadingCenter, in: currentBounds),
+            .settings: controlFrame(center: trailingCenter, in: currentBounds)
+        ])
     }
 
     private func configureContainer(_ container: UIView, with control: UIView) {

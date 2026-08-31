@@ -80,6 +80,8 @@
 		4A000000000000000000008B /* GlassTouchDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008B /* GlassTouchDriver.swift */; };
 		4A000000000000000000008C /* GlassControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008C /* GlassControlView.swift */; };
 		4A000000000000000000008D /* ReaderViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008D /* ReaderViewController.swift */; };
+		4A000000000000000000008E /* GlassContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008E /* GlassContainerView.swift */; };
+		4A000000000000000000008F /* GlassControlGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008F /* GlassControlGroup.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -153,6 +155,8 @@
 		3A000000000000000000008B /* GlassTouchDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassTouchDriver.swift; sourceTree = "<group>"; };
 		3A000000000000000000008C /* GlassControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlView.swift; sourceTree = "<group>"; };
 		3A000000000000000000008D /* ReaderViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderViewController.swift; sourceTree = "<group>"; };
+		3A000000000000000000008E /* GlassContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassContainerView.swift; sourceTree = "<group>"; };
+		3A000000000000000000008F /* GlassControlGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlGroup.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -395,6 +399,8 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000087 /* GlassState.swift */,
+				3A000000000000000000008E /* GlassContainerView.swift */,
+				3A000000000000000000008F /* GlassControlGroup.swift */,
 				3A000000000000000000008A /* GlassSurfaceView.swift */,
 				3A000000000000000000008C /* GlassControlView.swift */,
 			);
@@ -645,6 +651,8 @@
 				4A000000000000000000008B /* GlassTouchDriver.swift in Sources */,
 				4A000000000000000000008C /* GlassControlView.swift in Sources */,
 				4A000000000000000000008D /* ReaderViewController.swift in Sources */,
+				4A000000000000000000008E /* GlassContainerView.swift in Sources */,
+				4A000000000000000000008F /* GlassControlGroup.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
