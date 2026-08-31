@@ -439,8 +439,8 @@ struct CustomReaderSettingsSheet: View {
                         "页边空白",
                         value: $draft.pageMargins,
                         range: ReaderLayoutMetrics.pageMarginsRange,
-                        step: 1,
-                        text: "\(Int(draft.pageMargins))%"
+                        step: ReaderLayoutMetrics.pageMarginsStep,
+                        text: "\(Int(draft.pageMargins.rounded())) pt"
                     )
                     slider(
                         "字符间距",
@@ -456,7 +456,7 @@ struct CustomReaderSettingsSheet: View {
                         step: 2,
                         text: "\(Int(draft.wordSpacing))%"
                     )
-                    Text("正文上下边距固定为上 116 pt、下 84 pt；首行缩进固定为 2；页边空白以 24 pt 为基准。")
+                    Text("正文上下边距固定为上 116 pt、下 84 pt；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
@@ -507,6 +507,7 @@ struct CustomReaderSettingsSheet: View {
                     .fontWeight(draft.boldText ? .bold : .regular)
                     .kerning(ReaderLayoutMetrics.spacingPoints(for: draft.characterSpacing))
                     .lineSpacing(CGFloat(draft.lineHeight - 1) * 8)
+                    .padding(.horizontal, previewPageMarginInset)
                     .lineLimit(7)
             }
         }
@@ -517,6 +518,10 @@ struct CustomReaderSettingsSheet: View {
             Color(uiColor: previewBackgroundColor),
             in: RoundedRectangle(cornerRadius: 22, style: .continuous)
         )
+    }
+
+    private var previewPageMarginInset: CGFloat {
+        max(ReaderLayoutMetrics.pageBlankInset(for: draft.pageMargins) - 16, 0)
     }
 
     private var previewFont: Font {

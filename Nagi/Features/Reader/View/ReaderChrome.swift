@@ -454,12 +454,16 @@ struct ReaderSettingsSheet: View {
                 }
 
                 Section {
-                    LabeledContent("页边空白", value: "\(Int(pageMargins))%")
-                    Slider(value: $pageMargins, in: ReaderLayoutMetrics.pageMarginsRange, step: 1)
+                    LabeledContent("页边空白", value: "\(Int(pageMargins.rounded())) pt")
+                    Slider(
+                        value: $pageMargins,
+                        in: ReaderLayoutMetrics.pageMarginsRange,
+                        step: ReaderLayoutMetrics.pageMarginsStep
+                    )
                 } header: {
                     Text("页面与正文间距")
                 } footer: {
-                    Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白以 24 pt 为基准。")
+                    Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。")
                 }
 
                 Section("背景色") {

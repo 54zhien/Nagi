@@ -740,7 +740,7 @@ private struct CustomReaderSettingsSheet: View {
     }
 
     private var previewHorizontalPadding: CGFloat {
-        CGFloat(ReaderLayoutMetrics.pageBlankInset(for: draft.pageMargins) * 0.6)
+        max(ReaderLayoutMetrics.pageBlankInset(for: draft.pageMargins) - 16, 0)
     }
 
     private var previewTopPadding: CGFloat {
@@ -866,8 +866,8 @@ private struct CustomReaderSettingsSheet: View {
                     systemImage: "arrow.left.and.right",
                     value: $draft.pageMargins,
                     range: ReaderLayoutMetrics.pageMarginsRange,
-                    step: 1,
-                    valueText: "\(Int(draft.pageMargins))%"
+                    step: ReaderLayoutMetrics.pageMarginsStep,
+                    valueText: "\(Int(draft.pageMargins.rounded())) pt"
                 )
 
                 Divider()
@@ -905,7 +905,7 @@ private struct CustomReaderSettingsSheet: View {
                 in: RoundedRectangle(cornerRadius: 20, style: .continuous)
             )
 
-            Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白以 24 pt 为基准。开启出版方样式后，部分自定义排版可能由书籍本身覆盖。")
+            Text("正文上边距固定为 116 pt、下边距固定为 84 pt，首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。开启出版方样式后，部分自定义排版可能由书籍本身覆盖。")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)

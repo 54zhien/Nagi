@@ -193,26 +193,26 @@ enum ReaderFontSize {
 /// The typography values that are shared by the TXT and EPUB renderers.
 ///
 /// Keep the physical page clearance here instead of letting each renderer
-/// invent its own interpretation.  `pageMargins` is retained as the existing
-/// property name for source compatibility, but its value is now a signed
-/// percentage around a 24 pt base margin.
+/// invent its own interpretation. `pageMargins` is the horizontal inset, in
+/// points, applied to both sides of the reading content.
 enum ReaderLayoutMetrics {
     static let fixedContentTopInset = 116.0
     static let fixedContentBottomInset = 84.0
     static let fixedParagraphIndent = 2.0
 
     static let pageMarginBase = 24.0
-    static let pageMarginsRange = -10.0 ... 10.0
+    static let pageMarginsRange = 16.0 ... 48.0
+    static let pageMarginsStep = 2.0
     static let lineHeightRange = 0.80 ... 2.50
     static let characterSpacingRange = -10.0 ... 10.0
     static let wordSpacingRange = -20.0 ... 20.0
     static let defaultLineHeight = 1.50
-    static let defaultPageMargins = 0.0
+    static let defaultPageMargins = pageMarginBase
     static let defaultCharacterSpacing = 0.0
     static let defaultWordSpacing = 0.0
 
-    /// The percentage controls are based on the requested 24 pt reference,
-    /// rather than changing their meaning when the reader font changes.
+    /// Character and word spacing remain percentage controls based on a fixed
+    /// reference point size, independent of the reader font size.
     static let spacingReferencePointSize = 24.0
 
     /// Readium CSS expresses these two values in `rem`.  Its public
@@ -236,12 +236,15 @@ enum ReaderLayoutMetrics {
         min(max(value, wordSpacingRange.lowerBound), wordSpacingRange.upperBound)
     }
 
-    static func pageBlankInset(for adjustment: Double) -> CGFloat {
-        CGFloat(pageMarginBase * (1 + clampPageMargins(adjustment) / 100))
+    static func pageBlankInset(for pageMargin: Double) -> CGFloat {
+        CGFloat(clampPageMargins(pageMargin))
     }
 
-    static func pageMarginFactor(for adjustment: Double) -> Double {
-        1 + clampPageMargins(adjustment) / 100
+    /// Readium expresses page margins as a factor relative to its default
+    /// page margin. Keep the user-facing value in points and convert only at
+    /// the renderer boundary.
+    static func pageMarginFactor(for pageMargin: Double) -> Double {
+        clampPageMargins(pageMargin) / pageMarginBase
     }
 
     static func spacingPoints(for percentage: Double) -> CGFloat {
@@ -257,12 +260,18 @@ enum ReaderLayoutMetrics {
         Double(spacingPoints(for: clampWordSpacing(percentage))) / readiumRootPointSize
     }
 
-    /// Values written by the pre-percentage settings screen were factors in
-    /// the 0.5...2.0 range.  The new setting is stored under a new key, so
-    /// this conversion is only used when migrating an old value.
+    /// Values written by the original settings screen were factors in the
+    /// 0.5...2.0 range. Convert them to the new absolute-point value.
     static func migrateLegacyPageMargins(_ value: Double?) -> Double {
         guard let value else { return defaultPageMargins }
-        return clampPageMargins((value - 1) * 100)
+        return clampPageMargins(pageMarginBase * value)
+    }
+
+    /// Values written by the intermediate settings screen were signed
+    /// percentages around the 24 pt base. Convert them to points.
+    static func migrateLegacyPageMarginAdjustment(_ value: Double?) -> Double {
+        guard let value else { return defaultPageMargins }
+        return clampPageMargins(pageMarginBase * (1 + value / 100))
     }
 }
 
@@ -272,7 +281,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var boldText: Bool
     var lineHeight: Double
     var paragraphSpacing: Double
-    /// Signed percentage around the 24 pt base page blank.
+    /// Absolute horizontal page blank in points, applied to both sides.
     var pageMargins: Double
     /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
     var contentTopInset: Double
@@ -353,15 +362,23 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case showBookTitleInPageHeader
     }
 
-    private static let currentStorageVersion = 2
+    private static let currentStorageVersion = 3
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let storageVersion = try container.decodeIfPresent(Int.self, forKey: .storageVersion) ?? 1
         let storedPageMargins = try container.decodeIfPresent(Double.self, forKey: .pageMargins)
-        let pageMargins = storageVersion >= Self.currentStorageVersion
-            ? ReaderLayoutMetrics.clampPageMargins(storedPageMargins ?? ReaderLayoutMetrics.defaultPageMargins)
-            : ReaderLayoutMetrics.migrateLegacyPageMargins(storedPageMargins)
+        let pageMargins: Double
+        switch storageVersion {
+        case 3...:
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(
+                storedPageMargins ?? ReaderLayoutMetrics.defaultPageMargins
+            )
+        case 2:
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMarginAdjustment(storedPageMargins)
+        default:
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(storedPageMargins)
+        }
 
         self.init(
             fontSize: try container.decodeIfPresent(Double.self, forKey: .fontSize) ?? ReaderFontSize.defaultValue,

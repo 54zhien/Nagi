@@ -343,6 +343,7 @@ final class EPUBReaderModel {
         static let lineHeight = "reader.epub.lineHeight"
         static let pageMargins = "reader.epub.pageMargins"
         static let pageMarginAdjustment = "reader.epub.pageMarginAdjustment"
+        static let pageMarginPoints = "reader.epub.pageMarginPoints"
         static let paragraphIndent = "reader.epub.paragraphIndent"
         static let contentTopInset = "reader.epub.contentTopInset"
         static let contentBottomInset = "reader.epub.contentBottomInset"
@@ -384,8 +385,10 @@ final class EPUBReaderModel {
             defaults.object(forKey: PreferenceKey.lineHeight) as? Double
                 ?? ReaderLayoutMetrics.defaultLineHeight
         )
-        if let adjustment = defaults.object(forKey: PreferenceKey.pageMarginAdjustment) as? Double {
-            pageMargins = ReaderLayoutMetrics.clampPageMargins(adjustment)
+        if let pageMargin = defaults.object(forKey: PreferenceKey.pageMarginPoints) as? Double {
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(pageMargin)
+        } else if let adjustment = defaults.object(forKey: PreferenceKey.pageMarginAdjustment) as? Double {
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMarginAdjustment(adjustment)
         } else {
             pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(
                 defaults.object(forKey: PreferenceKey.pageMargins) as? Double
@@ -861,7 +864,7 @@ final class EPUBReaderModel {
         defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
         defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
-        defaults.set(pageMargins, forKey: PreferenceKey.pageMarginAdjustment)
+        defaults.set(pageMargins, forKey: PreferenceKey.pageMarginPoints)
         defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
         defaults.set(ReaderLayoutMetrics.fixedContentTopInset, forKey: PreferenceKey.contentTopInset)
         defaults.set(ReaderLayoutMetrics.fixedContentBottomInset, forKey: PreferenceKey.contentBottomInset)
