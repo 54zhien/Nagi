@@ -254,22 +254,43 @@ final class NagiRootViewController: UIViewController {
         )
         currentLayoutState = nextState
         let resolvedTransition = effectiveTransition(transition)
-        resolvedTransition.animate { [weak self] in
+        var completedParts = 0
+        var allPartsCompleted = true
+        func completePart(_ completed: Bool) {
+            completedParts += 1
+            allPartsCompleted = allPartsCompleted && completed
+            guard completedParts == 2 else { return }
+            completion?(allPartsCompleted)
+        }
+
+        resolvedTransition.perform { [weak self] in
             guard let self else { return }
-            NagiTabTransition.setFrame(self.contentContainerView, self.view.bounds)
-            NagiTabTransition.setFrame(self.tabBarView, layout.tabBarFrame)
+            resolvedTransition.setFrame(
+                view: self.contentContainerView,
+                frame: self.view.bounds
+            )
+            resolvedTransition.setFrame(
+                view: self.tabBarView,
+                frame: layout.tabBarFrame
+            )
             for controller in self.hostingControllers.values {
-                NagiTabTransition.setFrame(controller.view, self.contentContainerView.bounds)
+                resolvedTransition.setFrame(
+                    view: controller.view,
+                    frame: self.contentContainerView.bounds
+                )
             }
         } completion: { completed in
-            completion?(completed)
+            completePart(completed)
         }
 
         tabBarView.update(
             layout: layout,
             mode: nextState.mode,
             reduceTransparency: reduceTransparency,
-            transition: resolvedTransition
+            transition: resolvedTransition,
+            completion: { completed in
+                completePart(completed)
+            }
         )
     }
 

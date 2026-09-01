@@ -133,7 +133,6 @@ final class NagiLiquidLensView: UIView {
     private var pendingCompletion: ((Bool) -> Void)?
     private var interactiveDisplayLink: CADisplayLink?
     private var interactiveTargetCenter: CGPoint?
-    private var interactiveHoveredIndex: Int?
 
     var usesPrivateLens: Bool {
         nativeLensView != nil
@@ -251,7 +250,7 @@ final class NagiLiquidLensView: UIView {
         startInteractiveDisplayLink()
     }
 
-    func updateInteractiveSelection(originX: CGFloat, hoveredIndex: Int) {
+    func updateInteractiveSelection(originX: CGFloat, hoveredIndex _: Int) {
         guard var params = currentParams, !params.isCollapsed else {
             return
         }
@@ -259,7 +258,6 @@ final class NagiLiquidLensView: UIView {
         params.selectionOrigin.x = originX
         params.isLifted = true
         currentParams = params
-        interactiveHoveredIndex = hoveredIndex
 
         let targetCenter = CGPoint(
             x: originX + params.selectionSize.width * 0.5,
@@ -272,7 +270,6 @@ final class NagiLiquidLensView: UIView {
         interactiveDisplayLink?.invalidate()
         interactiveDisplayLink = nil
         interactiveTargetCenter = nil
-        interactiveHoveredIndex = nil
     }
 
     func apply(
@@ -316,9 +313,8 @@ final class NagiLiquidLensView: UIView {
             guard let self else { return }
             self.applyPresentationGeometry(
                 params: params,
-                previousParams: previousParams,
                 mainGlassParams: mainGlassParams,
-                animated: !transition.isImmediate
+                transition: transition
             )
         }
 
@@ -329,7 +325,7 @@ final class NagiLiquidLensView: UIView {
         guard let nativeLensView,
               oldLifted != params.isLifted,
               nativeLensView.responds(to: PrivateSelector.setLifted) else {
-            transition.animate(alongsideAnimations) { [weak self] completed in
+            transition.perform(alongsideAnimations) { [weak self] completed in
                 self?.finishApplyingPendingParams(
                     transition: transition,
                     completed: completed,
@@ -349,18 +345,27 @@ final class NagiLiquidLensView: UIView {
 
     private func applyPresentationGeometry(
         params: NagiLensParams,
-        previousParams: NagiLensParams?,
         mainGlassParams: NagiGlassParams,
-        animated: Bool
+        transition: NagiTabTransition
     ) {
         let containerFrame = CGRect(origin: params.containerOrigin, size: params.size)
-        dedicatedMainGlassContainer.frame = containerFrame
-        mainSurface.frame = dedicatedMainGlassContainer.bounds
+        transition.setFrame(view: dedicatedMainGlassContainer, frame: containerFrame)
+        transition.setFrame(
+            view: mainSurface,
+            frame: dedicatedMainGlassContainer.bounds
+        )
         mainSurface.applyGeometry(params: mainGlassParams)
-        mainSurface.layoutIfNeeded()
-        lensContentContainer.frame = mainSurface.contentView.bounds
-        selectedContentView.frame = lensContentContainer.bounds
-        contentView.frame = lensContentContainer.bounds
+        transition.setCornerRadius(view: mainSurface, radius: mainGlassParams.cornerRadius)
+        let contentFrame = CGRect(origin: .zero, size: params.size)
+        transition.setFrame(view: lensContentContainer, frame: contentFrame)
+        transition.setFrame(
+            view: selectedContentView,
+            frame: CGRect(origin: .zero, size: contentFrame.size)
+        )
+        transition.setFrame(
+            view: contentView,
+            frame: CGRect(origin: .zero, size: contentFrame.size)
+        )
 
         let effectiveInset: CGFloat
         if params.isCollapsed {
@@ -368,13 +373,23 @@ final class NagiLiquidLensView: UIView {
         } else {
             effectiveInset = params.isLifted ? params.liftedInset : -params.inset
         }
-        restingBackgroundView.frame = selectedContentView.bounds
         restingBackgroundView.apply(
             cornerRadius: min(selectedContentView.bounds.width, selectedContentView.bounds.height) * 0.5,
             isDark: params.isDark,
             reduceTransparency: params.reduceTransparency
         )
-        restingBackgroundView.alpha = params.isLifted || params.isCollapsed ? 0 : 1
+        transition.setFrame(
+            view: restingBackgroundView,
+            frame: selectedContentView.bounds
+        )
+        transition.setCornerRadius(
+            view: restingBackgroundView,
+            radius: min(selectedContentView.bounds.width, selectedContentView.bounds.height) * 0.5
+        )
+        transition.setAlpha(
+            view: restingBackgroundView,
+            alpha: params.isLifted || params.isCollapsed ? 0 : 1
+        )
 
         let newNativeSize = CGSize(
             width: max(0, params.selectionSize.width + effectiveInset * 2),
@@ -385,25 +400,12 @@ final class NagiLiquidLensView: UIView {
                 x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
                 y: params.selectionOrigin.y + params.selectionSize.height * 0.5
             )
-            let oldNativeSize = previousParams.map(nativeSize(for:))
-            nativeLensView.bounds = CGRect(origin: .zero, size: newNativeSize)
-            nativeLensView.center = newCenter
-            nativeLensView.alpha = 1
-
-            if animated,
-               let oldNativeSize,
-               oldNativeSize != newNativeSize {
-                animatePosition(
-                    layer: nativeLensView.layer,
-                    from: CGPoint(
-                        x: (newNativeSize.width - oldNativeSize.width) * 0.5,
-                        y: 0
-                    ),
-                    to: .zero,
-                    additive: true,
-                    duration: 0.24
-                )
-            }
+            transition.setBounds(
+                view: nativeLensView,
+                bounds: CGRect(origin: .zero, size: newNativeSize)
+            )
+            transition.setPosition(view: nativeLensView, position: newCenter)
+            transition.setAlpha(view: nativeLensView, alpha: 1)
         }
     }
 
@@ -421,9 +423,6 @@ final class NagiLiquidLensView: UIView {
     }
 
     private func setResizeClipping(_ clipped: Bool) {
-        dedicatedMainGlassContainer.clipsToBounds = clipped
-        mainSurface.contentView.clipsToBounds = clipped
-        lensContentContainer.clipsToBounds = clipped
         contentView.clipsToBounds = clipped
         selectedContentView.clipsToBounds = clipped
     }
@@ -481,22 +480,6 @@ final class NagiLiquidLensView: UIView {
         )
     }
 
-    private func animatePosition(
-        layer: CALayer,
-        from: CGPoint,
-        to: CGPoint,
-        additive: Bool,
-        duration: TimeInterval
-    ) {
-        let animation = CABasicAnimation(keyPath: "position")
-        animation.fromValue = NSValue(cgPoint: from)
-        animation.toValue = NSValue(cgPoint: to)
-        animation.isAdditive = additive
-        animation.duration = duration
-        animation.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        layer.add(animation, forKey: "nagi.lens.positionCompensation")
-    }
-
     private func invokeLifted(
         params: NagiLensParams,
         transition: NagiTabTransition,
@@ -505,7 +488,7 @@ final class NagiLiquidLensView: UIView {
     ) {
         guard let nativeLensView,
               let method = nativeLensView.method(for: PrivateSelector.setLifted) else {
-            transition.animate(alongsideAnimations) { [weak self] completed in
+            transition.perform(alongsideAnimations) { [weak self] completed in
                 self?.finishApplyingPendingParams(
                     transition: transition,
                     completed: completed,

@@ -116,10 +116,15 @@ final class NagiGlassBackgroundView: UIView {
         return true
     }
 
-    func applyGeometry(params: NagiGlassParams) {
+    func applyGeometry(params: NagiGlassParams, applyVisibility: Bool = true) {
         layer.cornerRadius = params.cornerRadius
         layer.cornerCurve = .continuous
-        alpha = params.isVisible ? 1 : 0
+        if applyVisibility {
+            alpha = params.isVisible ? 1 : 0
+        }
+        fallbackView.frame = bounds
+        effectView.frame = bounds
+        contentView.frame = bounds
         fallbackView.layer.cornerRadius = params.cornerRadius
         effectView.layer.cornerRadius = params.cornerRadius
         setNeedsLayout()

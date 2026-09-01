@@ -33,7 +33,7 @@ enum NagiTabBarMetrics {
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
     static let horizontalMargin: CGFloat = 16
-    static let normalBottomSpacing: CGFloat = 4
+    static let normalBottomSpacing: CGFloat = 0
     static let keyboardSpacing: CGFloat = 8
 
     static func calculateLayout(
@@ -83,40 +83,6 @@ enum NagiTabBarMetrics {
             height: barHeight
         )
 
-        if state.isSearchActive {
-            let collapsedFrame = CGRect(
-                x: bounds.minX - collapsedLensDiameter - collapsedOffscreenClearance,
-                y: barFrame.minY + (barHeight - collapsedLensDiameter) * 0.5,
-                width: collapsedLensDiameter,
-                height: collapsedLensDiameter
-            )
-            let searchBackgroundFrame = CGRect(
-                x: barFrame.minX,
-                y: barFrame.minY + (barHeight - activeSearchHeight) * 0.5,
-                width: max(0, barFrame.width - searchCloseDiameter - standaloneGap),
-                height: activeSearchHeight
-            )
-            let searchCloseFrame = CGRect(
-                x: searchBackgroundFrame.maxX + standaloneGap,
-                y: searchBackgroundFrame.minY,
-                width: searchCloseDiameter,
-                height: searchCloseDiameter
-            )
-
-            return NagiTabBarLayout(
-                tabBarFrame: barFrame,
-                mainTabsFrame: collapsedFrame,
-                searchContainerFrame: barFrame,
-                searchBackgroundFrame: searchBackgroundFrame,
-                searchCloseFrame: searchCloseFrame,
-                itemFrames: Array(repeating: collapsedFrame, count: mainItemCount),
-                lensSelectionFrame: collapsedFrame,
-                lensContainerFrame: collapsedFrame,
-                isSearchActive: true,
-                isLensCollapsed: true
-            )
-        }
-
         // The original Nagi system TabView uses the available width for the
         // complete floating bar. Keep the search surface independent, then
         // distribute the remaining main capsule width across the three tabs.
@@ -140,7 +106,7 @@ enum NagiTabBarMetrics {
             )
         }
         let selectedIndex: Int
-        switch state.selectedTab {
+        switch state.previousTab ?? state.selectedTab {
         case .home: selectedIndex = 0
         case .library: selectedIndex = 1
         case .settings: selectedIndex = 2
@@ -154,17 +120,76 @@ enum NagiTabBarMetrics {
             height: searchCloseDiameter
         )
 
+        guard state.isSearchActive else {
+            return NagiTabBarLayout(
+                tabBarFrame: barFrame,
+                mainTabsFrame: mainFrame,
+                searchContainerFrame: searchContainerFrame,
+                searchBackgroundFrame: searchContainerFrame,
+                searchCloseFrame: searchCloseFrame,
+                itemFrames: itemFrames,
+                lensSelectionFrame: selectedFrame,
+                lensContainerFrame: mainFrame,
+                isSearchActive: false,
+                isLensCollapsed: false
+            )
+        }
+
+        let collapsedFrame = CGRect(
+            x: bounds.minX - collapsedLensDiameter - collapsedOffscreenClearance,
+            y: barFrame.maxY - collapsedLensDiameter,
+            width: collapsedLensDiameter,
+            height: collapsedLensDiameter
+        )
+        let activeSearchContainerFrame = CGRect(
+            x: barFrame.minX,
+            y: barFrame.maxY - activeSearchHeight,
+            width: barFrame.width,
+            height: activeSearchHeight
+        )
+        let activeSearchBackgroundFrame = CGRect(
+            x: activeSearchContainerFrame.minX,
+            y: activeSearchContainerFrame.minY,
+            width: max(0, activeSearchContainerFrame.width - searchCloseDiameter - standaloneGap),
+            height: activeSearchHeight
+        )
+        let activeSearchCloseFrame = CGRect(
+            x: activeSearchBackgroundFrame.maxX + standaloneGap,
+            y: activeSearchContainerFrame.minY,
+            width: searchCloseDiameter,
+            height: searchCloseDiameter
+        )
+        let normalLocalItemFrames = itemFrames.map { frame in
+            CGRect(
+                x: frame.minX - mainFrame.minX,
+                y: frame.minY - mainFrame.minY,
+                width: frame.width,
+                height: frame.height
+            )
+        }
+        let activeItemFrames = normalLocalItemFrames.enumerated().map { index, localFrame in
+            guard index != selectedIndex else {
+                return collapsedFrame
+            }
+            return CGRect(
+                x: collapsedFrame.minX + localFrame.minX,
+                y: collapsedFrame.minY + localFrame.minY,
+                width: localFrame.width,
+                height: localFrame.height
+            )
+        }
+
         return NagiTabBarLayout(
             tabBarFrame: barFrame,
-            mainTabsFrame: mainFrame,
-            searchContainerFrame: searchContainerFrame,
-            searchBackgroundFrame: searchContainerFrame,
-            searchCloseFrame: searchCloseFrame,
-            itemFrames: itemFrames,
-            lensSelectionFrame: selectedFrame,
-            lensContainerFrame: mainFrame,
-            isSearchActive: false,
-            isLensCollapsed: false
+            mainTabsFrame: collapsedFrame,
+            searchContainerFrame: activeSearchContainerFrame,
+            searchBackgroundFrame: activeSearchBackgroundFrame,
+            searchCloseFrame: activeSearchCloseFrame,
+            itemFrames: activeItemFrames,
+            lensSelectionFrame: collapsedFrame,
+            lensContainerFrame: collapsedFrame,
+            isSearchActive: true,
+            isLensCollapsed: true
         )
     }
 }

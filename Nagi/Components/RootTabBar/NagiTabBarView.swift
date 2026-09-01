@@ -46,8 +46,12 @@ final class NagiTabBarView: UIView {
     init() {
         self.glassContainer = NagiGlassContainerView(spacing: 7)
         let mainTabs: [AppTab] = [.home, .library, .settings]
-        self.itemViews = mainTabs.map { NagiTabBarItemView(tab: $0) }
-        self.selectedItemViews = mainTabs.map { NagiTabBarItemView(tab: $0, isInteractive: false) }
+        self.itemViews = mainTabs.map {
+            NagiTabBarItemView(tab: $0, visualRole: .normal)
+        }
+        self.selectedItemViews = mainTabs.map {
+            NagiTabBarItemView(tab: $0, visualRole: .selected, isInteractive: false)
+        }
         self.searchView = NagiNavigationSearchView(frame: .zero)
         self.liquidLensView = NagiLiquidLensView(frame: .zero)
         self.tabSelectionRecognizer = NagiTabSelectionRecognizer(target: nil, action: nil)
@@ -132,7 +136,8 @@ final class NagiTabBarView: UIView {
         layout: NagiTabBarLayout,
         mode: NagiRootTabMode,
         reduceTransparency: Bool,
-        transition: NagiTabTransition
+        transition: NagiTabTransition,
+        completion: ((Bool) -> Void)? = nil
     ) {
         currentLayout = layout
         currentMode = mode
@@ -144,6 +149,7 @@ final class NagiTabBarView: UIView {
             selectionGestureIndex: selectionGestureState?.hoveredIndex
         )
         guard nextParams != previousParams else {
+            completion?(true)
             return
         }
         let oldParams = previousParams
@@ -189,11 +195,17 @@ final class NagiTabBarView: UIView {
         let shouldClipSearchContent = !transition.isImmediate && searchGeometryDidChange
         searchView.setContentClipping(shouldClipSearchContent)
 
-        transition.animate { [weak self] in
+        let itemAlphaTransition: NagiTabTransition = transition.isImmediate
+            ? .immediate
+            : .easeInOut(duration: 0.25)
+        transition.perform { [weak self] in
             guard let self else { return }
-            NagiTabTransition.setFrame(self.searchView, localSearchContainerFrame)
+            transition.setFrame(view: self.searchView, frame: localSearchContainerFrame)
             if searchParamsChanged || searchGeometryDidChange || oldParams == nil {
-                self.searchView.applyInternalGeometry(params: searchParams)
+                self.searchView.applyInternalGeometry(
+                    params: searchParams,
+                    transition: transition
+                )
             }
             self.liquidLensView.contentView.isUserInteractionEnabled = !layout.isSearchActive
 
@@ -201,13 +213,24 @@ final class NagiTabBarView: UIView {
                 zip(self.itemViews, self.selectedItemViews),
                 localItemFrames
             ) {
-                itemView.frame = itemFrame
-                selectedItemView.frame = itemFrame
+                transition.setFrame(view: itemView, frame: itemFrame)
+                transition.setFrame(view: selectedItemView, frame: itemFrame)
             }
-            self.updateItemSelectionPresentation(displayedIndex: displayedIndex)
-        } completion: { [weak self] _ in
-            guard let self, generation == self.searchTransitionGeneration else { return }
-            self.searchView.setContentClipping(false)
+            self.updateItemSelectionPresentation(
+                displayedIndex: displayedIndex,
+                transition: itemAlphaTransition,
+                isSearchActive: layout.isSearchActive
+            )
+        } completion: { [weak self] completed in
+            guard let self else { return }
+            if generation == self.searchTransitionGeneration {
+                self.searchView.setContentClipping(false)
+                self.searchView.finishTransition(
+                    params: searchParams,
+                    completed: completed
+                )
+            }
+            completion?(completed)
         }
 
         liquidLensView.apply(
@@ -405,15 +428,27 @@ final class NagiTabBarView: UIView {
         )
     }
 
-    private func updateItemSelectionPresentation(displayedIndex: Int?) {
+    private func updateItemSelectionPresentation(
+        displayedIndex: Int?,
+        transition: NagiTabTransition = .immediate,
+        isSearchActive: Bool = false
+    ) {
         for (itemView, selectedItemView) in zip(itemViews, selectedItemViews) {
             let isSelected = displayedIndex == mainIndex(for: itemView.tab)
             itemView.update(
                 isSelected: isSelected,
-                showsSelectedAppearance: !liquidLensView.usesPrivateLens && isSelected
+                usesPrivateLens: liquidLensView.usesPrivateLens
             )
-            selectedItemView.update(isSelected: isSelected)
-            selectedItemView.alpha = isSelected ? 1 : 0
+            selectedItemView.update(
+                isSelected: isSelected,
+                usesPrivateLens: liquidLensView.usesPrivateLens
+            )
+
+            let isVisible = !isSearchActive || isSelected
+            transition.setAlpha(view: itemView, alpha: isVisible ? 1 : 0)
+            transition.setBlur(layer: itemView.layer, radius: isVisible ? 0 : 10)
+            transition.setAlpha(view: selectedItemView, alpha: isVisible ? 1 : 0)
+            transition.setBlur(layer: selectedItemView.layer, radius: isVisible ? 0 : 10)
         }
     }
 

@@ -9,10 +9,16 @@
 import UIKit
 
 final class NagiTabBarItemView: UIView {
+    enum VisualRole {
+        case normal
+        case selected
+    }
+
     let tab: AppTab
     private let button: UIButton
     private let iconView: UIImageView
     private let isInteractive: Bool
+    private let visualRole: VisualRole
 
     var onActivate: (() -> Void)?
 
@@ -21,11 +27,16 @@ final class NagiTabBarItemView: UIView {
         weight: .medium
     )
 
-    init(tab: AppTab, isInteractive: Bool = true) {
+    init(
+        tab: AppTab,
+        visualRole: VisualRole = .normal,
+        isInteractive: Bool = true
+    ) {
         self.tab = tab
         self.button = UIButton(type: .system)
         self.iconView = UIImageView(frame: .zero)
         self.isInteractive = isInteractive
+        self.visualRole = visualRole
         super.init(frame: .zero)
 
         isAccessibilityElement = false
@@ -47,7 +58,7 @@ final class NagiTabBarItemView: UIView {
         switch tab {
         case .home:
             button.accessibilityLabel = "主页"
-            iconView.image = UIImage(systemName: "apple.books")
+            iconView.image = UIImage(systemName: "apple.books") ?? UIImage(systemName: "book.closed")
         case .library:
             button.accessibilityLabel = "书库"
             iconView.image = UIImage(systemName: "books.vertical")
@@ -60,7 +71,7 @@ final class NagiTabBarItemView: UIView {
         }
 
         iconView.preferredSymbolConfiguration = Self.tabSymbolConfiguration
-        update(isSelected: false)
+        update(isSelected: false, usesPrivateLens: true)
     }
 
     required init?(coder: NSCoder) {
@@ -73,10 +84,15 @@ final class NagiTabBarItemView: UIView {
         iconView.frame = bounds
     }
 
-    func update(isSelected: Bool, showsSelectedAppearance: Bool? = nil) {
-        let isVisuallySelected = showsSelectedAppearance ?? isSelected
-        let alpha: CGFloat = isVisuallySelected ? 1 : 0.55
-        iconView.tintColor = nagiAccentColor.withAlphaComponent(alpha)
+    func update(isSelected: Bool, usesPrivateLens: Bool) {
+        switch visualRole {
+        case .normal:
+            iconView.tintColor = (!usesPrivateLens && isSelected)
+                ? nagiAccentColor
+                : .secondaryLabel
+        case .selected:
+            iconView.tintColor = nagiAccentColor
+        }
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
     }
