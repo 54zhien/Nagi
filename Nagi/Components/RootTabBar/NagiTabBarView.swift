@@ -199,8 +199,10 @@ final class NagiTabBarView: UIView {
                 localItemFrames
             ) {
                 itemView.frame = itemFrame
+                let isSelected = displayedIndex == self.mainIndex(for: itemView.tab)
                 itemView.update(
-                    isSelected: !self.liquidLensView.usesPrivateLens && displayedIndex == self.mainIndex(for: itemView.tab)
+                    isSelected: isSelected,
+                    showsSelectedAppearance: !self.liquidLensView.usesPrivateLens && isSelected
                 )
                 selectedItemView.frame = itemFrame
                 selectedItemView.update(isSelected: displayedIndex == self.mainIndex(for: selectedItemView.tab))

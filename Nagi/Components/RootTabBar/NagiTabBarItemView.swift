@@ -80,8 +80,9 @@ final class NagiTabBarItemView: UIView {
         )
     }
 
-    func update(isSelected: Bool) {
-        iconView.tintColor = isSelected ? .label : .secondaryLabel
+    func update(isSelected: Bool, showsSelectedAppearance: Bool? = nil) {
+        let isVisuallySelected = showsSelectedAppearance ?? isSelected
+        iconView.tintColor = isVisuallySelected ? .label : .secondaryLabel
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
     }
