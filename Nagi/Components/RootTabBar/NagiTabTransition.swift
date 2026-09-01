@@ -11,36 +11,96 @@ import ObjectiveC
 import QuartzCore
 import UIKit
 
+private var nagiTransitionAnimationDelegatesKey: UInt8 = 0
 private let nagiBlurAnimationKey = "nagi.transition.blur"
-private var nagiBlurAnimationDelegateKey: UInt8 = 0
+private let nagiPositionAnimationKey = "nagi.transition.position"
+private let nagiBoundsAnimationKey = "nagi.transition.bounds"
+private let nagiOpacityAnimationKey = "nagi.transition.opacity"
+private let nagiTransformAnimationKey = "nagi.transition.transform"
+private let nagiCornerRadiusAnimationKey = "nagi.transition.cornerRadius"
+private let nagiTransitionContextThreadKey = "NagiTabTransition.context"
 
-private final class NagiBlurAnimationDelegate: NSObject, CAAnimationDelegate {
+private final class NagiTransitionCompletionContext: NSObject {
+    private var pendingAnimationCount = 0
+    private var allAnimationsFinished = true
+    private var didComplete = false
+    private let completion: ((Bool) -> Void)?
+
+    init(completion: ((Bool) -> Void)?) {
+        self.completion = completion
+    }
+
+    func registerAnimation() {
+        guard !didComplete else { return }
+        pendingAnimationCount += 1
+    }
+
+    func animationDidStop(finished: Bool) {
+        guard !didComplete else { return }
+        allAnimationsFinished = allAnimationsFinished && finished
+        pendingAnimationCount = max(0, pendingAnimationCount - 1)
+        finishIfPossible()
+    }
+
+    func finishIfPossible() {
+        guard !didComplete, pendingAnimationCount == 0 else { return }
+        didComplete = true
+        completion?(allAnimationsFinished)
+    }
+}
+
+private final class NagiTransitionAnimationDelegate: NSObject, CAAnimationDelegate {
+    private var didNotify = false
+    private let context: NagiTransitionCompletionContext?
+    private let completion: ((Bool) -> Void)?
     weak var layer: CALayer?
-    let shouldRemoveFilter: Bool
+    let animationKey: String
 
-    init(layer: CALayer, shouldRemoveFilter: Bool) {
+    init(
+        context: NagiTransitionCompletionContext?,
+        completion: ((Bool) -> Void)?,
+        layer: CALayer,
+        animationKey: String
+    ) {
+        self.context = context
+        self.completion = completion
         self.layer = layer
-        self.shouldRemoveFilter = shouldRemoveFilter
+        self.animationKey = animationKey
+        super.init()
     }
 
     func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
-        guard flag, let layer else { return }
-        if shouldRemoveFilter {
-            layer.filters = nil
-        }
-        objc_setAssociatedObject(
-            layer,
-            &nagiBlurAnimationDelegateKey,
-            nil,
-            .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-        )
+        removeAnimationDelegate(from: layer, forKey: animationKey)
+        notify(finished: flag)
     }
+
+    func cancel() {
+        notify(finished: false)
+    }
+
+    private func notify(finished: Bool) {
+        guard !didNotify else { return }
+        didNotify = true
+        completion?(finished)
+        context?.animationDidStop(finished: finished)
+    }
+}
+
+private func removeAnimationDelegate(from layer: CALayer?, forKey key: String) {
+    guard let layer,
+          let delegates = objc_getAssociatedObject(
+              layer,
+              &nagiTransitionAnimationDelegatesKey
+          ) as? NSMutableDictionary else {
+        return
+    }
+    delegates.removeObject(forKey: key as NSString)
 }
 
 enum NagiTabTransition {
     case immediate
     case easeInOut(duration: TimeInterval)
-    case spring(duration: TimeInterval, damping: CGFloat, velocity: CGFloat)
+    case spring(duration: TimeInterval)
     case keyboard(duration: TimeInterval, curve: UIView.AnimationOptions)
 
     var isImmediate: Bool {
@@ -54,33 +114,51 @@ enum NagiTabTransition {
         switch self {
         case .immediate:
             return 0
-        case let .easeInOut(duration), let .spring(duration, _, _), let .keyboard(duration, _):
+        case let .easeInOut(duration), let .spring(duration), let .keyboard(duration, _):
             return duration
         }
     }
 
     /// Apply a batch of property writes in one Core Animation transaction.
-    /// This replaces the old nested UIView.animate blocks while preserving a
-    /// single completion point for Root and TabBar state transitions.
+    /// The completion is held until every property animation registered by
+    /// this batch has finished. Interrupted animations complete as `false`,
+    /// allowing the caller to ignore stale transitions.
     func perform(_ changes: () -> Void, completion: ((Bool) -> Void)? = nil) {
+        if isImmediate {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            changes()
+            CATransaction.commit()
+            completion?(true)
+            return
+        }
+
+        let context = NagiTransitionCompletionContext(completion: completion)
+        let threadDictionary = Thread.current.threadDictionary
+        let previousContext = threadDictionary[nagiTransitionContextThreadKey]
+        threadDictionary[nagiTransitionContextThreadKey] = context
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        CATransaction.setCompletionBlock {
-            completion?(true)
-        }
         changes()
         CATransaction.commit()
+
+        if let previousContext {
+            threadDictionary[nagiTransitionContextThreadKey] = previousContext
+        } else {
+            threadDictionary.removeObject(forKey: nagiTransitionContextThreadKey)
+        }
+        context.finishIfPossible()
     }
 
     func setFrame(view: UIView, frame: CGRect) {
         let targetFrame = frame.integral
         let layer = view.layer
-        let presentation = layer.presentation()
-        let fromPosition = presentation?.position ?? layer.position
-        let fromBounds = presentation?.bounds ?? layer.bounds
+        let fromPosition = presentationPosition(for: layer, animationKey: nagiPositionAnimationKey)
+        let fromBounds = presentationBounds(for: layer, animationKey: nagiBoundsAnimationKey)
 
-        layer.removeAnimation(forKey: "nagi.transition.position")
-        layer.removeAnimation(forKey: "nagi.transition.bounds")
+        removeAnimation(from: layer, forKey: nagiPositionAnimationKey)
+        removeAnimation(from: layer, forKey: nagiBoundsAnimationKey)
         setModelValue {
             if view.transform == .identity {
                 view.frame = targetFrame
@@ -95,32 +173,33 @@ enum NagiTabTransition {
         let toPosition = layer.position
         let toBounds = layer.bounds
         if fromPosition != toPosition {
-            layer.add(
+            addAnimation(
                 makeAnimation(
                     keyPath: "position",
                     fromValue: NSValue(cgPoint: fromPosition),
                     toValue: NSValue(cgPoint: toPosition)
                 ),
-                forKey: "nagi.transition.position"
+                to: layer,
+                forKey: nagiPositionAnimationKey
             )
         }
         if fromBounds != toBounds {
-            layer.add(
+            addAnimation(
                 makeAnimation(
                     keyPath: "bounds",
                     fromValue: NSValue(cgRect: fromBounds),
                     toValue: NSValue(cgRect: toBounds)
                 ),
-                forKey: "nagi.transition.bounds"
+                to: layer,
+                forKey: nagiBoundsAnimationKey
             )
         }
     }
 
     func setBounds(view: UIView, bounds: CGRect) {
         let layer = view.layer
-        let presentation = layer.presentation()
-        let fromBounds = presentation?.bounds ?? layer.bounds
-        layer.removeAnimation(forKey: "nagi.transition.bounds")
+        let fromBounds = presentationBounds(for: layer, animationKey: nagiBoundsAnimationKey)
+        removeAnimation(from: layer, forKey: nagiBoundsAnimationKey)
         setModelValue {
             view.bounds = bounds
         }
@@ -128,21 +207,21 @@ enum NagiTabTransition {
         guard !isImmediate else { return }
         let toBounds = layer.bounds
         guard fromBounds != toBounds else { return }
-        layer.add(
+        addAnimation(
             makeAnimation(
                 keyPath: "bounds",
                 fromValue: NSValue(cgRect: fromBounds),
                 toValue: NSValue(cgRect: toBounds)
             ),
-            forKey: "nagi.transition.bounds"
+            to: layer,
+            forKey: nagiBoundsAnimationKey
         )
     }
 
     func setPosition(view: UIView, position: CGPoint) {
         let layer = view.layer
-        let presentation = layer.presentation()
-        let fromPosition = presentation?.position ?? layer.position
-        layer.removeAnimation(forKey: "nagi.transition.position")
+        let fromPosition = presentationPosition(for: layer, animationKey: nagiPositionAnimationKey)
+        removeAnimation(from: layer, forKey: nagiPositionAnimationKey)
         setModelValue {
             layer.position = position
         }
@@ -150,41 +229,43 @@ enum NagiTabTransition {
         guard !isImmediate else { return }
         let toPosition = layer.position
         guard fromPosition != toPosition else { return }
-        layer.add(
+        addAnimation(
             makeAnimation(
                 keyPath: "position",
                 fromValue: NSValue(cgPoint: fromPosition),
                 toValue: NSValue(cgPoint: toPosition)
             ),
-            forKey: "nagi.transition.position"
+            to: layer,
+            forKey: nagiPositionAnimationKey
         )
     }
 
     func setAlpha(view: UIView, alpha: CGFloat) {
         let layer = view.layer
-        let presentationOpacity = layer.presentation()?.opacity ?? layer.opacity
-        layer.removeAnimation(forKey: "nagi.transition.opacity")
+        let fromOpacity = presentationOpacity(for: layer, animationKey: nagiOpacityAnimationKey)
+        removeAnimation(from: layer, forKey: nagiOpacityAnimationKey)
         setModelValue {
             view.alpha = alpha
         }
 
         guard !isImmediate else { return }
         let toOpacity = layer.opacity
-        guard abs(CGFloat(presentationOpacity) - CGFloat(toOpacity)) > 0.0001 else { return }
-        layer.add(
+        guard abs(CGFloat(fromOpacity) - CGFloat(toOpacity)) > 0.0001 else { return }
+        addAnimation(
             makeAnimation(
                 keyPath: "opacity",
-                fromValue: presentationOpacity,
+                fromValue: fromOpacity,
                 toValue: toOpacity
             ),
-            forKey: "nagi.transition.opacity"
+            to: layer,
+            forKey: nagiOpacityAnimationKey
         )
     }
 
     func setScale(view: UIView, scale: CGFloat) {
         let layer = view.layer
-        let fromTransform = layer.presentation()?.transform ?? layer.transform
-        layer.removeAnimation(forKey: "nagi.transition.transform")
+        let fromTransform = presentationTransform(for: layer, animationKey: nagiTransformAnimationKey)
+        removeAnimation(from: layer, forKey: nagiTransformAnimationKey)
         setModelValue {
             view.transform = CGAffineTransform(scaleX: scale, y: scale)
         }
@@ -192,40 +273,42 @@ enum NagiTabTransition {
         guard !isImmediate else { return }
         let toTransform = layer.transform
         guard !CATransform3DEqualToTransform(fromTransform, toTransform) else { return }
-        layer.add(
+        addAnimation(
             makeAnimation(
                 keyPath: "transform",
                 fromValue: NSValue(caTransform3D: fromTransform),
                 toValue: NSValue(caTransform3D: toTransform)
             ),
-            forKey: "nagi.transition.transform"
+            to: layer,
+            forKey: nagiTransformAnimationKey
         )
     }
 
     func setCornerRadius(view: UIView, radius: CGFloat) {
         let layer = view.layer
-        let presentationRadius = layer.presentation()?.cornerRadius ?? layer.cornerRadius
-        layer.removeAnimation(forKey: "nagi.transition.cornerRadius")
+        let fromRadius = presentationCornerRadius(for: layer, animationKey: nagiCornerRadiusAnimationKey)
+        removeAnimation(from: layer, forKey: nagiCornerRadiusAnimationKey)
         setModelValue {
             layer.cornerRadius = radius
         }
 
         guard !isImmediate else { return }
         let toRadius = layer.cornerRadius
-        guard abs(presentationRadius - toRadius) > 0.0001 else { return }
-        layer.add(
+        guard abs(fromRadius - toRadius) > 0.0001 else { return }
+        addAnimation(
             makeAnimation(
                 keyPath: "cornerRadius",
-                fromValue: presentationRadius,
+                fromValue: fromRadius,
                 toValue: toRadius
             ),
-            forKey: "nagi.transition.cornerRadius"
+            to: layer,
+            forKey: nagiCornerRadiusAnimationKey
         )
     }
 
     func setBlur(layer: CALayer, radius: CGFloat) {
         let fromRadius = currentBlurRadius(on: layer)
-        layer.removeAnimation(forKey: nagiBlurAnimationKey)
+        removeAnimation(from: layer, forKey: nagiBlurAnimationKey)
 
         guard radius > 0 else {
             if isImmediate || fromRadius <= 0.0001 {
@@ -240,20 +323,19 @@ enum NagiTabTransition {
             setModelValue {
                 layer.filters = [filter]
             }
-            let animation = makeAnimation(
-                keyPath: "filters.gaussianBlur.inputRadius",
-                fromValue: fromRadius,
-                toValue: 0
-            )
-            let delegate = NagiBlurAnimationDelegate(layer: layer, shouldRemoveFilter: true)
-            animation.delegate = delegate
-            objc_setAssociatedObject(
-                layer,
-                &nagiBlurAnimationDelegateKey,
-                delegate,
-                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
-            )
-            layer.add(animation, forKey: nagiBlurAnimationKey)
+            addAnimation(
+                makeAnimation(
+                    keyPath: "filters.gaussianBlur.inputRadius",
+                    fromValue: fromRadius,
+                    toValue: 0
+                ),
+                to: layer,
+                forKey: nagiBlurAnimationKey
+            ) { [weak layer] finished in
+                if finished {
+                    layer?.filters = nil
+                }
+            }
             return
         }
 
@@ -262,12 +344,13 @@ enum NagiTabTransition {
             layer.filters = [filter]
         }
         guard !isImmediate, abs(fromRadius - radius) > 0.0001 else { return }
-        layer.add(
+        addAnimation(
             makeAnimation(
                 keyPath: "filters.gaussianBlur.inputRadius",
                 fromValue: fromRadius,
                 toValue: radius
             ),
+            to: layer,
             forKey: nagiBlurAnimationKey
         )
     }
@@ -279,24 +362,149 @@ enum NagiTabTransition {
         CATransaction.commit()
     }
 
+    private func addAnimation(
+        _ animation: CAAnimation,
+        to layer: CALayer,
+        forKey key: String,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        let context = currentContext()
+        if context == nil, completion == nil {
+            layer.add(animation, forKey: key)
+            return
+        }
+
+        context?.registerAnimation()
+        let delegate = NagiTransitionAnimationDelegate(
+            context: context,
+            completion: completion,
+            layer: layer,
+            animationKey: key
+        )
+        animation.delegate = delegate
+        retainAnimationDelegate(delegate, on: layer, forKey: key)
+        layer.add(animation, forKey: key)
+    }
+
+    private func removeAnimation(from layer: CALayer, forKey key: String) {
+        guard let animation = layer.animation(forKey: key) else { return }
+        if let delegate = animationDelegate(on: layer, forKey: key) {
+            removeAnimationDelegate(from: layer, forKey: key)
+            delegate.cancel()
+        } else {
+            removeAnimationDelegate(from: layer, forKey: key)
+        }
+        layer.removeAnimation(forKey: key)
+    }
+
+    private func retainAnimationDelegate(
+        _ delegate: NagiTransitionAnimationDelegate,
+        on layer: CALayer,
+        forKey key: String
+    ) {
+        let delegates: NSMutableDictionary
+        if let existing = objc_getAssociatedObject(
+            layer,
+            &nagiTransitionAnimationDelegatesKey
+        ) as? NSMutableDictionary {
+            delegates = existing
+        } else {
+            delegates = NSMutableDictionary()
+            objc_setAssociatedObject(
+                layer,
+                &nagiTransitionAnimationDelegatesKey,
+                delegates,
+                .OBJC_ASSOCIATION_RETAIN_NONATOMIC
+            )
+        }
+        delegates.setObject(delegate, forKey: key as NSString)
+    }
+
+    private func animationDelegate(on layer: CALayer, forKey key: String) -> NagiTransitionAnimationDelegate? {
+        let delegates = objc_getAssociatedObject(
+            layer,
+            &nagiTransitionAnimationDelegatesKey
+        ) as? NSMutableDictionary
+        return delegates?.object(forKey: key) as? NagiTransitionAnimationDelegate
+    }
+
+    private func removeAnimationDelegate(from layer: CALayer?, forKey key: String) {
+        guard let layer,
+              let delegates = objc_getAssociatedObject(
+                  layer,
+                  &nagiTransitionAnimationDelegatesKey
+              ) as? NSMutableDictionary else {
+            return
+        }
+        delegates.removeObject(forKey: key as NSString)
+    }
+
+    private func currentContext() -> NagiTransitionCompletionContext? {
+        Thread.current.threadDictionary[nagiTransitionContextThreadKey]
+            as? NagiTransitionCompletionContext
+    }
+
+    private func presentationPosition(for layer: CALayer, animationKey: String) -> CGPoint {
+        guard layer.animation(forKey: animationKey) != nil else {
+            return layer.position
+        }
+        return layer.presentation()?.position ?? layer.position
+    }
+
+    private func presentationBounds(for layer: CALayer, animationKey: String) -> CGRect {
+        guard layer.animation(forKey: animationKey) != nil else {
+            return layer.bounds
+        }
+        return layer.presentation()?.bounds ?? layer.bounds
+    }
+
+    private func presentationOpacity(for layer: CALayer, animationKey: String) -> Float {
+        guard layer.animation(forKey: animationKey) != nil else {
+            return layer.opacity
+        }
+        return layer.presentation()?.opacity ?? layer.opacity
+    }
+
+    private func presentationTransform(for layer: CALayer, animationKey: String) -> CATransform3D {
+        guard layer.animation(forKey: animationKey) != nil else {
+            return layer.transform
+        }
+        return layer.presentation()?.transform ?? layer.transform
+    }
+
+    private func presentationCornerRadius(for layer: CALayer, animationKey: String) -> CGFloat {
+        guard layer.animation(forKey: animationKey) != nil else {
+            return layer.cornerRadius
+        }
+        return layer.presentation()?.cornerRadius ?? layer.cornerRadius
+    }
+
     private func makeAnimation(
         keyPath: String,
         fromValue: Any,
         toValue: Any
     ) -> CAAnimation {
         switch self {
-        case let .spring(duration, damping, velocity):
+        case let .spring(duration):
             let animation = CASpringAnimation(keyPath: keyPath)
-            let normalizedDamping = max(0.1, min(1, damping))
-            let settlingDuration = max(0.1, duration)
-            let naturalFrequency = 4.6 / (normalizedDamping * settlingDuration)
-            animation.mass = 1
-            animation.stiffness = naturalFrequency * naturalFrequency
-            animation.damping = 2 * normalizedDamping * naturalFrequency
-            animation.initialVelocity = velocity
+            animation.mass = 1.0
+            animation.stiffness = 555.027
+            animation.damping = 47.118
+            animation.initialVelocity = 0.0
             animation.fromValue = fromValue
             animation.toValue = toValue
-            animation.duration = max(settlingDuration, animation.settlingDuration)
+            animation.duration = duration
+            animation.timingFunction = CAMediaTimingFunction(name: .linear)
+            if animation.responds(to: NSSelectorFromString("setAllowsOverdamping:")) {
+                animation.setValue(false, forKey: "allowsOverdamping")
+            }
+            if #available(iOS 15.0, *) {
+                animation.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 80,
+                    maximum: 120,
+                    preferred: 120
+                )
+            }
             return animation
         default:
             let animation = CABasicAnimation(keyPath: keyPath)
@@ -311,7 +519,7 @@ enum NagiTabTransition {
     private var timingFunction: CAMediaTimingFunction {
         switch self {
         case .immediate, .spring:
-            return CAMediaTimingFunction(name: .easeInEaseOut)
+            return CAMediaTimingFunction(name: .linear)
         case .easeInOut:
             return CAMediaTimingFunction(name: .easeInEaseOut)
         case let .keyboard(_, curve):

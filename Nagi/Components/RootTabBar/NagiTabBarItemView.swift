@@ -58,7 +58,9 @@ final class NagiTabBarItemView: UIView {
         switch tab {
         case .home:
             button.accessibilityLabel = "主页"
-            iconView.image = UIImage(systemName: "apple.books") ?? UIImage(systemName: "book.closed")
+            // Keep Home in the same SF Symbols family as the other tabs and
+            // use a symbol present on the deployment target.
+            iconView.image = UIImage(systemName: "book.closed")
         case .library:
             button.accessibilityLabel = "书库"
             iconView.image = UIImage(systemName: "books.vertical")

@@ -139,7 +139,7 @@ final class NagiRootViewController: UIViewController {
         case .tabs:
             guard state.mode.selectedTab != tab else { return }
             state.mode = .tabs(selected: tab)
-            let transition = effectiveTransition(.spring(duration: 0.28, damping: 0.86, velocity: 0.2))
+            let transition = effectiveTransition(.spring(duration: 0.4))
             showChild(for: tab, transition: transition)
             reconcileLayout(transition: transition)
         case .searchEntering, .searchActive, .searchExiting:

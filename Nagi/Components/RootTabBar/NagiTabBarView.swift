@@ -13,6 +13,7 @@ struct NagiTabBarParams: Equatable {
     var mode: NagiRootTabMode
     var reduceTransparency: Bool
     var selectionGestureIndex: Int?
+    var overrideSelectedIndex: Int?
 }
 
 private struct NagiSelectionGestureState: Equatable {
@@ -34,6 +35,7 @@ final class NagiTabBarView: UIView {
     private var currentLayout: NagiTabBarLayout?
     private var currentMode: NagiRootTabMode?
     private var selectionGestureState: NagiSelectionGestureState?
+    private var overrideSelectedIndex: Int?
     private let isLiftedStateEnabled = true
     private var searchTransitionGeneration = 0
     private var lastTraitStyle: UIUserInterfaceStyle
@@ -146,7 +148,8 @@ final class NagiTabBarView: UIView {
             layout: layout,
             mode: mode,
             reduceTransparency: reduceTransparency,
-            selectionGestureIndex: selectionGestureState?.hoveredIndex
+            selectionGestureIndex: selectionGestureState?.hoveredIndex,
+            overrideSelectedIndex: overrideSelectedIndex
         )
         guard nextParams != previousParams else {
             completion?(true)
@@ -160,7 +163,7 @@ final class NagiTabBarView: UIView {
         let localSearchContainerFrame = localFrame(layout.searchContainerFrame, in: layout.tabBarFrame)
         let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.lensContainerFrame) }
         let selectedIndex = mainIndex(for: mode.previousTab ?? mode.selectedTab)
-        let displayedIndex = selectionGestureState?.hoveredIndex ?? selectedIndex
+        let displayedIndex = selectionGestureState?.hoveredIndex ?? overrideSelectedIndex ?? selectedIndex
         let lensSelectionFrame = displayedIndex.flatMap { index in
             guard layout.itemFrames.indices.contains(index) else { return nil }
             return layout.itemFrames[index]
@@ -248,6 +251,13 @@ final class NagiTabBarView: UIView {
             ),
             transition: transition
         )
+
+        // The Root commits a tab selection synchronously from the touch-end
+        // callback. Once that state has reached this view, the override has
+        // served its purpose and the real Root selection becomes authoritative.
+        if selectionGestureState == nil, overrideSelectedIndex == selectedIndex {
+            overrideSelectedIndex = nil
+        }
     }
 
     func setSearchQuery(_ query: String) {
@@ -392,20 +402,23 @@ final class NagiTabBarView: UIView {
         liquidLensView.endInteractiveSelection()
         updateItemSelectionPresentation(displayedIndex: finalIndex)
 
-        let transition = NagiTabTransition.spring(
-            duration: 0.22,
-            damping: 0.88,
-            velocity: 0.1
-        )
+        if finalTab != actualTab {
+            // Keep the lens's final visual selection ahead of the Root's mode
+            // update. Root.select(tab:) immediately reconciles one continuous
+            // spring using this override, instead of waiting for a second
+            // completion callback from the lens.
+            overrideSelectedIndex = finalIndex
+            self.onTabSelected?(finalTab)
+            return
+        }
+
+        overrideSelectedIndex = nil
         applyLensSelection(
             layout: currentLayout,
             displayedIndex: finalIndex,
             isLifted: false,
-            transition: transition
-        ) { [weak self] completed in
-            guard let self, completed, finalTab != actualTab else { return }
-            self.onTabSelected?(finalTab)
-        }
+            transition: .spring(duration: 0.4)
+        )
     }
 
     private func cancelTabSelection() {
@@ -418,13 +431,14 @@ final class NagiTabBarView: UIView {
         }
 
         selectionGestureState = nil
+        overrideSelectedIndex = nil
         liquidLensView.endInteractiveSelection()
         updateItemSelectionPresentation(displayedIndex: actualIndex)
         applyLensSelection(
             layout: currentLayout,
             displayedIndex: actualIndex,
             isLifted: false,
-            transition: .spring(duration: 0.22, damping: 0.88, velocity: 0.1)
+            transition: .spring(duration: 0.4)
         )
     }
 
