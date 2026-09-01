@@ -21,7 +21,9 @@ final class NagiKeyboardLayoutCoordinator {
     }
 
     deinit {
-        stop()
+        for observer in observers {
+            NotificationCenter.default.removeObserver(observer)
+        }
     }
 
     func start() {

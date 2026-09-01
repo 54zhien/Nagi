@@ -96,7 +96,12 @@ final class NagiTabBarView: UIView {
         lastTraitStyle = style
         if let previousParams {
             self.previousParams = nil
-            apply(params: previousParams, transition: .immediate)
+            update(
+                layout: previousParams.layout,
+                mode: previousParams.mode,
+                reduceTransparency: previousParams.reduceTransparency,
+                transition: .immediate
+            )
         }
     }
 

@@ -149,8 +149,8 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         iconView.frame = CGRect(x: iconX, y: iconY, width: iconSize, height: iconSize)
         iconView.alpha = active ? 1 : 0.9
 
-        let fieldLeading = active ? 40 : 0
-        let trailingControls = active ? 92 : 0
+        let fieldLeading: CGFloat = active ? 40 : 0
+        let trailingControls: CGFloat = active ? 92 : 0
         let fieldWidth = max(0, bounds.width - fieldLeading - trailingControls)
         placeholderLabel.frame = CGRect(x: fieldLeading, y: 0, width: fieldWidth, height: bounds.height)
         textField.frame = placeholderLabel.frame
