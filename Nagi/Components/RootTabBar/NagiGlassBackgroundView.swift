@@ -82,10 +82,12 @@ final class NagiGlassBackgroundView: UIView {
         super.layoutSubviews()
         fallbackView.frame = bounds
         effectView.frame = bounds
+        contentView.frame = bounds
         fallbackView.layer.cornerRadius = layer.cornerRadius
         effectView.layer.cornerRadius = layer.cornerRadius
-        effectView.clipsToBounds = true
         contentView.layer.cornerRadius = layer.cornerRadius
+        contentView.layer.cornerCurve = .continuous
+        effectView.clipsToBounds = true
     }
 
     @discardableResult

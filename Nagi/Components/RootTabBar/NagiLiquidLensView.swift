@@ -13,6 +13,7 @@ struct NagiLensParams: Equatable {
     var containerOrigin: CGPoint
     var selectionOrigin: CGPoint
     var selectionSize: CGSize
+    var isDark: Bool
     var inset: CGFloat
     var liftedInset: CGFloat
     var isLifted: Bool
@@ -20,44 +21,86 @@ struct NagiLensParams: Equatable {
     var reduceTransparency: Bool
 }
 
-private final class NagiLensRestingBackgroundView: UIView {
-    private let blurView: UIVisualEffectView
-    private let colorMatrixView: UIView
+private final class NagiLensRestingBackgroundView: UIVisualEffectView {
+    private var isDark: Bool?
 
     override init(frame: CGRect) {
-        self.blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
-        self.colorMatrixView = UIView(frame: .zero)
-        super.init(frame: frame)
+        super.init(effect: UIBlurEffect(style: .light))
 
         isUserInteractionEnabled = false
         clipsToBounds = true
         layer.cornerCurve = .continuous
-        blurView.isUserInteractionEnabled = false
-        colorMatrixView.backgroundColor = UIColor.systemBlue.withAlphaComponent(0.12)
-        colorMatrixView.isUserInteractionEnabled = false
-        addSubview(blurView)
-        addSubview(colorMatrixView)
+
+        // Match Nagram's resting lens: the visual-effect subview is hidden and
+        // the surface is recolored by a CA color-matrix filter instead of a
+        // synthetic blue overlay.
+        for subview in subviews {
+            if subview.description.contains("VisualEffectSubview") {
+                subview.isHidden = true
+            }
+        }
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        blurView.frame = bounds
-        colorMatrixView.frame = bounds
-        blurView.layer.cornerRadius = layer.cornerRadius
-        colorMatrixView.layer.cornerRadius = layer.cornerRadius
+    func apply(cornerRadius: CGFloat, isDark: Bool, reduceTransparency: Bool) {
+        layer.cornerRadius = cornerRadius
+        layer.cornerCurve = .continuous
+        backgroundColor = reduceTransparency ? .secondarySystemBackground : .clear
+        update(isDark: isDark)
+        setNeedsLayout()
     }
 
-    func apply(cornerRadius: CGFloat, reduceTransparency: Bool) {
-        layer.cornerRadius = cornerRadius
-        blurView.isHidden = reduceTransparency
-        colorMatrixView.backgroundColor = reduceTransparency
-            ? UIColor.systemBlue.withAlphaComponent(0.18)
-            : UIColor.systemBlue.withAlphaComponent(0.12)
-        setNeedsLayout()
+    func update(isDark: Bool) {
+        guard self.isDark != isDark else {
+            return
+        }
+        self.isDark = isDark
+
+        guard let sublayer = layer.sublayers?.first,
+              sublayer.filters != nil,
+              let filterClass = NSClassFromString("CAFilter") as AnyObject? as? NSObjectProtocol,
+              filterClass.responds(to: NSSelectorFromString("filterWithName:")) else {
+            return
+        }
+
+        sublayer.backgroundColor = nil
+        sublayer.isOpaque = false
+
+        let filter = filterClass
+            .perform(NSSelectorFromString("filterWithName:"), with: "colorMatrix")
+            .takeUnretainedValue() as? NSObject
+        guard let filter else {
+            return
+        }
+
+        var matrix = Self.colorMatrix(isDark: isDark)
+        filter.setValue(
+            NSValue(bytes: &matrix, objCType: "{CAColorMatrix=ffffffffffffffffffff}"),
+            forKey: "inputColorMatrix"
+        )
+        sublayer.filters = [filter]
+        sublayer.setValue(1.0, forKey: "scale")
+    }
+
+    private static func colorMatrix(isDark: Bool) -> [Float32] {
+        if isDark {
+            return [
+                1.082, -0.113, -0.011, 0.0, 0.135,
+                -0.034, 1.003, -0.011, 0.0, 0.135,
+                -0.034, -0.113, 1.105, 0.0, 0.135,
+                0.0, 0.0, 0.0, 1.0, 0.0
+            ]
+        } else {
+            return [
+                1.185, -0.05, -0.005, 0.0, -0.2,
+                -0.015, 1.15, -0.005, 0.0, -0.2,
+                -0.015, -0.05, 1.195, 0.0, -0.2,
+                0.0, 0.0, 0.0, 1.0, 0.0
+            ]
+        }
     }
 }
 
@@ -80,7 +123,7 @@ final class NagiLiquidLensView: UIView {
     let dedicatedMainGlassContainer: UIView
 
     private let mainSurface: NagiGlassBackgroundView
-    private let selectionSurface: NagiGlassBackgroundView
+    private let lensContentContainer: UIView
     private let restingBackgroundView: NagiLensRestingBackgroundView
     private let nativeLensView: UIView?
     private var currentParams: NagiLensParams?
@@ -95,7 +138,7 @@ final class NagiLiquidLensView: UIView {
         guard #available(iOS 26.0, *) else {
             return false
         }
-        return makePrivateLensView(restingBackground: UIView()) != nil
+        return makePrivateLensView() != nil
     }
 
     override init(frame: CGRect) {
@@ -103,10 +146,10 @@ final class NagiLiquidLensView: UIView {
         self.selectedContentView = UIView(frame: .zero)
         self.dedicatedMainGlassContainer = UIView(frame: .zero)
         self.mainSurface = NagiGlassBackgroundView(frame: .zero)
-        self.selectionSurface = NagiGlassBackgroundView(frame: .zero)
+        self.lensContentContainer = UIView(frame: .zero)
         let restingBackgroundView = NagiLensRestingBackgroundView(frame: .zero)
         self.restingBackgroundView = restingBackgroundView
-        self.nativeLensView = Self.makePrivateLensView(restingBackground: restingBackgroundView)
+        self.nativeLensView = Self.makePrivateLensView()
         super.init(frame: frame)
 
         isUserInteractionEnabled = true
@@ -118,28 +161,28 @@ final class NagiLiquidLensView: UIView {
         dedicatedMainGlassContainer.isUserInteractionEnabled = true
         addSubview(dedicatedMainGlassContainer)
 
-        mainSurface.isUserInteractionEnabled = false
+        mainSurface.isUserInteractionEnabled = true
         dedicatedMainGlassContainer.addSubview(mainSurface)
-        dedicatedMainGlassContainer.addSubview(restingBackgroundView)
-
-        selectionSurface.isUserInteractionEnabled = false
-        selectionSurface.alpha = 0
-        dedicatedMainGlassContainer.addSubview(selectionSurface)
+        mainSurface.contentView.isUserInteractionEnabled = true
+        mainSurface.contentView.clipsToBounds = false
+        mainSurface.contentView.addSubview(lensContentContainer)
 
         selectedContentView.backgroundColor = .clear
         selectedContentView.isOpaque = false
         selectedContentView.isUserInteractionEnabled = false
-        dedicatedMainGlassContainer.addSubview(selectedContentView)
+        selectedContentView.clipsToBounds = false
+        selectedContentView.insertSubview(restingBackgroundView, at: 0)
+        lensContentContainer.addSubview(selectedContentView)
 
         contentView.backgroundColor = .clear
         contentView.isOpaque = false
         contentView.isUserInteractionEnabled = true
-        dedicatedMainGlassContainer.addSubview(contentView)
+        contentView.clipsToBounds = false
 
         if let nativeLensView {
             nativeLensView.isUserInteractionEnabled = false
             nativeLensView.layer.zPosition = 10
-            addSubview(nativeLensView)
+            lensContentContainer.addSubview(nativeLensView)
             nativeLensView.isHidden = false
             invoke(PrivateSelector.setLiftedContentMode, on: nativeLensView, integer: 1)
             invoke(PrivateSelector.setStyle, on: nativeLensView, integer: 1)
@@ -151,6 +194,8 @@ final class NagiLiquidLensView: UIView {
                 )
             }
         }
+
+        lensContentContainer.addSubview(contentView)
     }
 
     required init?(coder: NSCoder) {
@@ -178,7 +223,6 @@ final class NagiLiquidLensView: UIView {
 
     func apply(
         params: NagiLensParams,
-        isDark: Bool,
         transition: NagiTabTransition
     ) {
         if isApplyingParams {
@@ -199,8 +243,8 @@ final class NagiLiquidLensView: UIView {
         let mainGlassParams = NagiGlassParams(
             size: params.size,
             cornerRadius: mainCornerRadius,
-            isDark: isDark,
-            tintColor: isDark
+            isDark: params.isDark,
+            tintColor: params.isDark
                 ? UIColor.white.withAlphaComponent(0.025)
                 : UIColor.white.withAlphaComponent(0.1),
             isInteractive: true,
@@ -209,19 +253,6 @@ final class NagiLiquidLensView: UIView {
         )
         mainSurface.prepare(params: mainGlassParams)
 
-        let selectionSize = params.selectionSize
-        let selectionCornerRadius = min(selectionSize.width, selectionSize.height) * 0.5
-        let selectionGlassParams = NagiGlassParams(
-            size: selectionSize,
-            cornerRadius: selectionCornerRadius,
-            isDark: isDark,
-            tintColor: UIColor.systemBlue.withAlphaComponent(0.18),
-            isInteractive: false,
-            isVisible: !usesPrivateLens,
-            reduceTransparency: params.reduceTransparency
-        )
-        selectionSurface.prepare(params: selectionGlassParams)
-
         isApplyingParams = true
         let alongsideAnimations = { [weak self] in
             guard let self else { return }
@@ -229,7 +260,6 @@ final class NagiLiquidLensView: UIView {
                 params: params,
                 previousParams: previousParams,
                 mainGlassParams: mainGlassParams,
-                selectionGlassParams: selectionGlassParams,
                 animated: !transition.isImmediate
             )
         }
@@ -258,15 +288,16 @@ final class NagiLiquidLensView: UIView {
         params: NagiLensParams,
         previousParams: NagiLensParams?,
         mainGlassParams: NagiGlassParams,
-        selectionGlassParams: NagiGlassParams,
         animated: Bool
     ) {
         let containerFrame = CGRect(origin: params.containerOrigin, size: params.size)
         dedicatedMainGlassContainer.frame = containerFrame
         mainSurface.frame = dedicatedMainGlassContainer.bounds
         mainSurface.applyGeometry(params: mainGlassParams)
-        selectedContentView.frame = dedicatedMainGlassContainer.bounds
-        contentView.frame = dedicatedMainGlassContainer.bounds
+        mainSurface.layoutIfNeeded()
+        lensContentContainer.frame = mainSurface.contentView.bounds
+        selectedContentView.frame = lensContentContainer.bounds
+        contentView.frame = lensContentContainer.bounds
 
         let selectionFrame = CGRect(origin: params.selectionOrigin, size: params.selectionSize)
         let effectiveInset: CGFloat
@@ -276,13 +307,10 @@ final class NagiLiquidLensView: UIView {
             effectiveInset = params.isLifted ? params.liftedInset : -params.inset
         }
         let lensFrame = selectionFrame.insetBy(dx: -effectiveInset, dy: -effectiveInset)
-        selectionSurface.frame = lensFrame
-        selectionSurface.applyGeometry(params: selectionGlassParams)
-        selectionSurface.alpha = usesPrivateLens ? 0 : 1
-
         restingBackgroundView.frame = lensFrame
         restingBackgroundView.apply(
             cornerRadius: min(lensFrame.width, lensFrame.height) * 0.5,
+            isDark: params.isDark,
             reduceTransparency: params.reduceTransparency
         )
         restingBackgroundView.alpha = params.isLifted || params.isCollapsed ? 0 : 1
@@ -293,8 +321,8 @@ final class NagiLiquidLensView: UIView {
         )
         if let nativeLensView {
             let newCenter = CGPoint(
-                x: params.containerOrigin.x + params.selectionOrigin.x + params.selectionSize.width * 0.5,
-                y: params.containerOrigin.y + params.selectionOrigin.y + params.selectionSize.height * 0.5
+                x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
+                y: params.selectionOrigin.y + params.selectionSize.height * 0.5
             )
             let oldNativeSize = previousParams.map(nativeSize(for:))
             nativeLensView.bounds = CGRect(origin: .zero, size: newNativeSize)
@@ -333,6 +361,8 @@ final class NagiLiquidLensView: UIView {
 
     private func setResizeClipping(_ clipped: Bool) {
         dedicatedMainGlassContainer.clipsToBounds = clipped
+        mainSurface.contentView.clipsToBounds = clipped
+        lensContentContainer.clipsToBounds = clipped
         contentView.clipsToBounds = clipped
         selectedContentView.clipsToBounds = clipped
     }
@@ -395,10 +425,10 @@ final class NagiLiquidLensView: UIView {
         }
         self.pendingParams = nil
         isApplyingParams = false
-        apply(params: pendingParams, isDark: traitCollection.userInterfaceStyle == .dark, transition: transition)
+        apply(params: pendingParams, transition: transition)
     }
 
-    private static func makePrivateLensView(restingBackground: UIView) -> UIView? {
+    private static func makePrivateLensView() -> UIView? {
         guard #available(iOS 26.0, *), NSClassFromString("_UILiquidLensView") != nil else {
             return nil
         }
@@ -414,7 +444,7 @@ final class NagiLiquidLensView: UIView {
             return nil
         }
         let instance = allocated
-            .perform(PrivateSelector.initWithRestingBackground, with: restingBackground)
+            .perform(PrivateSelector.initWithRestingBackground, with: UIView())
             .takeUnretainedValue()
         guard let lensView = instance as? UIView else {
             return nil

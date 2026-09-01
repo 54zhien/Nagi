@@ -28,6 +28,7 @@ enum NagiTabBarMetrics {
     static let searchDiameter: CGFloat = 64
     static let searchCloseDiameter: CGFloat = 48
     static let collapsedLensDiameter: CGFloat = 48
+    static let collapsedOffscreenClearance: CGFloat = 24
     static let standaloneGap: CGFloat = 8
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
@@ -83,7 +84,7 @@ enum NagiTabBarMetrics {
 
         if state.isSearchActive {
             let collapsedFrame = CGRect(
-                x: barFrame.minX - collapsedLensDiameter - standaloneGap,
+                x: bounds.minX - collapsedLensDiameter - collapsedOffscreenClearance,
                 y: barFrame.minY + (barHeight - collapsedLensDiameter) * 0.5,
                 width: collapsedLensDiameter,
                 height: collapsedLensDiameter

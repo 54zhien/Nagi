@@ -129,7 +129,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             isDark: params.isDark,
             tintColor: glassTintColor(isDark: params.isDark),
             isInteractive: true,
-            isVisible: true,
+            isVisible: params.isActive,
             reduceTransparency: params.reduceTransparency
         ))
         return backgroundChanged || closeChanged
@@ -158,7 +158,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             isDark: params.isDark,
             tintColor: glassTintColor(isDark: params.isDark),
             isInteractive: true,
-            isVisible: true,
+            isVisible: params.isActive,
             reduceTransparency: params.reduceTransparency
         ))
         backgroundView.contentView.clipsToBounds = isContentClippedDuringTransition

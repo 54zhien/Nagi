@@ -217,13 +217,13 @@ final class NagiTabBarView: UIView {
                 containerOrigin: localLensContainerFrame.origin,
                 selectionOrigin: localSelectionFrame.origin,
                 selectionSize: localSelectionFrame.size,
+                isDark: isDark,
                 inset: NagiTabBarMetrics.innerInset,
                 liftedInset: NagiTabBarMetrics.innerInset,
                 isLifted: selectionGestureState != nil && isLiftedStateEnabled,
                 isCollapsed: layout.isLensCollapsed,
                 reduceTransparency: reduceTransparency
             ),
-            isDark: isDark,
             transition: transition
         )
     }

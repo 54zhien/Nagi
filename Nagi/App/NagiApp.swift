@@ -15,6 +15,7 @@ struct NagiApp: App {
     var body: some Scene {
         WindowGroup {
             NagiRootRepresentable()
+                .ignoresSafeArea(.container, edges: .all)
                 .onOpenURL { url in
                     handleIncomingFile(url)
                 }
