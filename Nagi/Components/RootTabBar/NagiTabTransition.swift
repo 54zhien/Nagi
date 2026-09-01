@@ -86,7 +86,7 @@ enum NagiTabTransition {
                 view.frame = targetFrame
             } else {
                 view.bounds = CGRect(origin: view.bounds.origin, size: targetFrame.size)
-                view.center = targetFrame.center
+                view.center = CGPoint(x: targetFrame.midX, y: targetFrame.midY)
             }
         }
 
@@ -191,7 +191,7 @@ enum NagiTabTransition {
 
         guard !isImmediate else { return }
         let toTransform = layer.transform
-        guard fromTransform != toTransform else { return }
+        guard !CATransform3DEqualToTransform(fromTransform, toTransform) else { return }
         layer.add(
             makeAnimation(
                 keyPath: "transform",
