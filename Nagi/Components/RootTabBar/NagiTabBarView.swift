@@ -153,8 +153,12 @@ final class NagiTabBarView: UIView {
         let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.lensContainerFrame) }
         let selectedIndex = mainIndex(for: mode.previousTab ?? mode.selectedTab)
         let displayedIndex = selectionGestureState?.index ?? selectedIndex
+        let lensSelectionFrame = displayedIndex.flatMap { index in
+            guard layout.itemFrames.indices.contains(index) else { return nil }
+            return layout.itemFrames[index]
+        } ?? layout.lensSelectionFrame
         let localSelectionFrame = localFrame(
-            layout.lensSelectionFrame,
+            lensSelectionFrame,
             in: layout.lensContainerFrame
         )
         let searchParams = NagiSearchParams(
@@ -266,7 +270,7 @@ final class NagiTabBarView: UIView {
     }
 
     private func localFrame(_ frame: CGRect, in parentFrame: CGRect) -> CGRect {
-        guard !frame.isNull else { return .zero }
+        guard !frame.isEmpty else { return .zero }
         return frame.offsetBy(dx: -parentFrame.minX, dy: -parentFrame.minY)
     }
 

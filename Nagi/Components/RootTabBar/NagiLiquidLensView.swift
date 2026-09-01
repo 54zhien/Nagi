@@ -234,6 +234,10 @@ final class NagiLiquidLensView: UIView {
             )
         }
 
+        if let nativeLensView {
+            invoke(setCollapsed: params.isCollapsed, on: nativeLensView)
+        }
+
         guard let nativeLensView,
               oldLifted != params.isLifted,
               nativeLensView.responds(to: PrivateSelector.setLifted) else {
@@ -243,10 +247,6 @@ final class NagiLiquidLensView: UIView {
             return
         }
 
-        invoke(
-            setCollapsed: params.isCollapsed,
-            on: nativeLensView
-        )
         invokeLifted(
             params: params,
             transition: transition,
