@@ -2,28 +2,32 @@
 //  NagiNavigationSearchView.swift
 //  Nagi
 //
-//  持久化的搜索 surface。搜索从圆形入口展开为同一个 UITextField，
-//  不通过 SwiftUI searchable 或删除/创建子视图来切换状态。
+//  持久化的搜索 surface。外部 frame 由 NagiTabBarView 统一拥有，
+//  本 view 只管理两个 Glass surface 内部的内容和控件 geometry。
 //
 
 import UIKit
 
 struct NagiSearchParams: Equatable {
-    var size: CGSize
+    var containerSize: CGSize
+    var backgroundFrame: CGRect
+    var closeFrame: CGRect
     var isActive: Bool
-    var isExpanded: Bool
+    var isExpandedStandaloneBar: Bool
     var isDark: Bool
     var reduceTransparency: Bool
 }
 
 final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureRecognizerDelegate {
     private let backgroundView: NagiGlassBackgroundView
+    private let closeBackgroundView: NagiGlassBackgroundView
     private let iconView: UIImageView
     private let placeholderLabel: UILabel
     private let textField: UITextField
     private let clearButton: UIButton
     private let closeButton: UIButton
     private var previousParams: NagiSearchParams?
+    private var isContentClippedDuringTransition = false
 
     var onActivate: (() -> Void)?
     var onCancel: (() -> Void)?
@@ -33,6 +37,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
     override init(frame: CGRect) {
         self.backgroundView = NagiGlassBackgroundView(frame: .zero)
+        self.closeBackgroundView = NagiGlassBackgroundView(frame: .zero)
         self.iconView = UIImageView(image: UIImage(systemName: "magnifyingglass"))
         self.placeholderLabel = UILabel(frame: .zero)
         self.textField = UITextField(frame: .zero)
@@ -42,20 +47,24 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         clipsToBounds = false
         isUserInteractionEnabled = true
+
+        backgroundView.isUserInteractionEnabled = true
+        closeBackgroundView.isUserInteractionEnabled = true
         addSubview(backgroundView)
+        addSubview(closeBackgroundView)
 
         iconView.tintColor = .secondaryLabel
         iconView.contentMode = .scaleAspectFit
         iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
         iconView.isUserInteractionEnabled = false
-        addSubview(iconView)
+        backgroundView.contentView.addSubview(iconView)
 
         placeholderLabel.text = "搜索书名"
         placeholderLabel.textColor = .secondaryLabel
         placeholderLabel.font = .preferredFont(forTextStyle: .body)
         placeholderLabel.adjustsFontForContentSizeCategory = true
         placeholderLabel.isUserInteractionEnabled = false
-        addSubview(placeholderLabel)
+        backgroundView.contentView.addSubview(placeholderLabel)
 
         textField.delegate = self
         textField.backgroundColor = .clear
@@ -69,19 +78,19 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         textField.adjustsFontForContentSizeCategory = true
         textField.accessibilityLabel = "搜索书名"
         textField.addTarget(self, action: #selector(textDidChange), for: .editingChanged)
-        addSubview(textField)
+        backgroundView.contentView.addSubview(textField)
 
         clearButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
         clearButton.tintColor = .secondaryLabel
         clearButton.accessibilityLabel = "清除搜索"
         clearButton.addTarget(self, action: #selector(clearQuery), for: .primaryActionTriggered)
-        addSubview(clearButton)
+        backgroundView.contentView.addSubview(clearButton)
 
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
         closeButton.tintColor = .secondaryLabel
         closeButton.accessibilityLabel = "关闭搜索"
         closeButton.addTarget(self, action: #selector(cancelSearch), for: .primaryActionTriggered)
-        addSubview(closeButton)
+        closeBackgroundView.contentView.addSubview(closeButton)
 
         let recognizer = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
         recognizer.cancelsTouchesInView = false
@@ -98,7 +107,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         guard let params = previousParams else {
             return
         }
-        applyGeometry(params: params)
+        applyInternalGeometry(params: params)
     }
 
     @discardableResult
@@ -109,39 +118,65 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         previousParams = params
         isActive = params.isActive
 
-        return backgroundView.prepare(params: NagiGlassParams(
-            size: params.size,
-            cornerRadius: params.isExpanded ? params.size.height * 0.5 : min(params.size.width, params.size.height) * 0.5,
+        let backgroundSize = params.backgroundFrame.size
+        let backgroundRadius = min(backgroundSize.width, backgroundSize.height) * 0.5
+        let closeSize = params.closeFrame.size
+        let closeRadius = min(closeSize.width, closeSize.height) * 0.5
+        let backgroundChanged = backgroundView.prepare(params: NagiGlassParams(
+            size: backgroundSize,
+            cornerRadius: backgroundRadius,
             isDark: params.isDark,
-            tintColor: params.isDark ? UIColor.white.withAlphaComponent(0.025) : UIColor.white.withAlphaComponent(0.1),
-            tintKey: params.isExpanded ? "search-expanded" : "search-circle",
+            tintColor: glassTintColor(isDark: params.isDark),
             isInteractive: true,
             isVisible: true,
             reduceTransparency: params.reduceTransparency
         ))
+        let closeChanged = closeBackgroundView.prepare(params: NagiGlassParams(
+            size: closeSize,
+            cornerRadius: closeRadius,
+            isDark: params.isDark,
+            tintColor: glassTintColor(isDark: params.isDark),
+            isInteractive: true,
+            isVisible: true,
+            reduceTransparency: params.reduceTransparency
+        ))
+        return backgroundChanged || closeChanged
     }
 
-    func applyGeometry(params: NagiSearchParams) {
-        let radius = params.isExpanded ? params.size.height * 0.5 : min(params.size.width, params.size.height) * 0.5
-        backgroundView.frame = bounds
+    func applyInternalGeometry(params: NagiSearchParams) {
+        let backgroundSize = params.backgroundFrame.size
+        let backgroundRadius = min(backgroundSize.width, backgroundSize.height) * 0.5
+        let closeSize = params.closeFrame.size
+        let closeRadius = min(closeSize.width, closeSize.height) * 0.5
+
+        backgroundView.frame = params.backgroundFrame
+        closeBackgroundView.frame = params.closeFrame
         backgroundView.applyGeometry(params: NagiGlassParams(
-            size: params.size,
-            cornerRadius: radius,
+            size: backgroundSize,
+            cornerRadius: backgroundRadius,
             isDark: params.isDark,
-            tintColor: params.isDark ? UIColor.white.withAlphaComponent(0.025) : UIColor.white.withAlphaComponent(0.1),
-            tintKey: params.isExpanded ? "search-expanded" : "search-circle",
+            tintColor: glassTintColor(isDark: params.isDark),
             isInteractive: true,
             isVisible: true,
             reduceTransparency: params.reduceTransparency
         ))
+        closeBackgroundView.applyGeometry(params: NagiGlassParams(
+            size: closeSize,
+            cornerRadius: closeRadius,
+            isDark: params.isDark,
+            tintColor: glassTintColor(isDark: params.isDark),
+            isInteractive: true,
+            isVisible: true,
+            reduceTransparency: params.reduceTransparency
+        ))
+        backgroundView.contentView.clipsToBounds = isContentClippedDuringTransition
+        closeBackgroundView.contentView.clipsToBounds = true
         layoutControls(for: params)
     }
 
-    func update(params: NagiSearchParams) {
-        guard prepare(params: params) else {
-            return
-        }
-        applyGeometry(params: params)
+    func setContentClipping(_ clipped: Bool) {
+        isContentClippedDuringTransition = clipped
+        backgroundView.contentView.clipsToBounds = clipped
     }
 
     func setQuery(_ query: String) {
@@ -162,33 +197,61 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     }
 
     private func layoutControls(for params: NagiSearchParams) {
-        let active = params.isActive && params.isExpanded
+        let backgroundBounds = backgroundView.bounds
+        let closeBounds = closeBackgroundView.bounds
+        let active = params.isActive
+
         let iconSize: CGFloat = active ? 20 : 24
-        let iconX = active ? 12 : bounds.midX - iconSize * 0.5
-        let iconY = bounds.midY - iconSize * 0.5
+        let iconX = active ? 12 : backgroundBounds.midX - iconSize * 0.5
+        let iconY = backgroundBounds.midY - iconSize * 0.5
         iconView.frame = CGRect(x: iconX, y: iconY, width: iconSize, height: iconSize)
         iconView.alpha = active ? 1 : 0.9
 
         let fieldLeading: CGFloat = active ? 40 : 0
-        let trailingControls: CGFloat = active ? 92 : 0
-        let fieldWidth = max(0, bounds.width - fieldLeading - trailingControls)
-        placeholderLabel.frame = CGRect(x: fieldLeading, y: 0, width: fieldWidth, height: bounds.height)
+        let trailingControls: CGFloat = active ? 48 : 0
+        let fieldWidth = max(0, backgroundBounds.width - fieldLeading - trailingControls)
+        placeholderLabel.frame = CGRect(
+            x: fieldLeading,
+            y: 0,
+            width: fieldWidth,
+            height: backgroundBounds.height
+        )
         textField.frame = placeholderLabel.frame
         clearButton.frame = active
-            ? CGRect(x: max(0, bounds.width - 92), y: max(0, bounds.midY - 22), width: 44, height: 44)
+            ? CGRect(
+                x: max(0, backgroundBounds.width - 48),
+                y: max(0, backgroundBounds.midY - 22),
+                width: 44,
+                height: 44
+            )
             : .zero
-        closeButton.frame = active
-            ? CGRect(x: max(0, bounds.width - 48), y: max(0, bounds.midY - 22), width: 44, height: 44)
-            : .zero
+
+        closeButton.frame = CGRect(
+            x: max(0, closeBounds.midX - 22),
+            y: max(0, closeBounds.midY - 22),
+            width: min(44, closeBounds.width),
+            height: min(44, closeBounds.height)
+        )
 
         placeholderLabel.alpha = active ? 1 : 0
         textField.alpha = active ? 1 : 0
         textField.isUserInteractionEnabled = active
         clearButton.alpha = active && !(textField.text ?? "").isEmpty ? 1 : 0
         clearButton.isUserInteractionEnabled = active
-        closeButton.alpha = active ? 1 : 0
+
+        closeBackgroundView.alpha = active ? 1 : 0
+        closeBackgroundView.transform = active
+            ? .identity
+            : CGAffineTransform(scaleX: 0.001, y: 0.001)
+        closeBackgroundView.isUserInteractionEnabled = active
         closeButton.isUserInteractionEnabled = active
         updatePlaceholderVisibility()
+    }
+
+    private func glassTintColor(isDark: Bool) -> UIColor {
+        isDark
+            ? UIColor.white.withAlphaComponent(0.025)
+            : UIColor.white.withAlphaComponent(0.1)
     }
 
     private func updatePlaceholderVisibility() {

@@ -92,4 +92,8 @@ enum NagiTabTransition {
     static func setCornerRadius(_ view: UIView, _ radius: CGFloat) {
         view.layer.cornerRadius = radius
     }
+
+    static func setBlur(_ view: UIView, _ effect: UIVisualEffect?) {
+        (view as? UIVisualEffectView)?.effect = effect
+    }
 }

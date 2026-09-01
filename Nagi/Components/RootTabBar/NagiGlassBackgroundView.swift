@@ -13,7 +13,6 @@ struct NagiGlassParams: Equatable {
     var cornerRadius: CGFloat
     var isDark: Bool
     var tintColor: UIColor?
-    var tintKey: String
     var isInteractive: Bool
     var isVisible: Bool
     var reduceTransparency: Bool
@@ -23,7 +22,6 @@ struct NagiGlassParams: Equatable {
         lhs.cornerRadius == rhs.cornerRadius &&
         lhs.isDark == rhs.isDark &&
         colorsEqual(lhs.tintColor, rhs.tintColor) &&
-        lhs.tintKey == rhs.tintKey &&
         lhs.isInteractive == rhs.isInteractive &&
         lhs.isVisible == rhs.isVisible &&
         lhs.reduceTransparency == rhs.reduceTransparency
@@ -42,6 +40,8 @@ struct NagiGlassParams: Equatable {
 }
 
 final class NagiGlassBackgroundView: UIView {
+    let contentView: UIView
+
     private let effectView: UIVisualEffectView
     private let fallbackView: UIView
     private var previousParams: NagiGlassParams?
@@ -53,6 +53,7 @@ final class NagiGlassBackgroundView: UIView {
         effect.isInteractive = false
         self.effectView = UIVisualEffectView(effect: effect)
         self.fallbackView = UIView(frame: .zero)
+        self.contentView = UIView(frame: .zero)
         super.init(frame: frame)
 
         isUserInteractionEnabled = false
@@ -66,6 +67,11 @@ final class NagiGlassBackgroundView: UIView {
 
         addSubview(fallbackView)
         addSubview(effectView)
+        contentView.backgroundColor = .clear
+        contentView.isOpaque = false
+        contentView.clipsToBounds = true
+        contentView.layer.cornerCurve = .continuous
+        addSubview(contentView)
     }
 
     required init?(coder: NSCoder) {
@@ -79,6 +85,7 @@ final class NagiGlassBackgroundView: UIView {
         fallbackView.layer.cornerRadius = layer.cornerRadius
         effectView.layer.cornerRadius = layer.cornerRadius
         effectView.clipsToBounds = true
+        contentView.layer.cornerRadius = layer.cornerRadius
     }
 
     @discardableResult
@@ -89,7 +96,9 @@ final class NagiGlassBackgroundView: UIView {
         let previousEffectKey = currentEffectKey
         previousParams = params
 
-        let effectKey = "regular|\(params.tintKey)|\(params.isDark)|\(params.isInteractive)"
+        // Size, corner radius, visibility, and search presentation state are
+        // geometry/visibility inputs. They must never recreate the glass.
+        let effectKey = "regular|\(params.isDark)|\(params.isInteractive)"
         if effectKey != previousEffectKey || !NagiGlassParams.colorsEqual(currentTintColor, params.tintColor) {
             let effect = UIGlassEffect(style: .regular)
             effect.tintColor = params.tintColor
@@ -106,7 +115,6 @@ final class NagiGlassBackgroundView: UIView {
     }
 
     func applyGeometry(params: NagiGlassParams) {
-        frame.size = params.size
         layer.cornerRadius = params.cornerRadius
         layer.cornerCurve = .continuous
         alpha = params.isVisible ? 1 : 0

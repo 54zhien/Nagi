@@ -93,7 +93,6 @@
 		4A00000000000000000000A2 /* NagiRootState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A2 /* NagiRootState.swift */; };
 		4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */; };
 		4A00000000000000000000A4 /* SystemRootTabReferenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */; };
-		4A00000000000000000000AD /* NagiRootPageHostView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AD /* NagiRootPageHostView.swift */; };
 		4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A5 /* NagiTabBarView.swift */; };
 		4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A6 /* NagiTabBarItemView.swift */; };
 		4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A7 /* NagiNavigationSearchView.swift */; };
@@ -188,7 +187,6 @@
 		3A00000000000000000000A2 /* NagiRootState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootState.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiKeyboardLayoutCoordinator.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemRootTabReferenceView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000AD /* NagiRootPageHostView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootPageHostView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A5 /* NagiTabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A6 /* NagiTabBarItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarItemView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A7 /* NagiNavigationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiNavigationSearchView.swift; sourceTree = "<group>"; };
@@ -259,7 +257,6 @@
 				3A00000000000000000000A2 /* NagiRootState.swift */,
 				3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */,
 				3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */,
-				3A00000000000000000000AD /* NagiRootPageHostView.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
@@ -780,7 +777,6 @@
 				4A00000000000000000000A2 /* NagiRootState.swift in Sources */,
 				4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */,
 				4A00000000000000000000A4 /* SystemRootTabReferenceView.swift in Sources */,
-				4A00000000000000000000AD /* NagiRootPageHostView.swift in Sources */,
 				4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */,
 				4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */,
 				4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */,

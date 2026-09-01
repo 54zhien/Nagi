@@ -16,9 +16,11 @@ final class NagiRootViewController: UIViewController {
 
     let state = NagiRootState()
     private var hostingControllers: [AppTab: UIHostingController<AnyView>] = [:]
-    private var pageHosts: [AppTab: NagiRootPageHostView] = [:]
     private var keyboardCoordinator: NagiKeyboardLayoutCoordinator?
     private var currentLayoutState = NagiRootLayoutState.initial
+    private var activeLayoutTransition: NagiTabTransition?
+    private var keyboardTransitionGeneration = 0
+    private var searchExitLayoutCompleted = false
     private var reduceMotion: Bool
     private var reduceTransparency: Bool
 
@@ -35,10 +37,10 @@ final class NagiRootViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Each persistent page host owns a full-bleed page background. The
-        // root itself must not become a visible strip around SwiftUI content.
-        view.backgroundColor = .clear
-        view.isOpaque = false
+        // This is only the transition fallback. Each persistent hosting view
+        // owns the same semantic page background while it is visible.
+        view.backgroundColor = pageBackgroundColor(for: .home)
+        view.isOpaque = true
         contentContainerView.backgroundColor = .clear
         contentContainerView.clipsToBounds = false
         view.addSubview(contentContainerView)
@@ -55,12 +57,12 @@ final class NagiRootViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        reconcileLayout(transition: .immediate)
+        reconcileLayout(transition: activeLayoutTransition ?? .immediate)
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        reconcileLayout(transition: .immediate)
+        reconcileLayout(transition: activeLayoutTransition ?? .immediate)
     }
 
     func updateAccessibility(reduceMotion: Bool, reduceTransparency: Bool) {
@@ -68,7 +70,7 @@ final class NagiRootViewController: UIViewController {
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
         guard changed else { return }
-        reconcileLayout(transition: .immediate)
+        reconcileLayout(transition: .immediate, force: true)
     }
 
     func stopKeyboardObservation() {
@@ -79,21 +81,16 @@ final class NagiRootViewController: UIViewController {
     private func installPersistentChildren() {
         let tabs: [AppTab] = [.home, .library, .settings, .search]
         for tab in tabs {
-            let pageHost = NagiRootPageHostView(backgroundColor: pageBackgroundColor(for: tab))
-            pageHosts[tab] = pageHost
-            contentContainerView.addSubview(pageHost)
-
             let controller = makeHostingController(for: tab)
             hostingControllers[tab] = controller
             addChild(controller)
-            controller.view.backgroundColor = .clear
-            controller.view.isOpaque = false
+            controller.view.backgroundColor = pageBackgroundColor(for: tab)
+            controller.view.isOpaque = true
             controller.view.frame = contentContainerView.bounds
-            pageHost.contentView.addSubview(controller.view)
+            contentContainerView.addSubview(controller.view)
             controller.didMove(toParent: self)
-            pageHost.alpha = tab == .home ? 1 : 0
-            pageHost.isHidden = tab != .home
-            pageHost.isUserInteractionEnabled = tab == .home
+            controller.view.alpha = 1
+            controller.view.isHidden = tab != .home
             controller.view.isUserInteractionEnabled = tab == .home
         }
     }
@@ -145,7 +142,7 @@ final class NagiRootViewController: UIViewController {
             let transition = effectiveTransition(.spring(duration: 0.28, damping: 0.86, velocity: 0.2))
             showChild(for: tab, transition: transition)
             reconcileLayout(transition: transition)
-        case .searchActivating, .searchActive, .searchDeactivating:
+        case .searchEntering, .searchActive, .searchExiting:
             cancelSearch(to: tab)
         }
     }
@@ -156,68 +153,61 @@ final class NagiRootViewController: UIViewController {
         state.tabBeforeSearch = selected
         state.searchText = ""
         tabBarView.setSearchQuery("")
-        state.mode = .searchActivating
+        state.mode = .searchEntering(previous: selected)
 
         let transition = effectiveTransition(.easeInOut(duration: 0.26))
         showChild(for: .search, transition: transition)
         reconcileLayout(transition: transition)
         tabBarView.becomeSearchFirstResponder()
 
-        state.mode = .searchActive
+        state.mode = .searchActive(previous: selected)
     }
 
     private func cancelSearch(to targetTab: AppTab? = nil) {
-        let target = targetTab ?? state.tabBeforeSearch
+        let target = targetTab ?? state.mode.previousTab ?? state.tabBeforeSearch
         guard target != .search else { return }
-        guard state.mode.isSearchVisible || state.mode.isSearchExpanded else {
+        guard state.mode.isSearchVisible else {
             state.mode = .tabs(selected: target)
             showChild(for: target, transition: .immediate)
-            reconcileLayout(transition: .immediate)
+            reconcileLayout(transition: .immediate, force: true)
             return
         }
 
         state.searchText = ""
         tabBarView.setSearchQuery("")
         tabBarView.resignSearchFirstResponder()
-        state.mode = .searchDeactivating(previous: target)
+        searchExitLayoutCompleted = false
+        state.mode = .searchExiting(previous: target)
 
         let transition = effectiveTransition(.easeInOut(duration: 0.24))
         showChild(for: target, transition: transition)
-        reconcileLayout(transition: transition)
-
-        if currentLayoutState.keyboardFrame == nil {
-            transition.animate({}) { [weak self] _ in
-                guard let self else { return }
-                self.finishSearchDeactivation(target: target)
-            }
+        reconcileLayout(transition: transition) { [weak self] completed in
+            guard let self, completed else { return }
+            self.searchExitLayoutCompleted = true
+            self.finishSearchDeactivationIfReady(target: target)
         }
     }
 
-    private func finishSearchDeactivation(target: AppTab) {
-        guard case .searchDeactivating = state.mode else { return }
+    private func finishSearchDeactivationIfReady(target: AppTab) {
+        guard case let .searchExiting(previous) = state.mode,
+              previous == target,
+              searchExitLayoutCompleted,
+              currentLayoutState.keyboardFrame == nil else {
+            return
+        }
         state.mode = .tabs(selected: target)
-        reconcileLayout(transition: .immediate)
+        reconcileLayout(transition: .immediate, force: true)
     }
 
     private func showChild(for tab: AppTab, transition: NagiTabTransition) {
         let visibleTab = tab
+        _ = transition
+        view.backgroundColor = pageBackgroundColor(for: visibleTab)
         for (childTab, controller) in hostingControllers {
             let isVisible = childTab == visibleTab
-            guard let pageHost = pageHosts[childTab] else { continue }
-            pageHost.isHidden = false
-            pageHost.isUserInteractionEnabled = isVisible
+            controller.view.alpha = 1
+            controller.view.isHidden = !isVisible
             controller.view.isUserInteractionEnabled = isVisible
-        }
-        transition.animate { [weak self] in
-            guard let self else { return }
-            for (childTab, pageHost) in self.pageHosts {
-                pageHost.alpha = childTab == visibleTab ? 1 : 0
-            }
-        } completion: { [weak self] completed in
-            guard let self, completed else { return }
-            for (childTab, pageHost) in self.pageHosts where childTab != visibleTab {
-                pageHost.isHidden = true
-            }
         }
     }
 
@@ -227,20 +217,32 @@ final class NagiRootViewController: UIViewController {
             reconcileLayout(transition: .immediate)
             return
         }
-        reconcileLayout(transition: effectiveTransition(transition))
-        if frame == nil, case let .searchDeactivating(previous) = state.mode {
-            finishSearchDeactivation(target: previous)
+        keyboardTransitionGeneration += 1
+        let generation = keyboardTransitionGeneration
+        let resolvedTransition = effectiveTransition(transition)
+        activeLayoutTransition = resolvedTransition
+        reconcileLayout(transition: resolvedTransition) { [weak self] _ in
+            guard let self, generation == self.keyboardTransitionGeneration else { return }
+            self.activeLayoutTransition = nil
+        }
+        if frame == nil, case let .searchExiting(previous) = state.mode {
+            finishSearchDeactivationIfReady(target: previous)
         }
     }
 
-    private func reconcileLayout(transition: NagiTabTransition) {
+    private func reconcileLayout(
+        transition: NagiTabTransition,
+        force: Bool = false,
+        completion: ((Bool) -> Void)? = nil
+    ) {
         let nextState = NagiRootLayoutState(
             bounds: view.bounds,
             safeAreaInsets: view.safeAreaInsets,
             keyboardFrame: currentLayoutState.keyboardFrame,
             mode: state.mode
         )
-        guard nextState != currentLayoutState || tabBarView.frame == .zero else {
+        guard force || nextState != currentLayoutState || tabBarView.frame == .zero else {
+            completion?(true)
             return
         }
 
@@ -256,12 +258,11 @@ final class NagiRootViewController: UIViewController {
             guard let self else { return }
             NagiTabTransition.setFrame(self.contentContainerView, self.view.bounds)
             NagiTabTransition.setFrame(self.tabBarView, layout.tabBarFrame)
-            for (tab, pageHost) in self.pageHosts {
-                NagiTabTransition.setFrame(pageHost, self.contentContainerView.bounds)
-                if let controller = self.hostingControllers[tab] {
-                    NagiTabTransition.setFrame(controller.view, self.contentContainerView.bounds)
-                }
+            for controller in self.hostingControllers.values {
+                NagiTabTransition.setFrame(controller.view, self.contentContainerView.bounds)
             }
+        } completion: { completed in
+            completion?(completed)
         }
 
         tabBarView.update(

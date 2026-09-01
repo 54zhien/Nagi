@@ -17,26 +17,60 @@ enum AppTab: Hashable {
     case search
 }
 
+struct NagiSearchPresentationState: Equatable {
+    var isActive: Bool
+    var isExpandedStandaloneBar: Bool
+
+    static let inactive = NagiSearchPresentationState(
+        isActive: false,
+        isExpandedStandaloneBar: false
+    )
+}
+
 enum NagiRootTabMode: Equatable {
     case tabs(selected: AppTab)
-    case searchActivating
-    case searchActive
-    case searchDeactivating(previous: AppTab)
+    case searchEntering(previous: AppTab)
+    case searchActive(previous: AppTab)
+    case searchExiting(previous: AppTab)
 
     var selectedTab: AppTab {
         switch self {
         case let .tabs(selected):
             return selected
-        case .searchActivating, .searchActive:
+        case .searchEntering, .searchActive:
             return .search
-        case let .searchDeactivating(previous):
+        case let .searchExiting(previous):
             return previous
         }
     }
 
+    var previousTab: AppTab? {
+        switch self {
+        case let .tabs(selected):
+            return selected
+        case let .searchEntering(previous), let .searchActive(previous), let .searchExiting(previous):
+            return previous
+        }
+    }
+
+    var searchPresentation: NagiSearchPresentationState {
+        switch self {
+        case .tabs:
+            return .inactive
+        case .searchEntering, .searchActive:
+            return NagiSearchPresentationState(isActive: true, isExpandedStandaloneBar: false)
+        case .searchExiting:
+            return NagiSearchPresentationState(isActive: false, isExpandedStandaloneBar: false)
+        }
+    }
+
+    var isSearchActive: Bool {
+        searchPresentation.isActive
+    }
+
     var isSearchVisible: Bool {
         switch self {
-        case .searchActivating, .searchActive, .searchDeactivating:
+        case .searchEntering, .searchActive, .searchExiting:
             return true
         case .tabs:
             return false
@@ -45,21 +79,28 @@ enum NagiRootTabMode: Equatable {
 
     var isSearchInteractionActive: Bool {
         switch self {
-        case .searchActivating, .searchActive, .searchDeactivating:
+        case .searchEntering, .searchActive, .searchExiting:
             return true
         case .tabs:
             return false
         }
     }
 
-    var isSearchExpanded: Bool {
+    var layoutIdentity: NagiRootLayoutIdentity {
         switch self {
-        case .searchActivating, .searchActive:
-            return true
-        case .tabs, .searchDeactivating:
-            return false
+        case let .tabs(selected):
+            return .normal(selected: selected)
+        case .searchEntering, .searchActive:
+            return .searchActive
+        case let .searchExiting(previous):
+            return .normal(selected: previous)
         }
     }
+}
+
+enum NagiRootLayoutIdentity: Equatable {
+    case normal(selected: AppTab)
+    case searchActive
 }
 
 struct NagiRootLayoutState: Equatable {
@@ -74,6 +115,13 @@ struct NagiRootLayoutState: Equatable {
         keyboardFrame: nil,
         mode: .tabs(selected: .home)
     )
+
+    static func == (lhs: NagiRootLayoutState, rhs: NagiRootLayoutState) -> Bool {
+        lhs.bounds == rhs.bounds &&
+        lhs.safeAreaInsets == rhs.safeAreaInsets &&
+        lhs.keyboardFrame == rhs.keyboardFrame &&
+        lhs.mode.layoutIdentity == rhs.mode.layoutIdentity
+    }
 }
 
 final class NagiRootState: ObservableObject {
