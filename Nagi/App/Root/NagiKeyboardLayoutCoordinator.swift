@@ -34,14 +34,18 @@ final class NagiKeyboardLayoutCoordinator {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            self?.handle(notification: notification)
+            Task { @MainActor [weak self] in
+                self?.handle(notification: notification)
+            }
         })
         observers.append(center.addObserver(
             forName: UIResponder.keyboardWillHideNotification,
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            self?.handleHide(notification: notification)
+            Task { @MainActor [weak self] in
+                self?.handleHide(notification: notification)
+            }
         })
     }
 

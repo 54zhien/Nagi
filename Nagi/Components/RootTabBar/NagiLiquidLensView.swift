@@ -231,7 +231,7 @@ final class NagiLiquidLensView: UIView {
 
     private func invoke(_ selector: Selector, on object: AnyObject, object argument: AnyObject?) {
         guard object.responds(to: selector) else { return }
-        object.perform(selector, with: argument)
+        _ = object.perform(selector, with: argument)
     }
 
     private func invoke(_ selector: Selector, on object: AnyObject, integer: Int32) {

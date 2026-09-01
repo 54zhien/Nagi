@@ -39,6 +39,10 @@ final class NagiTabBarView: UIView {
         self.lastTraitStyle = .unspecified
         super.init(frame: .zero)
 
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: NagiTabBarView, previousTraitCollection) in
+            view.handleTraitCollectionChange(previousTraitCollection)
+        }
+
         clipsToBounds = false
         isUserInteractionEnabled = true
 
@@ -89,8 +93,7 @@ final class NagiTabBarView: UIView {
         }
     }
 
-    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
-        super.traitCollectionDidChange(previousTraitCollection)
+    private func handleTraitCollectionChange(_ previousTraitCollection: UITraitCollection) {
         let style = traitCollection.userInterfaceStyle
         guard style != lastTraitStyle else { return }
         lastTraitStyle = style

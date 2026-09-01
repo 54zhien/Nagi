@@ -27,7 +27,6 @@ final class NagiTabBarItemView: UIView {
         button.accessibilityTraits = [.button]
         button.contentHorizontalAlignment = .center
         button.contentVerticalAlignment = .center
-        button.adjustsImageWhenHighlighted = false
 
         iconView.isUserInteractionEnabled = false
         iconView.contentMode = .scaleAspectFit
