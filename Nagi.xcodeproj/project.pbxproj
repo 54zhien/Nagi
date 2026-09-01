@@ -878,7 +878,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 114;
+			CURRENT_PROJECT_VERSION = 115;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -904,7 +904,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 114;
+			CURRENT_PROJECT_VERSION = 115;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
