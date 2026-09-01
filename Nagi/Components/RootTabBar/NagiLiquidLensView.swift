@@ -24,7 +24,7 @@ struct NagiLensParams: Equatable {
 private final class NagiLensRestingBackgroundView: UIVisualEffectView {
     private var isDark: Bool?
 
-    override init(frame: CGRect) {
+    init() {
         super.init(effect: UIBlurEffect(style: .light))
 
         isUserInteractionEnabled = false
@@ -147,7 +147,7 @@ final class NagiLiquidLensView: UIView {
         self.dedicatedMainGlassContainer = UIView(frame: .zero)
         self.mainSurface = NagiGlassBackgroundView(frame: .zero)
         self.lensContentContainer = UIView(frame: .zero)
-        let restingBackgroundView = NagiLensRestingBackgroundView(frame: .zero)
+        let restingBackgroundView = NagiLensRestingBackgroundView()
         self.restingBackgroundView = restingBackgroundView
         self.nativeLensView = Self.makePrivateLensView()
         super.init(frame: frame)
