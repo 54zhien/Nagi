@@ -157,10 +157,12 @@ final class NagiTabBarView: UIView {
         let selectedTab = mode.selectedTab
         let selectedIndex = mainIndex(for: selectedTab)
         let displayedIndex = selectionGestureState?.index ?? selectedIndex
-        let lensFrame = displayedIndex.flatMap { index in
-            guard layout.itemFrames.indices.contains(index) else { return nil }
-            return localFrame(layout.itemFrames[index], in: layout.tabBarFrame)
-        } ?? .zero
+        let lensFrame: CGRect
+        if let displayedIndex, layout.itemFrames.indices.contains(displayedIndex) {
+            lensFrame = localFrame(layout.itemFrames[displayedIndex], in: layout.tabBarFrame)
+        } else {
+            lensFrame = .zero
+        }
         let isLifted = selectionGestureState != nil && isLiftedStateEnabled
         let isLensVisible = !layout.isSearchExpanded && !lensFrame.isEmpty
         let mainGlassParams = NagiGlassParams(
