@@ -88,6 +88,7 @@
 		4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000093 /* GlassBackendConfiguration.swift */; };
 		4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */; };
 		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
+		4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */; };
 		4A00000000000000000000A0 /* NagiRootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A0 /* NagiRootViewController.swift */; };
 		4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A1 /* NagiRootRepresentable.swift */; };
 		4A00000000000000000000A2 /* NagiRootState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A2 /* NagiRootState.swift */; };
@@ -183,6 +184,7 @@
 		3A0000000000000000000093 /* GlassBackendConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBackendConfiguration.swift; sourceTree = "<group>"; };
 		3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceSignposts.swift; sourceTree = "<group>"; };
 		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
+		3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFontSizeStepperControl.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A0 /* NagiRootViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootViewController.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A1 /* NagiRootRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootRepresentable.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A2 /* NagiRootState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootState.swift; sourceTree = "<group>"; };
@@ -519,6 +521,7 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000090 /* ReaderSettingsViewController.swift */,
+				3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -775,6 +778,7 @@
 				4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */,
 				4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */,
 				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
+				4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */,
 				4A00000000000000000000A0 /* NagiRootViewController.swift in Sources */,
 				4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */,
 				4A00000000000000000000A2 /* NagiRootState.swift in Sources */,

@@ -78,9 +78,9 @@ enum ReaderAppearanceMode: String, CaseIterable, Identifiable, Codable, Sendable
 
     var systemImage: String {
         switch self {
-        case .light: return "sunrise.fill"
-        case .dark: return "sunset.fill"
-        case .system: return "circle.lefthalf.filled"
+        case .light: return "microbe"
+        case .dark: return "moon"
+        case .system: return "leaf"
         }
     }
 }
@@ -105,22 +105,13 @@ enum ReaderPageTransition: String, CaseIterable, Identifiable, Codable, Sendable
     var systemImage: String {
         switch self {
         case .slide:
-            return ReaderSystemSymbol.name(
-                "arrow.left.page.on.rectangle",
-                fallback: "arrow.left.arrow.right"
-            )
+            return "wind.snow"
         case .pageCurl:
-            return ReaderSystemSymbol.name("book.pages", fallback: "book")
+            return "tornado"
         case .fade:
-            return ReaderSystemSymbol.name(
-                "rectangle.on.rectangle.transition",
-                fallback: "rectangle.on.rectangle"
-            )
+            return "bird"
         case .scroll:
-            return ReaderSystemSymbol.name(
-                "arrow.up.and.down.text.horizontal",
-                fallback: "arrow.up.and.down"
-            )
+            return "cloud.bolt.rain"
         }
     }
 }
