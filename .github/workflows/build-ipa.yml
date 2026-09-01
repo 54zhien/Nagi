@@ -3,7 +3,7 @@ name: Build unsigned IPA
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, codex/reader-fluidity-refactor ]
 
 jobs:
   build:
