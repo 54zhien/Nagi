@@ -266,32 +266,49 @@ final class NagiLiquidLensView: UIView {
         )
         mainSurface.prepare(params: mainGlassParams)
 
-        isApplyingParams = true
-        let alongsideAnimations = { [weak self] in
+        if let nativeLensView {
+            invoke(setCollapsed: params.isCollapsed, on: nativeLensView)
+        }
+
+        let applyAnimations = { [weak self] in
             guard let self else { return }
             self.applyPresentationGeometry(
                 params: params,
                 mainGlassParams: mainGlassParams,
+                transition: transition
+            )
+            self.applyNativeLensGeometry(
+                params: params,
                 transition: transition,
                 privateLiftChanged: privateLiftChanged
             )
         }
 
-        if let nativeLensView {
-            invoke(setCollapsed: params.isCollapsed, on: nativeLensView)
-        }
-
         guard let nativeLensView,
               oldLifted != params.isLifted,
               nativeLensView.responds(to: PrivateSelector.setLifted) else {
-            transition.perform(alongsideAnimations) { [weak self] completed in
-                self?.finishApplyingPendingParams(
-                    transition: transition,
-                    completed: completed,
-                    completion: completion
-                )
+            transition.perform(applyAnimations) { [weak self] completed in
+                guard let self else {
+                    completion?(completed)
+                    return
+                }
+                if self.currentParams == params {
+                    self.setResizeClipping(false)
+                }
+                completion?(completed)
             }
             return
+        }
+
+        isApplyingParams = true
+        transition.perform(applyAnimations)
+
+        let alongsideAnimations = { [weak self] in
+            guard let self,
+                  let nativeLensView = self.nativeLensView else {
+                return
+            }
+            nativeLensView.bounds = self.nativeLensTargetBounds(for: params)
         }
 
         invokeLifted(
@@ -305,8 +322,7 @@ final class NagiLiquidLensView: UIView {
     private func applyPresentationGeometry(
         params: NagiLensParams,
         mainGlassParams: NagiGlassParams,
-        transition: NagiTabTransition,
-        privateLiftChanged: Bool
+        transition: NagiTabTransition
     ) {
         let containerFrame = CGRect(origin: params.containerOrigin, size: params.size)
         transition.setFrame(view: dedicatedMainGlassContainer, frame: containerFrame)
@@ -327,12 +343,6 @@ final class NagiLiquidLensView: UIView {
             frame: CGRect(origin: .zero, size: contentFrame.size)
         )
 
-        let effectiveInset: CGFloat
-        if params.isCollapsed {
-            effectiveInset = 0
-        } else {
-            effectiveInset = params.isLifted ? params.liftedInset : -params.inset
-        }
         restingBackgroundView.apply(
             cornerRadius: min(selectedContentView.bounds.width, selectedContentView.bounds.height) * 0.5,
             isDark: params.isDark,
@@ -350,52 +360,65 @@ final class NagiLiquidLensView: UIView {
             view: restingBackgroundView,
             alpha: params.isLifted || params.isCollapsed ? 0 : 1
         )
+    }
 
-        let newNativeSize = CGSize(
-            width: max(0, params.selectionSize.width + effectiveInset * 2),
-            height: max(0, params.selectionSize.height + effectiveInset * 2)
+    private func applyNativeLensGeometry(
+        params: NagiLensParams,
+        transition: NagiTabTransition,
+        privateLiftChanged: Bool
+    ) {
+        guard let nativeLensView else { return }
+
+        let newCenter = CGPoint(
+            x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
+            y: params.selectionOrigin.y + params.selectionSize.height * 0.5
         )
-        if let nativeLensView {
-            let newCenter = CGPoint(
-                x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
-                y: params.selectionOrigin.y + params.selectionSize.height * 0.5
-            )
+        let targetBounds = nativeLensTargetBounds(for: params)
+        let previousBounds = nativeLensView.bounds
 
-            let targetBounds = CGRect(
-                origin: .zero,
-                size: newNativeSize
-            )
-            let previousBounds = nativeLensView.bounds
+        if !privateLiftChanged {
+            // Keep ordinary resize geometry on the model layer and use
+            // Nagram's additive position compensation for width changes.
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            nativeLensView.bounds = targetBounds
+            CATransaction.commit()
 
-            if privateLiftChanged {
-                // _UILiquidLensView coordinates this bounds change from its
-                // setLifted(_:animated:alongsideAnimations:completion:) path.
-                nativeLensView.bounds = targetBounds
-                transition.setPosition(view: nativeLensView, position: newCenter)
-            } else {
-                // Keep ordinary resize geometry on the model layer and use
-                // Nagram's additive position compensation for width changes.
-                CATransaction.begin()
-                CATransaction.setDisableActions(true)
-                nativeLensView.bounds = targetBounds
-                CATransaction.commit()
-
-                transition.setPosition(view: nativeLensView, position: newCenter)
-
-                if !transition.isImmediate {
-                    let widthDelta = targetBounds.width - previousBounds.width
-                    if abs(widthDelta) > 0.001 {
-                        transition.animatePosition(
-                            layer: nativeLensView.layer,
-                            from: CGPoint(x: widthDelta * 0.5, y: 0),
-                            to: .zero,
-                            additive: true
-                        )
-                    }
+            if !transition.isImmediate {
+                let widthDelta = targetBounds.width - previousBounds.width
+                if abs(widthDelta) > 0.001 {
+                    transition.animatePosition(
+                        layer: nativeLensView.layer,
+                        from: CGPoint(x: widthDelta * 0.5, y: 0),
+                        to: .zero,
+                        additive: true
+                    )
                 }
             }
-            transition.setAlpha(view: nativeLensView, alpha: 1)
         }
+
+        // The center is always an ordinary property transition. During a
+        // private lift, only bounds are deferred to setLifted's alongside
+        // callback so the private Lens owns its size animation.
+        transition.setPosition(view: nativeLensView, position: newCenter)
+        transition.setAlpha(view: nativeLensView, alpha: 1)
+    }
+
+    private func nativeLensTargetBounds(for params: NagiLensParams) -> CGRect {
+        let effectiveInset: CGFloat
+        if params.isCollapsed {
+            effectiveInset = 0
+        } else {
+            effectiveInset = params.isLifted ? params.liftedInset : -params.inset
+        }
+
+        return CGRect(
+            origin: .zero,
+            size: CGSize(
+                width: max(0, params.selectionSize.width + effectiveInset * 2),
+                height: max(0, params.selectionSize.height + effectiveInset * 2)
+            )
+        )
     }
 
     private func setResizeClipping(_ clipped: Bool) {
@@ -452,11 +475,15 @@ final class NagiLiquidLensView: UIView {
         guard let nativeLensView,
               let method = nativeLensView.method(for: PrivateSelector.setLifted) else {
             transition.perform(alongsideAnimations) { [weak self] completed in
-                self?.finishApplyingPendingParams(
-                    transition: transition,
-                    completed: completed,
-                    completion: completion
-                )
+                guard let self else {
+                    completion?(completed)
+                    return
+                }
+                self.isApplyingParams = false
+                if self.currentParams == params {
+                    self.setResizeClipping(false)
+                }
+                completion?(completed)
             }
             return
         }
@@ -470,42 +497,81 @@ final class NagiLiquidLensView: UIView {
             (() -> Void)?
         ) -> Void
         let function = unsafeBitCast(method, to: ObjCMethod.self)
+        var didProcessUpdate = false
+        var shouldScheduleUpdate = false
+
         function(
             nativeLensView,
             PrivateSelector.setLifted,
             params.isLifted,
             !transition.isImmediate,
-            alongsideAnimations,
             { [weak self] in
-                self?.finishApplyingPendingParams(
-                    transition: transition,
-                    completed: true,
-                    completion: completion
-                )
+                guard let self else { return }
+
+                alongsideAnimations()
+
+                didProcessUpdate = true
+
+                // If UIKit delays alongside, a newer touch update may already
+                // be waiting. Release the reentrancy guard on the next main
+                // turn and apply only the newest pending params.
+                if shouldScheduleUpdate {
+                    DispatchQueue.main.async { [weak self] in
+                        guard let self else { return }
+
+                        self.isApplyingParams = false
+
+                        guard let pendingParams = self.pendingParams else {
+                            return
+                        }
+
+                        let pendingCompletion = self.pendingCompletion
+
+                        self.pendingParams = nil
+                        self.pendingCompletion = nil
+
+                        self.apply(
+                            params: pendingParams,
+                            transition: transition,
+                            completion: pendingCompletion
+                        )
+                    }
+                }
+            },
+            { [weak self] in
+                guard let self else { return }
+
+                // This is the private Lens animation completion. It must not
+                // be responsible for releasing the touch-update guard.
+                if self.currentParams == params {
+                    self.setResizeClipping(false)
+                }
+                completion?(true)
             }
         )
-    }
 
-    private func finishApplyingPendingParams(
-        transition: NagiTabTransition,
-        completed: Bool,
-        completion: ((Bool) -> Void)?
-    ) {
-        guard let pendingParams else {
+        if didProcessUpdate {
+            // alongside already ran synchronously, so the next touch-move may
+            // update the Lens immediately instead of waiting for Lift to end.
             isApplyingParams = false
-            setResizeClipping(false)
-            completion?(completed)
-            return
+
+            if let pendingParams {
+                let pendingCompletion = self.pendingCompletion
+
+                self.pendingParams = nil
+                self.pendingCompletion = nil
+
+                apply(
+                    params: pendingParams,
+                    transition: transition,
+                    completion: pendingCompletion
+                )
+            }
+        } else {
+            // UIKit has not called alongside yet. Keep the guard until that
+            // callback has processed the geometry.
+            shouldScheduleUpdate = true
         }
-        let pendingCompletion = self.pendingCompletion
-        self.pendingParams = nil
-        self.pendingCompletion = nil
-        isApplyingParams = false
-        apply(
-            params: pendingParams,
-            transition: transition,
-            completion: pendingCompletion
-        )
     }
 
     private static func makePrivateLensView() -> UIView? {

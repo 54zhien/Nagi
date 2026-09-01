@@ -354,14 +354,8 @@ final class NagiTabBarView: UIView {
             return
         }
 
-        let lensContainerWidth = currentLayout.lensContainerFrame.width
-        let selectionWidth = gestureState.itemWidth + NagiTabBarMetrics.innerInset * 2.0
-        let maxSelectionX = max(0, lensContainerWidth - selectionWidth)
         let translation = recognizer.translation(in: liquidLensView)
-        let currentSelectionX = min(
-            max(0, gestureState.startSelectionX + translation.x),
-            maxSelectionX
-        )
+        let currentSelectionX = gestureState.startSelectionX + translation.x
         let hoveredIndex = mainIndex(
             at: recognizer.currentTouchLocation,
             requiresMainFrameHit: false
