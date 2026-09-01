@@ -609,7 +609,7 @@ final class EPUBReaderModel {
         guard systemIsDark != isDark else { return }
         systemIsDark = isDark
         guard appearanceMode == .system else { return }
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: .immediate)
     }
 
     func selectPageTransition(_ transition: EPUBPageTransitionMode) {
@@ -618,7 +618,7 @@ final class EPUBReaderModel {
             flowMode = transition == .scroll ? .scroll : .paged
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: .immediate)
     }
 
     func selectAppearance(_ appearance: EPUBAppearanceMode) {
@@ -626,7 +626,7 @@ final class EPUBReaderModel {
             appearanceMode = appearance
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: .immediate)
     }
 
     func setFontScale(_ scale: Double) {
@@ -647,7 +647,7 @@ final class EPUBReaderModel {
             brightness = 1
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: .immediate)
     }
 
     func makeDraft() -> EPUBReaderDraft {
@@ -676,7 +676,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: .immediate)
     }
 
     var readerPreferences: ReaderPreferences {
@@ -699,7 +699,10 @@ final class EPUBReaderModel {
         )
     }
 
-    func apply(preferences: ReaderPreferences) {
+    func apply(
+        preferences: ReaderPreferences,
+        commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
+    ) {
         withPreferenceUpdatesSuspended {
             fontScale = min(
                 max(preferences.fontSize / ReaderFontSize.defaultValue, ReaderFontSize.minimumScale),
@@ -722,7 +725,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: commitBehavior)
         onStateChange?()
     }
 
@@ -755,7 +758,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(commitBehavior: .immediate)
     }
 
     private func loadTableOfContents(from publication: Publication) async {
@@ -821,8 +824,13 @@ final class EPUBReaderModel {
         persistPreferences()
     }
 
-    private func schedulePreferencesCommit() {
+    private func schedulePreferencesCommit(
+        commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
+    ) {
         enqueuePreferencesMutation()
+        if commitBehavior == .immediate {
+            mutationScheduler.flush()
+        }
     }
 
     /// Captures the complete Readium preference value before the scheduler

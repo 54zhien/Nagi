@@ -104,7 +104,11 @@ final class TextKitRenderer: ReaderRenderer {
         return changed
     }
 
-    func apply(preferences: ReaderPreferences) {
+    func apply(
+        preferences: ReaderPreferences,
+        commitBehavior: ReaderPreferenceCommitBehavior
+    ) {
+        _ = commitBehavior
         model.apply(preferences: preferences)
         onStateChange?()
     }
@@ -264,8 +268,11 @@ final class ReadiumRenderer: ReaderRenderer {
         )
     }
 
-    func apply(preferences: ReaderPreferences) {
-        model.apply(preferences: preferences)
+    func apply(
+        preferences: ReaderPreferences,
+        commitBehavior: ReaderPreferenceCommitBehavior
+    ) {
+        model.apply(preferences: preferences, commitBehavior: commitBehavior)
         onStateChange?()
     }
 

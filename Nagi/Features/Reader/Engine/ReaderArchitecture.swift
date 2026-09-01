@@ -491,6 +491,11 @@ struct ReadingPosition: Codable, Hashable, Sendable {
 
 // MARK: - Renderer contract
 
+enum ReaderPreferenceCommitBehavior: Sendable, Equatable {
+    case coalesced
+    case immediate
+}
+
 @MainActor
 protocol ReaderRenderer: AnyObject {
     var document: ReaderDocument? { get }
@@ -522,7 +527,10 @@ protocol ReaderRenderer: AnyObject {
     func restoreFromForeground(isDark: Bool) async
     @discardableResult
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool
-    func apply(preferences: ReaderPreferences)
+    func apply(
+        preferences: ReaderPreferences,
+        commitBehavior: ReaderPreferenceCommitBehavior
+    )
     func updateSystemAppearance(isDark: Bool)
     func selectPreset(_ preset: ReaderThemePreset)
     func tearDown()
@@ -589,7 +597,10 @@ final class ReaderEngine {
         // now owns a live UIScreen brightness session instead.
         initialPreferences.brightness = 1
         preferences = initialPreferences
-        renderer.apply(preferences: preferences)
+        renderer.apply(
+            preferences: preferences,
+            commitBehavior: .coalesced
+        )
         renderer.onStateChange = { [weak self] in
             guard let self else { return }
             self.synchronizeFromRenderer()
@@ -634,10 +645,16 @@ final class ReaderEngine {
         return true
     }
 
-    func apply(preferences: ReaderPreferences) {
+    func apply(
+        preferences: ReaderPreferences,
+        commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
+    ) {
         var normalizedPreferences = preferences
         normalizedPreferences.brightness = 1
-        renderer.apply(preferences: normalizedPreferences)
+        renderer.apply(
+            preferences: normalizedPreferences,
+            commitBehavior: commitBehavior
+        )
         synchronizeFromRenderer()
     }
 
@@ -759,10 +776,13 @@ final class ReaderViewModel {
         return true
     }
 
-    func setPreference(_ update: (inout ReaderPreferences) -> Void) {
+    func setPreference(
+        _ update: (inout ReaderPreferences) -> Void,
+        commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
+    ) {
         var next = preferences
         update(&next)
-        engine.apply(preferences: next)
+        engine.apply(preferences: next, commitBehavior: commitBehavior)
         synchronize()
     }
 
@@ -784,11 +804,17 @@ final class ReaderViewModel {
     }
 
     func setAppearance(_ appearance: ReaderAppearanceMode) {
-        setPreference { $0.appearanceMode = appearance }
+        setPreference(
+            { $0.appearanceMode = appearance },
+            commitBehavior: .immediate
+        )
     }
 
     func setPageTransition(_ transition: ReaderPageTransition) {
-        setPreference { $0.pageTransition = transition }
+        setPreference(
+            { $0.pageTransition = transition },
+            commitBehavior: .immediate
+        )
     }
 
     func updateSystemAppearance(isDark: Bool) {
@@ -819,16 +845,19 @@ final class ReaderViewModel {
     }
 
     func apply(_ draft: ReaderCustomizationDraft) {
-        setPreference { preferences in
-            preferences.fontFamily = draft.fontFamily
-            preferences.boldText = draft.boldText
-            preferences.lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
-            preferences.pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
-            preferences.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
-            preferences.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
-            preferences.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(draft.wordSpacing)
-            preferences.publisherStyles = draft.publisherStyles
-        }
+        setPreference(
+            { preferences in
+                preferences.fontFamily = draft.fontFamily
+                preferences.boldText = draft.boldText
+                preferences.lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
+                preferences.pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
+                preferences.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
+                preferences.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
+                preferences.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(draft.wordSpacing)
+                preferences.publisherStyles = draft.publisherStyles
+            },
+            commitBehavior: .immediate
+        )
     }
 
     func goForward() {

@@ -301,8 +301,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private func makeContentSignature() -> ReaderContentSignature {
         ReaderContentSignature(
             hasDocument: model.document != nil,
-            errorMessage: model.errorMessage,
-            backgroundColor: model.backgroundColor
+            errorMessage: model.errorMessage
         )
     }
 
@@ -327,11 +326,9 @@ private struct ReaderContentHostView: View {
 private struct ReaderContentSignature {
     let hasDocument: Bool
     let errorMessage: String?
-    let backgroundColor: UIColor
 
     func matches(_ other: ReaderContentSignature) -> Bool {
         hasDocument == other.hasDocument
             && errorMessage == other.errorMessage
-            && backgroundColor.isEqual(other.backgroundColor)
     }
 }
