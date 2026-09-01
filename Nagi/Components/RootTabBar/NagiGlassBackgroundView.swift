@@ -22,10 +22,22 @@ struct NagiGlassParams: Equatable {
         lhs.size == rhs.size &&
         lhs.cornerRadius == rhs.cornerRadius &&
         lhs.isDark == rhs.isDark &&
+        colorsEqual(lhs.tintColor, rhs.tintColor) &&
         lhs.tintKey == rhs.tintKey &&
         lhs.isInteractive == rhs.isInteractive &&
         lhs.isVisible == rhs.isVisible &&
         lhs.reduceTransparency == rhs.reduceTransparency
+    }
+
+    static func colorsEqual(_ lhs: UIColor?, _ rhs: UIColor?) -> Bool {
+        switch (lhs, rhs) {
+        case (nil, nil):
+            return true
+        case let (lhs?, rhs?):
+            return lhs.isEqual(rhs)
+        default:
+            return false
+        }
     }
 }
 
@@ -34,6 +46,7 @@ final class NagiGlassBackgroundView: UIView {
     private let fallbackView: UIView
     private var previousParams: NagiGlassParams?
     private var currentEffectKey: String?
+    private var currentTintColor: UIColor?
 
     override init(frame: CGRect) {
         let effect = UIGlassEffect(style: .regular)
@@ -81,12 +94,13 @@ final class NagiGlassBackgroundView: UIView {
         alpha = params.isVisible ? 1 : 0
 
         let effectKey = "regular|\(params.tintKey)|\(params.isDark)|\(params.isInteractive)"
-        if effectKey != previousEffectKey {
+        if effectKey != previousEffectKey || !NagiGlassParams.colorsEqual(currentTintColor, params.tintColor) {
             let effect = UIGlassEffect(style: .regular)
             effect.tintColor = params.tintColor
             effect.isInteractive = params.isInteractive
             effectView.effect = effect
             currentEffectKey = effectKey
+            currentTintColor = params.tintColor
         }
 
         let useFallback = params.reduceTransparency

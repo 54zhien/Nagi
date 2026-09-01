@@ -37,11 +37,11 @@ final class NagiLiquidLensView: UIView {
         nativeLensView != nil
     }
 
-    static var privateLensCapabilityAvailable: Bool {
+    static var supportsNativeLiquidLens: Bool {
         guard #available(iOS 26.0, *) else {
             return false
         }
-        return NSClassFromString("_UILiquidLensView") != nil
+        return makePrivateLensView() != nil
     }
 
     override init(frame: CGRect) {
@@ -196,7 +196,7 @@ final class NagiLiquidLensView: UIView {
     }
 
     private static func makePrivateLensView() -> UIView? {
-        guard #available(iOS 26.0, *), privateLensCapabilityAvailable else {
+        guard #available(iOS 26.0, *), NSClassFromString("_UILiquidLensView") != nil else {
             return nil
         }
         guard let viewClass = NSClassFromString("_UILiquidLensView") as AnyObject as? NSObjectProtocol else {
