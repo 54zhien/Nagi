@@ -362,7 +362,6 @@ final class NagiLiquidLensView: UIView {
         selectedContentView.frame = lensContentContainer.bounds
         contentView.frame = lensContentContainer.bounds
 
-        let selectionFrame = CGRect(origin: params.selectionOrigin, size: params.selectionSize)
         let effectiveInset: CGFloat
         if params.isCollapsed {
             effectiveInset = 0
