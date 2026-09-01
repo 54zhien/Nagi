@@ -81,17 +81,13 @@ final class NagiGlassBackgroundView: UIView {
         effectView.clipsToBounds = true
     }
 
-    func update(params: NagiGlassParams) {
+    @discardableResult
+    func prepare(params: NagiGlassParams) -> Bool {
         guard params != previousParams else {
-            return
+            return false
         }
         let previousEffectKey = currentEffectKey
         previousParams = params
-
-        frame.size = params.size
-        layer.cornerRadius = params.cornerRadius
-        layer.cornerCurve = .continuous
-        alpha = params.isVisible ? 1 : 0
 
         let effectKey = "regular|\(params.tintKey)|\(params.isDark)|\(params.isInteractive)"
         if effectKey != previousEffectKey || !NagiGlassParams.colorsEqual(currentTintColor, params.tintColor) {
@@ -106,8 +102,23 @@ final class NagiGlassBackgroundView: UIView {
         let useFallback = params.reduceTransparency
         fallbackView.isHidden = !useFallback
         effectView.isHidden = useFallback
+        return true
+    }
+
+    func applyGeometry(params: NagiGlassParams) {
+        frame.size = params.size
+        layer.cornerRadius = params.cornerRadius
+        layer.cornerCurve = .continuous
+        alpha = params.isVisible ? 1 : 0
         fallbackView.layer.cornerRadius = params.cornerRadius
         effectView.layer.cornerRadius = params.cornerRadius
         setNeedsLayout()
+    }
+
+    func update(params: NagiGlassParams) {
+        guard prepare(params: params) else {
+            return
+        }
+        applyGeometry(params: params)
     }
 }

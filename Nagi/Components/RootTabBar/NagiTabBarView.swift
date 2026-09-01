@@ -126,25 +126,35 @@ final class NagiTabBarView: UIView {
         let localLensFrame = localFrame(layout.lensFrame, in: layout.tabBarFrame)
         let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.tabBarFrame) }
         let selectedTab = mode.selectedTab
+        let mainGlassParams = NagiGlassParams(
+            size: localMainFrame.size,
+            cornerRadius: NagiTabBarMetrics.barHeight * 0.5,
+            isDark: isDark,
+            tintColor: isDark ? UIColor.white.withAlphaComponent(0.025) : UIColor.white.withAlphaComponent(0.1),
+            tintKey: "main-tabs",
+            isInteractive: true,
+            isVisible: !layout.isSearchExpanded,
+            reduceTransparency: reduceTransparency
+        )
+        let searchParams = NagiSearchParams(
+            size: localSearchFrame.size,
+            isActive: mode.isSearchVisible,
+            isExpanded: layout.isSearchExpanded,
+            isDark: isDark,
+            reduceTransparency: reduceTransparency
+        )
 
         if selectedTab != .search, let selectedIndex = mainIndex(for: selectedTab) {
             liquidLensView.setTarget(itemViews[selectedIndex])
         }
 
+        mainSurface.prepare(params: mainGlassParams)
+        searchView.prepare(params: searchParams)
+
         transition.animate { [weak self] in
             guard let self else { return }
             self.glassContainer.frame = self.bounds
-            self.mainSurface.frame = localMainFrame
-            self.mainSurface.update(params: NagiGlassParams(
-                size: localMainFrame.size,
-                cornerRadius: NagiTabBarMetrics.barHeight * 0.5,
-                isDark: isDark,
-                tintColor: isDark ? UIColor.white.withAlphaComponent(0.025) : UIColor.white.withAlphaComponent(0.1),
-                tintKey: "main-tabs",
-                isInteractive: true,
-                isVisible: !layout.isSearchExpanded,
-                reduceTransparency: reduceTransparency
-            ))
+            self.mainSurface.applyGeometry(params: mainGlassParams)
             self.mainContentView.frame = localMainFrame
             self.mainContentView.alpha = layout.isSearchExpanded ? 0 : 1
             self.mainContentView.isUserInteractionEnabled = !layout.isSearchExpanded
@@ -154,14 +164,7 @@ final class NagiTabBarView: UIView {
                 itemView.update(isSelected: itemView.tab == selectedTab)
             }
 
-            self.searchView.frame = localSearchFrame
-            self.searchView.update(params: NagiSearchParams(
-                size: localSearchFrame.size,
-                isActive: mode.isSearchVisible,
-                isExpanded: layout.isSearchExpanded,
-                isDark: isDark,
-                reduceTransparency: reduceTransparency
-            ))
+            self.searchView.applyGeometry(params: searchParams)
             self.searchView.alpha = mode.isSearchVisible || !layout.isSearchExpanded ? 1 : 0
         }
 

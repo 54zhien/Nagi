@@ -108,19 +108,21 @@ final class NagiLiquidLensView: UIView {
         currentParams = params
 
         let selectionVisible = !usesPrivateLens && params.isLifted && !params.baseFrame.isEmpty
+        let selectionGlassParams = NagiGlassParams(
+            size: params.baseFrame.size,
+            cornerRadius: min(params.baseFrame.width, params.baseFrame.height) * 0.5,
+            isDark: traitCollection.userInterfaceStyle == .dark,
+            tintColor: UIColor.systemBlue.withAlphaComponent(0.18),
+            tintKey: "selection",
+            isInteractive: false,
+            isVisible: selectionVisible,
+            reduceTransparency: params.reduceTransparency
+        )
+        selectionSurface.prepare(params: selectionGlassParams)
         transition.animate { [weak self] in
             guard let self else { return }
             self.selectionSurface.frame = params.baseFrame
-            self.selectionSurface.update(params: NagiGlassParams(
-                size: params.baseFrame.size,
-                cornerRadius: min(params.baseFrame.width, params.baseFrame.height) * 0.5,
-                isDark: self.traitCollection.userInterfaceStyle == .dark,
-                tintColor: UIColor.systemBlue.withAlphaComponent(0.18),
-                tintKey: "selection",
-                isInteractive: false,
-                isVisible: selectionVisible,
-                reduceTransparency: params.reduceTransparency
-            ))
+            self.selectionSurface.applyGeometry(params: selectionGlassParams)
             self.selectionSurface.alpha = selectionVisible ? 1 : 0
         }
 

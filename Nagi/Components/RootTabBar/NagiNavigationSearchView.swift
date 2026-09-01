@@ -98,21 +98,35 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         guard let params = previousParams else {
             return
         }
-        layoutControls(for: params)
+        applyGeometry(params: params)
     }
 
-    func update(params: NagiSearchParams) {
+    @discardableResult
+    func prepare(params: NagiSearchParams) -> Bool {
         guard params != previousParams else {
-            return
+            return false
         }
         previousParams = params
         isActive = params.isActive
 
+        return backgroundView.prepare(params: NagiGlassParams(
+            size: params.size,
+            cornerRadius: params.isExpanded ? params.size.height * 0.5 : min(params.size.width, params.size.height) * 0.5,
+            isDark: params.isDark,
+            tintColor: params.isDark ? UIColor.white.withAlphaComponent(0.025) : UIColor.white.withAlphaComponent(0.1),
+            tintKey: params.isExpanded ? "search-expanded" : "search-circle",
+            isInteractive: true,
+            isVisible: true,
+            reduceTransparency: params.reduceTransparency
+        ))
+    }
+
+    func applyGeometry(params: NagiSearchParams) {
         frame.size = params.size
         let radius = params.isExpanded ? params.size.height * 0.5 : min(params.size.width, params.size.height) * 0.5
         backgroundView.frame = bounds
-        backgroundView.update(params: NagiGlassParams(
-            size: bounds.size,
+        backgroundView.applyGeometry(params: NagiGlassParams(
+            size: params.size,
             cornerRadius: radius,
             isDark: params.isDark,
             tintColor: params.isDark ? UIColor.white.withAlphaComponent(0.025) : UIColor.white.withAlphaComponent(0.1),
@@ -122,6 +136,13 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             reduceTransparency: params.reduceTransparency
         ))
         layoutControls(for: params)
+    }
+
+    func update(params: NagiSearchParams) {
+        guard prepare(params: params) else {
+            return
+        }
+        applyGeometry(params: params)
     }
 
     func setQuery(_ query: String) {
