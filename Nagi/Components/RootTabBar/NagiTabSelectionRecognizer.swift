@@ -26,8 +26,7 @@ final class NagiTabSelectionRecognizer: UIGestureRecognizer {
     }
 
     required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        configureTouchDelivery()
+        fatalError("init(coder:) has not been implemented")
     }
 
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
