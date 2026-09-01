@@ -102,14 +102,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        guard let params = previousParams else {
-            return
-        }
-        applyInternalGeometry(params: params)
-    }
-
     @discardableResult
     func prepare(params: NagiSearchParams) -> Bool {
         guard params != previousParams else {
