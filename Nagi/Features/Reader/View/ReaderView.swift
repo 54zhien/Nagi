@@ -121,12 +121,6 @@ private struct ReaderSessionView: View {
                     bottomLeading: geometry.containerCornerInsets.bottomLeading,
                     bottomTrailing: geometry.containerCornerInsets.bottomTrailing
                 ),
-                safeAreaInsets: UIEdgeInsets(
-                    top: geometry.safeAreaInsets.top,
-                    left: geometry.safeAreaInsets.leading,
-                    bottom: geometry.safeAreaInsets.bottom,
-                    right: geometry.safeAreaInsets.trailing
-                ),
                 onDismiss: dismissReader,
                 onTableOfContents: { showTableOfContents = true },
                 onSettings: { showSettings = true },
@@ -134,11 +128,7 @@ private struct ReaderSessionView: View {
             )
             .frame(width: geometry.size.width, height: geometry.size.height)
         }
-        .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
-        .background(
-            Color(uiColor: model.backgroundColor),
-            ignoresSafeAreaEdges: .all
-        )
+        .ignoresSafeArea(.container, edges: .all)
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)

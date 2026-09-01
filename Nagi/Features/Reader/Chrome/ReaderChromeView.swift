@@ -34,7 +34,6 @@ final class ReaderChromeView: UIView {
     private var reduceMotion = false
     private(set) var isControlsVisible = true
     private var containerCornerInsets: ReaderChromeCornerInsets?
-    private var externalSafeAreaInsets: UIEdgeInsets?
     private var currentControlTint: UIColor?
     private var currentControlReduceMotion = false
     private var accessibilityActionName: String?
@@ -69,6 +68,8 @@ final class ReaderChromeView: UIView {
         titleLabel.lineBreakMode = .byTruncatingTail
         titleLabel.isUserInteractionEnabled = false
         titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.backgroundColor = .clear
+        titleLabel.isOpaque = false
 
         configureContainer(exitContainer, with: exitControl)
 
@@ -124,8 +125,7 @@ final class ReaderChromeView: UIView {
         fontFamily: ReaderFontFamily,
         showsTitle: Bool,
         reduceMotion: Bool,
-        cornerInsets: ReaderChromeCornerInsets?,
-        safeAreaInsets: UIEdgeInsets?
+        cornerInsets: ReaderChromeCornerInsets?
     ) {
         if titleLabel.text != title {
             titleLabel.text = title
@@ -148,10 +148,6 @@ final class ReaderChromeView: UIView {
 
         if containerCornerInsets != cornerInsets {
             containerCornerInsets = cornerInsets
-            setNeedsLayout()
-        }
-        if externalSafeAreaInsets != safeAreaInsets {
-            externalSafeAreaInsets = safeAreaInsets
             setNeedsLayout()
         }
 
@@ -273,7 +269,7 @@ final class ReaderChromeView: UIView {
         super.layoutSubviews()
 
         let currentBounds = bounds
-        let currentSafeAreaInsets = externalSafeAreaInsets ?? safeAreaInsets
+        let currentSafeAreaInsets = safeAreaInsets
         let currentDisplayScale = window?.screen.scale ?? UIScreen.main.scale
         guard currentBounds != cachedBounds
             || currentSafeAreaInsets != cachedSafeAreaInsets

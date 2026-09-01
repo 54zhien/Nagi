@@ -29,9 +29,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var latestShowsTitle: Bool
     private var latestReduceMotion: Bool
     private var latestCornerInsets: ReaderChromeCornerInsets
-    private var latestSafeAreaInsets: UIEdgeInsets
     private var lastViewportBounds = CGRect.null
-    private var lastViewportSafeAreaInsets = UIEdgeInsets.zero
+    private var lastViewportContentInsets = UIEdgeInsets.zero
     private var lastViewportDisplayScale: CGFloat = 0
 
     private var onDismiss: () -> Void
@@ -47,7 +46,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         showsTitle: Bool,
         reduceMotion: Bool,
         cornerInsets: ReaderChromeCornerInsets,
-        safeAreaInsets: UIEdgeInsets,
         onDismiss: @escaping () -> Void,
         onTableOfContents: @escaping () -> Void,
         onSettings: @escaping () -> Void,
@@ -62,7 +60,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         latestShowsTitle = showsTitle
         latestReduceMotion = reduceMotion
         latestCornerInsets = cornerInsets
-        latestSafeAreaInsets = safeAreaInsets
         self.onDismiss = onDismiss
         self.onTableOfContents = onTableOfContents
         self.onSettings = onSettings
@@ -87,8 +84,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         contentSignature = makeContentSignature()
         let contentRoot = makeContentRoot()
         let contentController = UIHostingController(rootView: contentRoot)
-        contentController.view.backgroundColor = latestReaderBackground
-        contentController.view.isOpaque = true
+        contentController.view.backgroundColor = .clear
+        contentController.view.isOpaque = false
         contentController.view.accessibilityCustomActions = [
             UIAccessibilityCustomAction(
                 name: "显示或隐藏阅读控件",
@@ -137,6 +134,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         setNeedsStatusBarAppearanceUpdate()
     }
 
+    override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        chromeView.setNeedsLayout()
+        view.setNeedsLayout()
+    }
+
     func update(
         stateRevision: Int,
         title: String,
@@ -146,13 +149,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         showsTitle: Bool,
         reduceMotion: Bool,
         cornerInsets: ReaderChromeCornerInsets,
-        safeAreaInsets: UIEdgeInsets,
         onDismiss: @escaping () -> Void,
         onTableOfContents: @escaping () -> Void,
         onSettings: @escaping () -> Void
     ) {
         let stateRevisionChanged = latestStateRevision != stateRevision
-        let safeAreaChanged = latestSafeAreaInsets != safeAreaInsets
+        let showsTitleChanged = latestShowsTitle != showsTitle
         latestStateRevision = stateRevision
         latestTitle = title
         latestTitleColor = titleColor
@@ -161,7 +163,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         latestShowsTitle = showsTitle
         latestReduceMotion = reduceMotion
         latestCornerInsets = cornerInsets
-        latestSafeAreaInsets = safeAreaInsets
         self.onDismiss = onDismiss
         self.onTableOfContents = onTableOfContents
         self.onSettings = onSettings
@@ -169,10 +170,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         guard isViewLoaded else { return }
 
         view.backgroundColor = readerBackground
-        contentHostController?.view.backgroundColor = readerBackground
         snapshotHostView.fallbackBackgroundColor = readerBackground
         updateChrome()
-        if safeAreaChanged {
+        if showsTitleChanged {
             view.setNeedsLayout()
         }
         if stateRevisionChanged {
@@ -188,20 +188,21 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         chromeView.frame = bounds
         snapshotHostView.frame = bounds
 
-        let safeAreaInsets = latestSafeAreaInsets
+        let chromeSafeAreaInsets = view.safeAreaInsets
+        let contentInsets = readableContentInsets(for: chromeSafeAreaInsets)
         let displayScale = view.window?.screen.scale ?? UIScreen.main.scale
         guard bounds != lastViewportBounds
-            || safeAreaInsets != lastViewportSafeAreaInsets
+            || contentInsets != lastViewportContentInsets
             || displayScale != lastViewportDisplayScale else {
             return
         }
 
         lastViewportBounds = bounds
-        lastViewportSafeAreaInsets = safeAreaInsets
+        lastViewportContentInsets = contentInsets
         lastViewportDisplayScale = displayScale
         model.updateViewport(
             size: bounds.size,
-            safeAreaInsets: safeAreaInsets,
+            safeAreaInsets: contentInsets,
             displayScale: displayScale
         )
     }
@@ -279,9 +280,16 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             fontFamily: latestTitleFontFamily,
             showsTitle: latestShowsTitle,
             reduceMotion: latestReduceMotion,
-            cornerInsets: latestCornerInsets,
-            safeAreaInsets: latestSafeAreaInsets
+            cornerInsets: latestCornerInsets
         )
+    }
+
+    private func readableContentInsets(for systemInsets: UIEdgeInsets) -> UIEdgeInsets {
+        var contentInsets = systemInsets
+        if latestShowsTitle {
+            contentInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
+        }
+        return contentInsets
     }
 
     private func handleContentToggle() {

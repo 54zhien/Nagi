@@ -35,8 +35,8 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
 }
 
 extension EPUBNavigatorViewController {
-    /// The SwiftUI ReaderChrome owns the full reflowable background. Readium's
-    /// UIKit hierarchy must therefore stay transparent, including the
+    /// The UIKit ReaderViewController owns the full reflowable background.
+    /// Readium's hierarchy must therefore stay transparent, including the
     /// scroll-view and WKWebView containers created after the navigator is
     /// initialized.
     func applyNagiReaderBaseAppearance(

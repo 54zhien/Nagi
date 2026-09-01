@@ -23,7 +23,6 @@ struct ReaderControllerRepresentable: UIViewControllerRepresentable {
     let showsTitle: Bool
     let reduceMotion: Bool
     let cornerInsets: ReaderChromeCornerInsets
-    let safeAreaInsets: UIEdgeInsets
     let onDismiss: () -> Void
     let onTableOfContents: () -> Void
     let onSettings: () -> Void
@@ -42,7 +41,6 @@ struct ReaderControllerRepresentable: UIViewControllerRepresentable {
             showsTitle: showsTitle,
             reduceMotion: reduceMotion,
             cornerInsets: cornerInsets,
-            safeAreaInsets: safeAreaInsets,
             onDismiss: onDismiss,
             onTableOfContents: onTableOfContents,
             onSettings: onSettings,
@@ -63,7 +61,6 @@ struct ReaderControllerRepresentable: UIViewControllerRepresentable {
             showsTitle: showsTitle,
             reduceMotion: reduceMotion,
             cornerInsets: cornerInsets,
-            safeAreaInsets: safeAreaInsets,
             onDismiss: onDismiss,
             onTableOfContents: onTableOfContents,
             onSettings: onSettings

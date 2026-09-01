@@ -1387,18 +1387,25 @@ extension EPUBReaderModel {
         return true
     }
 
-    /// Let Readium reserve only system-protected areas and the visible page
-    /// header's own occupied height. Reading clearance is derived from the
-    /// current window and chrome instead of an app-wide fixed margin.
+    /// The UIKit Reader surface passes the complete readable inset here:
+    /// system safe area plus the occupied page-header height. Keep that
+    /// content inset separate from ReaderChrome's own system safe area so the
+    /// header is reserved exactly once. The fallback preserves the legacy
+    /// delegate path until the controller has delivered its first viewport.
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
-        var safeAreaInsets = viewportSafeAreaInsets
-            ?? navigator.view.window?.safeAreaInsets
-            ?? navigator.view.safeAreaInsets
-        if showBookTitleInPageHeader {
-            safeAreaInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
+        let contentInsets: UIEdgeInsets
+        if let viewportSafeAreaInsets {
+            contentInsets = viewportSafeAreaInsets
+        } else {
+            var fallbackSystemInsets = navigator.view.window?.safeAreaInsets
+                ?? navigator.view.safeAreaInsets
+            if showBookTitleInPageHeader {
+                fallbackSystemInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
+            }
+            contentInsets = fallbackSystemInsets
         }
         return ReaderContentInsetResolver.resolve(
-            safeAreaInsets: safeAreaInsets,
+            safeAreaInsets: contentInsets,
             top: 0,
             bottom: 0,
             horizontal: 0
