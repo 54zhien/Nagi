@@ -20,6 +20,13 @@ private enum ReaderSettingsControlID: Hashable {
     case paper
 }
 
+private enum PendingReaderMutation {
+    case fontStep(Int)
+    case preset(ReaderThemePreset)
+    case transition(ReaderPageTransition)
+    case appearance(ReaderAppearanceMode)
+}
+
 @MainActor
 final class ReaderSettingsViewController: UIViewController {
     private let model: ReaderViewModel
@@ -43,6 +50,8 @@ final class ReaderSettingsViewController: UIViewController {
     private let indicatorView = UIView()
     private let indicatorDots: [UIView] = (0 ..< ReaderFontSize.indicatorCount).map { _ in UIView() }
     private var indicatorHideTask: Task<Void, Never>?
+    private var deferredMutationTask: Task<Void, Never>?
+    private var pendingMutations: [PendingReaderMutation] = []
 
     init(
         model: ReaderViewModel,
@@ -66,6 +75,7 @@ final class ReaderSettingsViewController: UIViewController {
 
     deinit {
         indicatorHideTask?.cancel()
+        deferredMutationTask?.cancel()
     }
 
     override func viewDidLoad() {
@@ -126,7 +136,8 @@ final class ReaderSettingsViewController: UIViewController {
             for: .primaryActionTriggered
         )
 
-        render()
+        configurePersistentControls()
+        updateAllControls()
     }
 
     func update(
@@ -135,12 +146,42 @@ final class ReaderSettingsViewController: UIViewController {
         isDarkAppearance: Bool,
         reduceMotion: Bool
     ) {
+        let previousPreferences = latestPreferences
+        let previousBrightness = latestSystemBrightness
+        let previousIsDarkAppearance = latestIsDarkAppearance
+        let previousReduceMotion = latestReduceMotion
+
         latestPreferences = preferences
         latestSystemBrightness = min(max(systemBrightness, 0), 1)
         latestIsDarkAppearance = isDarkAppearance
         latestReduceMotion = reduceMotion
         guard isViewLoaded else { return }
-        render()
+
+        if previousReduceMotion != reduceMotion {
+            updateFontControls()
+            updateTransitionControl()
+            updateAppearanceControl()
+            updateThemeControls()
+            updateCustomControl()
+        } else {
+            if previousPreferences.fontSize != preferences.fontSize {
+                updateFontControls()
+            }
+            if previousPreferences.pageTransition != preferences.pageTransition {
+                updateTransitionControl()
+            }
+            if previousPreferences.appearanceMode != preferences.appearanceMode {
+                updateAppearanceControl()
+            }
+            if previousPreferences.themePreset != preferences.themePreset
+                || previousIsDarkAppearance != isDarkAppearance {
+                updateThemeControls()
+            }
+        }
+
+        if abs(previousBrightness - latestSystemBrightness) > 0.0001 {
+            updateBrightness()
+        }
     }
 
     override func viewDidLayoutSubviews() {
@@ -234,90 +275,156 @@ final class ReaderSettingsViewController: UIViewController {
         scrollView.contentSize = contentView.bounds.size
     }
 
-    private func render() {
-        guard isViewLoaded else { return }
+    private var accentColor: UIColor {
+        UIColor(named: "AccentColor") ?? .systemBlue
+    }
 
-        let preferences = latestPreferences
-        let accentColor = UIColor(named: "AccentColor") ?? .systemBlue
-        let currentFontIndex = fontSizeIndex(for: preferences.fontSize)
-        let smallerIndex = max(0, currentFontIndex - 1)
-        let largerIndex = min(ReaderFontSize.indicatorCount - 1, currentFontIndex + 1)
-        let symbolConfiguration = UIImage.SymbolConfiguration(
-            pointSize: 24,
-            weight: .regular
-        )
+    private var symbolConfiguration: UIImage.SymbolConfiguration {
+        UIImage.SymbolConfiguration(pointSize: 24, weight: .regular)
+    }
 
+    private func configurePersistentControls() {
         topControlGroup.update(items: [
             .init(
                 id: .fontSmaller,
-                image: UIImage(named: "readerFontSizeSmaller")?.withRenderingMode(.alwaysTemplate),
+                image: nil,
                 accessibilityLabel: "字号小",
                 tintColor: accentColor,
-                isEnabled: smallerIndex != currentFontIndex,
-                reduceMotion: latestReduceMotion,
-                action: { [weak self] in self?.adjustFontSize(to: smallerIndex) }
+                action: { [weak self] in self?.adjustFontSize(by: -1) }
             ),
             .init(
                 id: .fontLarger,
-                image: UIImage(named: "readerFontSizeLarger")?.withRenderingMode(.alwaysTemplate),
+                image: nil,
                 accessibilityLabel: "字号大",
                 tintColor: accentColor,
-                isEnabled: largerIndex != currentFontIndex,
-                reduceMotion: latestReduceMotion,
-                action: { [weak self] in self?.adjustFontSize(to: largerIndex) }
+                action: { [weak self] in self?.adjustFontSize(by: 1) }
             ),
             .init(
                 id: .transition,
-                image: UIImage(
-                    systemName: preferences.pageTransition.systemImage,
-                    withConfiguration: symbolConfiguration
-                ),
+                image: nil,
                 accessibilityLabel: "翻页方式",
                 tintColor: .label,
-                reduceMotion: latestReduceMotion,
                 action: { [weak self] in self?.presentTransitionMenu() }
             ),
             .init(
                 id: .appearance,
-                image: UIImage(
-                    systemName: preferences.appearanceMode.systemImage,
-                    withConfiguration: symbolConfiguration
-                ),
+                image: nil,
                 accessibilityLabel: "外观模式",
                 tintColor: .label,
-                reduceMotion: latestReduceMotion,
                 action: { [weak self] in self?.presentAppearanceMenu() }
             )
         ])
         topControlGroup.accessibilityLabel = "字号、翻页和外观"
-        let fontAccessibilityValue = "当前字号 \(Int(preferences.fontSize.rounded())) 磅"
-        topControlGroup.control(for: .fontSmaller)?.accessibilityValue = fontAccessibilityValue
-        topControlGroup.control(for: .fontLarger)?.accessibilityValue = fontAccessibilityValue
-        topControlGroup.control(for: .transition)?.accessibilityValue = preferences.pageTransition.label
-        topControlGroup.control(for: .appearance)?.accessibilityValue = preferences.appearanceMode.label
 
         presetControlGroup.update(items: ReaderThemePreset.allCases.map { preset in
-            let isSelected = preferences.themePreset == preset
-            let theme = preset.paletteTheme
-            let background = theme.readerBackgroundUIColor(isDarkAppearance: latestIsDarkAppearance)
-            let content = isSelected
-                ? accentColor
-                : theme.readerContentUIColor(isDarkAppearance: latestIsDarkAppearance)
-            return .init(
+            .init(
                 id: controlID(for: preset),
                 image: nil,
                 accessibilityLabel: "主题预设：\(preset.label)",
-                tintColor: background,
-                reduceMotion: latestReduceMotion,
+                tintColor: nil,
                 title: preset.label,
-                isSelected: isSelected,
                 cornerRadius: 18,
-                contentColor: content,
                 action: { [weak self] in self?.select(preset: preset) }
             )
         })
         presetControlGroup.accessibilityLabel = "主题预设"
+        customControl.accessibilityHint = "打开更多文字与布局选项"
+    }
 
+    private func updateAllControls() {
+        updateFontControls()
+        updateTransitionControl()
+        updateAppearanceControl()
+        updateThemeControls()
+        updateCustomControl()
+        updateBrightness()
+    }
+
+    private func updateFontControls() {
+        let currentFontIndex = fontSizeIndex(for: latestPreferences.fontSize)
+        let smallerIndex = max(0, currentFontIndex - 1)
+        let largerIndex = min(ReaderFontSize.indicatorCount - 1, currentFontIndex + 1)
+        let accessibilityValue = "当前字号 \(Int(latestPreferences.fontSize.rounded())) 磅"
+
+        topControlGroup.control(for: .fontSmaller)?.update(
+            image: UIImage(named: "readerFontSizeSmaller")?.withRenderingMode(.alwaysTemplate),
+            accessibilityLabel: "字号小",
+            tintColor: accentColor,
+            isEnabled: smallerIndex != currentFontIndex,
+            reduceMotion: latestReduceMotion
+        )
+        topControlGroup.control(for: .fontLarger)?.update(
+            image: UIImage(named: "readerFontSizeLarger")?.withRenderingMode(.alwaysTemplate),
+            accessibilityLabel: "字号大",
+            tintColor: accentColor,
+            isEnabled: largerIndex != currentFontIndex,
+            reduceMotion: latestReduceMotion
+        )
+        topControlGroup.control(for: .fontSmaller)?.accessibilityValue = accessibilityValue
+        topControlGroup.control(for: .fontLarger)?.accessibilityValue = accessibilityValue
+
+        for (index, dot) in indicatorDots.enumerated() {
+            dot.backgroundColor = index <= currentFontIndex
+                ? accentColor
+                : UIColor.secondaryLabel.withAlphaComponent(0.22)
+        }
+    }
+
+    private func updateTransitionControl() {
+        let transition = latestPreferences.pageTransition
+        topControlGroup.control(for: .transition)?.update(
+            image: UIImage(
+                systemName: transition.systemImage,
+                withConfiguration: symbolConfiguration
+            ),
+            accessibilityLabel: "翻页方式",
+            tintColor: .label,
+            isEnabled: true,
+            reduceMotion: latestReduceMotion
+        )
+        topControlGroup.control(for: .transition)?.accessibilityValue = transition.label
+    }
+
+    private func updateAppearanceControl() {
+        let appearance = latestPreferences.appearanceMode
+        topControlGroup.control(for: .appearance)?.update(
+            image: UIImage(
+                systemName: appearance.systemImage,
+                withConfiguration: symbolConfiguration
+            ),
+            accessibilityLabel: "外观模式",
+            tintColor: .label,
+            isEnabled: true,
+            reduceMotion: latestReduceMotion
+        )
+        topControlGroup.control(for: .appearance)?.accessibilityValue = appearance.label
+    }
+
+    private func updateThemeControls() {
+        for preset in ReaderThemePreset.allCases {
+            let isSelected = latestPreferences.themePreset == preset
+            let theme = preset.paletteTheme
+            let background = theme.readerBackgroundUIColor(
+                isDarkAppearance: latestIsDarkAppearance
+            )
+            let content = isSelected
+                ? accentColor
+                : theme.readerContentUIColor(isDarkAppearance: latestIsDarkAppearance)
+            presetControlGroup.control(for: controlID(for: preset))?.update(
+                image: nil,
+                accessibilityLabel: "主题预设：\(preset.label)",
+                tintColor: background,
+                isEnabled: true,
+                reduceMotion: latestReduceMotion,
+                title: preset.label,
+                isSelected: isSelected,
+                cornerRadius: 18,
+                contentColor: content
+            )
+        }
+    }
+
+    private func updateCustomControl() {
         customControl.update(
             image: UIImage(systemName: "gear"),
             accessibilityLabel: "自定义",
@@ -328,20 +435,14 @@ final class ReaderSettingsViewController: UIViewController {
             cornerRadius: 24,
             contentColor: accentColor
         )
-        customControl.accessibilityHint = "打开更多文字与布局选项"
+    }
 
+    private func updateBrightness() {
         let brightness = Float(min(max(latestSystemBrightness, 0), 1))
         if abs(brightnessSlider.value - brightness) > 0.0001 {
             brightnessSlider.setValue(brightness, animated: false)
         }
         brightnessSlider.accessibilityValue = "\(Int(Double(brightness) * 100))%"
-
-        for (index, dot) in indicatorDots.enumerated() {
-            dot.backgroundColor = index <= currentFontIndex
-                ? accentColor
-                : UIColor.secondaryLabel.withAlphaComponent(0.22)
-        }
-        view.setNeedsLayout()
     }
 
     private func layoutIndicatorDots() {
@@ -372,25 +473,20 @@ final class ReaderSettingsViewController: UIViewController {
         }
     }
 
-    private func adjustFontSize(to index: Int) {
+    private func adjustFontSize(by step: Int) {
         guard ReaderFontSize.indicatorCount > 0 else { return }
         let currentIndex = fontSizeIndex(for: model.preferences.fontSize)
-        guard index != currentIndex else { return }
-
-        onBeforeMutation?()
-        let size = ReaderFontSize.minimum + Double(index) * ReaderFontSize.step
-        model.setFontSize(size)
-        latestPreferences = model.preferences
-        showFontSizeIndicator()
-        render()
+        let targetIndex = min(
+            max(currentIndex + step, 0),
+            ReaderFontSize.indicatorCount - 1
+        )
+        guard targetIndex != currentIndex else { return }
+        enqueueMutation(.fontStep(step))
     }
 
     private func select(preset: ReaderThemePreset) {
         guard model.preferences.themePreset != preset else { return }
-        onBeforeMutation?()
-        model.selectPreset(preset)
-        latestPreferences = model.preferences
-        render()
+        enqueueMutation(.preset(preset))
     }
 
     private func presentTransitionMenu() {
@@ -436,18 +532,113 @@ final class ReaderSettingsViewController: UIViewController {
 
     private func select(transition: ReaderPageTransition) {
         guard model.preferences.pageTransition != transition else { return }
-        onBeforeMutation?()
-        model.setPageTransition(transition)
-        latestPreferences = model.preferences
-        render()
+        enqueueMutation(.transition(transition))
     }
 
     private func select(appearance: ReaderAppearanceMode) {
         guard model.preferences.appearanceMode != appearance else { return }
-        onBeforeMutation?()
-        model.setAppearance(appearance)
+        enqueueMutation(.appearance(appearance))
+    }
+
+    private func enqueueMutation(_ mutation: PendingReaderMutation) {
+        switch mutation {
+        case .fontStep(let step):
+            var combinedStep = step
+            pendingMutations.removeAll { pending in
+                guard case .fontStep(let pendingStep) = pending else { return false }
+                combinedStep += pendingStep
+                return true
+            }
+            if combinedStep != 0 {
+                pendingMutations.append(.fontStep(combinedStep))
+            }
+
+        case .preset:
+            pendingMutations.removeAll {
+                if case .preset = $0 { return true }
+                return false
+            }
+            pendingMutations.append(mutation)
+
+        case .transition:
+            pendingMutations.removeAll {
+                if case .transition = $0 { return true }
+                return false
+            }
+            pendingMutations.append(mutation)
+
+        case .appearance:
+            pendingMutations.removeAll {
+                if case .appearance = $0 { return true }
+                return false
+            }
+            pendingMutations.append(mutation)
+        }
+        guard deferredMutationTask == nil else { return }
+
+        deferredMutationTask = Task { @MainActor [weak self] in
+            // Let GlassControlView finish the touch-release transaction and
+            // commit the first spring frame before snapshot/layout work starts.
+            await Task.yield()
+            guard let self, !Task.isCancelled else { return }
+
+            let mutations = self.pendingMutations
+            self.pendingMutations.removeAll(keepingCapacity: true)
+            self.deferredMutationTask = nil
+            guard !mutations.isEmpty else { return }
+
+            self.onBeforeMutation?()
+            for mutation in mutations {
+                self.apply(mutation)
+            }
+        }
+    }
+
+    private func apply(_ mutation: PendingReaderMutation) {
+        let previousPreferences = model.preferences
+
+        switch mutation {
+        case .fontStep(let step):
+            let currentIndex = fontSizeIndex(for: model.preferences.fontSize)
+            let targetIndex = min(
+                max(currentIndex + step, 0),
+                ReaderFontSize.indicatorCount - 1
+            )
+            guard targetIndex != currentIndex else { return }
+            let size = ReaderFontSize.minimum + Double(targetIndex) * ReaderFontSize.step
+            model.setFontSize(size)
+            showFontSizeIndicator()
+
+        case .preset(let preset):
+            guard model.preferences.themePreset != preset else { return }
+            model.selectPreset(preset)
+
+        case .transition(let transition):
+            guard model.preferences.pageTransition != transition else { return }
+            model.setPageTransition(transition)
+
+        case .appearance(let appearance):
+            guard model.preferences.appearanceMode != appearance else { return }
+            model.setAppearance(appearance)
+        }
+
         latestPreferences = model.preferences
-        render()
+        updateChangedPreferenceControls(from: previousPreferences)
+    }
+
+    private func updateChangedPreferenceControls(from previous: ReaderPreferences) {
+        if previous.fontSize != latestPreferences.fontSize {
+            updateFontControls()
+        }
+        if previous.pageTransition != latestPreferences.pageTransition {
+            updateTransitionControl()
+        }
+        if previous.appearanceMode != latestPreferences.appearanceMode {
+            updateAppearanceControl()
+        }
+        if previous.themePreset != latestPreferences.themePreset {
+            updateThemeControls()
+        }
     }
 
     private func showFontSizeIndicator() {

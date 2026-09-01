@@ -73,10 +73,6 @@ final class GlassControlGroup<ID: Hashable>: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    var itemViews: [UIView] {
-        orderedIDs.compactMap { controls[$0] }
-    }
-
     func control(for id: ID) -> GlassControlView? {
         controls[id]
     }
