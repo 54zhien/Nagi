@@ -114,7 +114,6 @@ final class NagiLiquidLensView: UIView {
         static let setStyle = NSSelectorFromString("setStyle:")
         static let setWarpsContentBelow = NSSelectorFromString("setWarpsContentBelow:")
         static let setLifted = NSSelectorFromString("setLifted:animated:alongsideAnimations:completion:")
-        static let setCollapsed = NSSelectorFromString("setCollapsed:")
         static let setRestingBackgroundColor = NSSelectorFromString("setRestingBackgroundColor:")
     }
 
@@ -247,8 +246,11 @@ final class NagiLiquidLensView: UIView {
         updateLiftedDisplayLink(isLifted: params.isLifted)
         let oldLifted = previousParams?.isLifted ?? false
         let privateLiftChanged = nativeLensView != nil && oldLifted != params.isLifted
-        let containerSizeChanged = previousParams.map { $0.size != params.size } ?? false
-        let shouldClip = !transition.isImmediate && previousParams != nil && containerSizeChanged
+        let containerGeometryChanged =
+            previousParams == nil ||
+            previousParams?.size != params.size ||
+            previousParams?.containerOrigin != params.containerOrigin
+        let shouldClip = !transition.isImmediate && previousParams != nil && containerGeometryChanged
         setResizeClipping(shouldClip)
 
         let mainCornerRadius = min(params.size.width, params.size.height) * 0.5
@@ -263,18 +265,16 @@ final class NagiLiquidLensView: UIView {
             isVisible: true,
             reduceTransparency: params.reduceTransparency
         )
-        mainSurface.prepare(params: mainGlassParams)
-
-        if let nativeLensView {
-            invoke(setCollapsed: params.isCollapsed, on: nativeLensView)
-        }
+        let mainGlassChanged = mainSurface.prepare(params: mainGlassParams)
 
         let applyAnimations = { [weak self] in
             guard let self else { return }
             self.applyPresentationGeometry(
                 params: params,
                 mainGlassParams: mainGlassParams,
-                transition: transition
+                transition: transition,
+                mainGlassChanged: mainGlassChanged,
+                containerGeometryChanged: containerGeometryChanged
             )
             self.applyNativeLensGeometry(
                 params: params,
@@ -321,40 +321,52 @@ final class NagiLiquidLensView: UIView {
     private func applyPresentationGeometry(
         params: NagiLensParams,
         mainGlassParams: NagiGlassParams,
-        transition: NagiTabTransition
+        transition: NagiTabTransition,
+        mainGlassChanged: Bool,
+        containerGeometryChanged: Bool
     ) {
-        let containerFrame = CGRect(origin: params.containerOrigin, size: params.size)
-        transition.setFrame(view: dedicatedMainGlassContainer, frame: containerFrame)
-        transition.setFrame(
-            view: mainSurface,
-            frame: dedicatedMainGlassContainer.bounds
-        )
-        mainSurface.applyGeometry(params: mainGlassParams)
-        transition.setCornerRadius(view: mainSurface, radius: mainGlassParams.cornerRadius)
-        let contentFrame = CGRect(origin: .zero, size: params.size)
-        transition.setFrame(view: lensContentContainer, frame: contentFrame)
-        transition.setFrame(
-            view: selectedContentView,
-            frame: CGRect(origin: .zero, size: contentFrame.size)
-        )
-        transition.setFrame(
-            view: contentView,
-            frame: CGRect(origin: .zero, size: contentFrame.size)
-        )
+        if containerGeometryChanged {
+            let containerFrame = CGRect(origin: params.containerOrigin, size: params.size)
+            transition.setFrame(view: dedicatedMainGlassContainer, frame: containerFrame)
+            transition.setFrame(
+                view: mainSurface,
+                frame: dedicatedMainGlassContainer.bounds
+            )
 
-        restingBackgroundView.apply(
-            cornerRadius: min(selectedContentView.bounds.width, selectedContentView.bounds.height) * 0.5,
-            isDark: params.isDark,
-            reduceTransparency: params.reduceTransparency
-        )
-        transition.setFrame(
-            view: restingBackgroundView,
-            frame: selectedContentView.bounds
-        )
-        transition.setCornerRadius(
-            view: restingBackgroundView,
-            radius: min(selectedContentView.bounds.width, selectedContentView.bounds.height) * 0.5
-        )
+            let contentFrame = CGRect(origin: .zero, size: params.size)
+            transition.setFrame(view: lensContentContainer, frame: contentFrame)
+            transition.setFrame(
+                view: selectedContentView,
+                frame: contentFrame
+            )
+            transition.setFrame(
+                view: contentView,
+                frame: contentFrame
+            )
+
+            let restingCornerRadius = min(params.size.width, params.size.height) * 0.5
+            transition.setFrame(
+                view: restingBackgroundView,
+                frame: contentFrame
+            )
+            transition.setCornerRadius(
+                view: restingBackgroundView,
+                radius: restingCornerRadius
+            )
+        }
+
+        if mainGlassChanged {
+            mainSurface.applyGeometry(
+                params: mainGlassParams,
+                transition: transition
+            )
+            restingBackgroundView.apply(
+                cornerRadius: min(params.size.width, params.size.height) * 0.5,
+                isDark: params.isDark,
+                reduceTransparency: params.reduceTransparency
+            )
+        }
+
         transition.setAlpha(
             view: restingBackgroundView,
             alpha: params.isLifted || params.isCollapsed ? 0 : 1
@@ -404,12 +416,9 @@ final class NagiLiquidLensView: UIView {
     }
 
     private func nativeLensTargetBounds(for params: NagiLensParams) -> CGRect {
-        let effectiveInset: CGFloat
-        if params.isCollapsed {
-            effectiveInset = 0
-        } else {
-            effectiveInset = params.isLifted ? params.liftedInset : -params.inset
-        }
+        let effectiveInset: CGFloat = params.isLifted
+            ? params.liftedInset
+            : -params.inset
 
         return CGRect(
             origin: .zero,

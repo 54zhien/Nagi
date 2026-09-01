@@ -2,11 +2,13 @@
 //  NagiGlassBackgroundView.swift
 //  Nagi
 //
-//  单个持久化 native Glass surface。项目最低部署版本为 iOS 26，
-//  因此这里只保留 UIGlassEffect 路径；尺寸、圆角和透明度变化不会
-//  重建 effect view，也不会把内容延迟到下一轮 layout。
+//  单个持久化 native Glass surface。Effect settings 通过与 Nagram 相同的
+//  iOS 26 backdrop luma runtime hook 生效，surface 和 native effect 的
+//  geometry 由调用方传入的同一个 NagiTabTransition 驱动。
 //
 
+import ObjectiveC.runtime
+import QuartzCore
 import UIKit
 
 struct NagiGlassParams: Equatable {
@@ -40,239 +42,123 @@ struct NagiGlassParams: Equatable {
     }
 }
 
-private protocol NagiGlassTintMaskProviding: AnyObject {
-    var tintMask: UIView { get }
-}
+final class NagiEffectSettingsContainerView: UIView {
+    var lumaMin: Double = 0
+    var lumaMax: Double = 0
 
-private final class NagiGlassContentLayer: CALayer {
-    weak var targetLayer: CALayer?
-
-    override init() {
-        super.init()
-    }
-
-    override init(layer: Any) {
-        super.init(layer: layer)
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        NagiGlassEffectRuntime.installIfNeeded()
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
-
-    override var position: CGPoint {
-        get { return super.position }
-        set {
-            targetLayer?.position = newValue
-            super.position = newValue
-        }
-    }
-
-    override var bounds: CGRect {
-        get { return super.bounds }
-        set {
-            targetLayer?.bounds = newValue
-            super.bounds = newValue
-        }
-    }
-
-    override var anchorPoint: CGPoint {
-        get { return super.anchorPoint }
-        set {
-            targetLayer?.anchorPoint = newValue
-            super.anchorPoint = newValue
-        }
-    }
-
-    override var anchorPointZ: CGFloat {
-        get { return super.anchorPointZ }
-        set {
-            targetLayer?.anchorPointZ = newValue
-            super.anchorPointZ = newValue
-        }
-    }
-
-    override var opacity: Float {
-        get { return super.opacity }
-        set {
-            targetLayer?.opacity = newValue
-            super.opacity = newValue
-        }
-    }
-
-    override var sublayerTransform: CATransform3D {
-        get { return super.sublayerTransform }
-        set {
-            targetLayer?.sublayerTransform = newValue
-            super.sublayerTransform = newValue
-        }
-    }
-
-    override var transform: CATransform3D {
-        get { return super.transform }
-        set {
-            targetLayer?.transform = newValue
-            super.transform = newValue
-        }
-    }
-
-    override func add(_ animation: CAAnimation, forKey key: String?) {
-        targetLayer?.add(animation, forKey: key)
-        super.add(animation, forKey: key)
-    }
-
-    override func removeAllAnimations() {
-        targetLayer?.removeAllAnimations()
-        super.removeAllAnimations()
-    }
-
-    override func removeAnimation(forKey key: String) {
-        targetLayer?.removeAnimation(forKey: key)
-        super.removeAnimation(forKey: key)
-    }
 }
 
-private final class NagiGlassContentContainer: UIView {
-    private let maskContentView: UIView
-
-    init(maskContentView: UIView) {
-        self.maskContentView = maskContentView
-        super.init(frame: .zero)
-    }
-
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-
-    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
-        guard let result = super.hitTest(point, with: event) else {
-            return nil
-        }
-        if result === self, (gestureRecognizers ?? []).isEmpty {
-            return nil
-        }
-        return result
-    }
-
-    override func didAddSubview(_ subview: UIView) {
-        super.didAddSubview(subview)
-        guard let tintMaskView = subview as? NagiGlassTintMaskProviding else {
+private enum NagiGlassEffectRuntime {
+    private static let installOnce: Void = {
+        guard #available(iOS 26.0, *) else {
             return
         }
-        maskContentView.addSubview(tintMaskView.tintMask)
-    }
 
-    override func willRemoveSubview(_ subview: UIView) {
-        if let tintMaskView = subview as? NagiGlassTintMaskProviding {
-            tintMaskView.tintMask.removeFromSuperview()
+        let className =
+            "_TtC5UIKitP33_ACD4A08F4BE9D00246F2A9C24A80CA8817UISDFBackdropView"
+        let selector = NSSelectorFromString("backdropLayer:didChangeLuma:")
+
+        guard
+            let cls = NSClassFromString(className),
+            let method = class_getInstanceMethod(cls, selector)
+        else {
+            return
         }
-        super.willRemoveSubview(subview)
-    }
-}
 
-private final class NagiGlassNativeParamsView: UIView {
-    private let effectView: UIVisualEffectView
+        let typeEncoding = String(cString: method_getTypeEncoding(method))
+        guard typeEncoding == "v32@0:8@16d24" else {
+            return
+        }
 
-    var lumaMin: CGFloat = 0 {
-        didSet { applyNativeValue(lumaMin, key: "lumaMin") }
-    }
+        typealias OriginalIMP = @convention(c) (
+            AnyObject,
+            Selector,
+            CALayer,
+            Double
+        ) -> Void
 
-    var lumaMax: CGFloat = 1 {
-        didSet { applyNativeValue(lumaMax, key: "lumaMax") }
-    }
+        let original = unsafeBitCast(
+            method_getImplementation(method),
+            to: OriginalIMP.self
+        )
 
-    init(effectView: UIVisualEffectView) {
-        self.effectView = effectView
-        super.init(frame: .zero)
-        isUserInteractionEnabled = true
-        clipsToBounds = false
-        addSubview(effectView)
-    }
+        let block: @convention(block) (
+            AnyObject,
+            CALayer,
+            Double
+        ) -> Void = { object, layer, luma in
+            var resolvedLuma = luma
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
+            if let view = object as? UIView,
+               let container = findEffectContainer(from: view) {
+                resolvedLuma = min(
+                    max(luma, container.lumaMin),
+                    container.lumaMax
+                )
+            }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        effectView.frame = bounds
-    }
+            original(object, selector, layer, resolvedLuma)
+        }
 
-    private func applyNativeValue(_ value: CGFloat, key: String) {
-        let setterName = "set\(key.prefix(1).uppercased())\(key.dropFirst()):"
-        let setter = NSSelectorFromString(setterName)
-        guard effectView.responds(to: setter) else { return }
-        effectView.setValue(value, forKey: key)
-    }
-}
+        let replacement = imp_implementationWithBlock(block)
+        method_setImplementation(method, replacement)
+    }()
 
-private final class NagiGlassContentProxyView: UIView {
-    override class var layerClass: AnyClass {
-        NagiGlassContentLayer.self
-    }
-
-    init(targetLayer: CALayer) {
-        super.init(frame: .zero)
-        isHidden = true
-        isUserInteractionEnabled = false
-        (layer as? NagiGlassContentLayer)?.targetLayer = targetLayer
+    static func installIfNeeded() {
+        _ = installOnce
     }
 
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-}
+    private static func findEffectContainer(
+        from view: UIView
+    ) -> NagiEffectSettingsContainerView? {
+        var current: UIView? = view
+        var depth = 0
 
-private final class NagiClippingShapeContext {
-    private(set) var cornerRadius: CGFloat = 0
+        while let value = current, depth <= 10 {
+            if let container = value as? NagiEffectSettingsContainerView {
+                return container
+            }
+            current = value.superview
+            depth += 1
+        }
 
-    func update(view: UIView, size: CGSize, cornerRadius: CGFloat) {
-        self.cornerRadius = min(cornerRadius, min(size.width, size.height) * 0.5)
-        view.layer.mask = nil
-        view.layer.cornerRadius = self.cornerRadius
-        view.layer.cornerCurve = .continuous
-        view.clipsToBounds = true
+        return nil
     }
 }
 
 final class NagiGlassBackgroundView: UIView {
-    let contentView: UIView
+    var contentView: UIView {
+        effectView.contentView
+    }
 
     private let effectView: UIVisualEffectView
-    private let nativeParamsView: NagiGlassNativeParamsView
-    private let nativeContentProxy: NagiGlassContentProxyView
+    private let nativeParamsView: NagiEffectSettingsContainerView
     private let fallbackView: UIView
-    private let maskContainerView: UIView
-    private let maskContentView: UIView
-    private let contentContainer: NagiGlassContentContainer
-    private let clippingShapeContext: NagiClippingShapeContext
     private var previousParams: NagiGlassParams?
     private var currentEffectKey: String?
     private var currentTintColor: UIColor?
 
     override init(frame: CGRect) {
-        let effect = UIGlassEffect(style: .regular)
-        effect.isInteractive = false
-        let effectView = UIVisualEffectView(effect: effect)
-        let nativeParamsView = NagiGlassNativeParamsView(effectView: effectView)
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.isInteractive = false
+
+        let effectView = UIVisualEffectView(effect: glassEffect)
+        let nativeParamsView = NagiEffectSettingsContainerView(frame: .zero)
         let fallbackView = UIView(frame: .zero)
-        let maskContainerView = UIView(frame: .zero)
-        let maskContentView = UIView(frame: .zero)
-        let contentContainer = NagiGlassContentContainer(maskContentView: maskContentView)
 
         self.effectView = effectView
         self.nativeParamsView = nativeParamsView
-        self.nativeContentProxy = NagiGlassContentProxyView(
-            targetLayer: effectView.contentView.layer
-        )
         self.fallbackView = fallbackView
-        self.maskContainerView = maskContainerView
-        self.maskContentView = maskContentView
-        self.contentContainer = contentContainer
-        self.contentView = contentContainer
-        self.clippingShapeContext = NagiClippingShapeContext()
         super.init(frame: frame)
 
-        isUserInteractionEnabled = false
         clipsToBounds = false
         layer.cornerCurve = .continuous
 
@@ -281,39 +167,15 @@ final class NagiGlassBackgroundView: UIView {
         fallbackView.isUserInteractionEnabled = false
         fallbackView.layer.cornerCurve = .continuous
 
-        maskContainerView.isHidden = true
-        maskContainerView.isUserInteractionEnabled = false
-        maskContainerView.backgroundColor = .white
-        maskContentView.isUserInteractionEnabled = false
-        maskContainerView.addSubview(maskContentView)
+        effectView.layer.cornerCurve = .continuous
+        nativeParamsView.addSubview(effectView)
 
         addSubview(fallbackView)
         addSubview(nativeParamsView)
-        nativeParamsView.addSubview(nativeContentProxy)
-        effectView.contentView.addSubview(contentContainer)
-        addSubview(maskContainerView)
-        contentContainer.backgroundColor = .clear
-        contentContainer.isOpaque = false
-        contentContainer.clipsToBounds = false
-        contentContainer.layer.cornerCurve = .continuous
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        fallbackView.frame = bounds
-        nativeParamsView.frame = bounds
-        nativeContentProxy.frame = nativeParamsView.bounds
-        contentContainer.frame = effectView.contentView.bounds
-        maskContainerView.frame = bounds
-        maskContentView.frame = bounds
-        fallbackView.layer.cornerRadius = layer.cornerRadius
-        nativeParamsView.layer.cornerRadius = layer.cornerRadius
-        effectView.layer.cornerRadius = layer.cornerRadius
-        contentContainer.layer.cornerRadius = layer.cornerRadius
     }
 
     @discardableResult
@@ -321,69 +183,87 @@ final class NagiGlassBackgroundView: UIView {
         guard params != previousParams else {
             return false
         }
-        let previousEffectKey = currentEffectKey
+
         previousParams = params
 
         let effectKey = "regular|\(params.isDark)|\(params.isInteractive)"
         let useFallback = params.reduceTransparency
-        if !useFallback &&
-            (effectKey != previousEffectKey ||
-             !NagiGlassParams.colorsEqual(currentTintColor, params.tintColor) ||
-             effectView.effect == nil) {
+        let shouldRebuildEffect =
+            !useFallback &&
+            (
+                currentEffectKey != effectKey ||
+                !NagiGlassParams.colorsEqual(
+                    currentTintColor,
+                    params.tintColor
+                ) ||
+                effectView.effect == nil
+            )
+
+        if shouldRebuildEffect {
             let effect = UIGlassEffect(style: .regular)
             effect.tintColor = params.tintColor
             effect.isInteractive = params.isInteractive
             effectView.effect = effect
-            effectView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
-            nativeParamsView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
             currentEffectKey = effectKey
             currentTintColor = params.tintColor
         }
 
-        nativeParamsView.lumaMin = params.isDark ? 0.0 : 0.8
-        nativeParamsView.lumaMax = params.isDark ? 0.15 : 0.801
+        effectView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
+
+        if params.isDark {
+            nativeParamsView.lumaMin = 0.0
+            nativeParamsView.lumaMax = 0.15
+        } else {
+            nativeParamsView.lumaMin = 0.8
+            nativeParamsView.lumaMax = 0.801
+        }
 
         fallbackView.isHidden = !useFallback
-        // Keep the native content view mounted even when Reduce Transparency
-        // is enabled. Removing only the effect preserves labels, controls and
-        // hit testing over the solid fallback surface.
-        effectView.isHidden = false
+
         if useFallback {
             effectView.effect = nil
         }
+
         return true
     }
 
-    func applyGeometry(params: NagiGlassParams, applyVisibility: Bool = true) {
-        let targetBounds = CGRect(origin: .zero, size: params.size)
-        layer.cornerRadius = params.cornerRadius
-        layer.cornerCurve = .continuous
-        if applyVisibility {
-            alpha = params.isVisible ? 1 : 0
-        }
+    func applyGeometry(
+        params: NagiGlassParams,
+        transition: NagiTabTransition,
+        applyVisibility: Bool = true
+    ) {
+        let targetFrame = CGRect(origin: .zero, size: params.size)
 
-        fallbackView.frame = targetBounds
-        nativeParamsView.frame = targetBounds
-        nativeParamsView.layer.cornerRadius = params.cornerRadius
-        effectView.frame = nativeParamsView.bounds
-        effectView.layer.cornerRadius = params.cornerRadius
-        nativeContentProxy.frame = nativeParamsView.bounds
-        contentContainer.frame = effectView.contentView.bounds
-        contentContainer.layer.cornerRadius = params.cornerRadius
-        maskContainerView.frame = targetBounds
-        maskContentView.frame = targetBounds
-        clippingShapeContext.update(
-            view: effectView,
-            size: params.size,
-            cornerRadius: params.cornerRadius
+        transition.setFrame(view: fallbackView, frame: targetFrame)
+        transition.setFrame(view: nativeParamsView, frame: targetFrame)
+        transition.setFrame(view: effectView, frame: targetFrame)
+
+        transition.setCornerRadius(
+            view: fallbackView,
+            radius: params.cornerRadius
         )
-        setNeedsLayout()
+        transition.setCornerRadius(
+            view: effectView,
+            radius: params.cornerRadius
+        )
+        transition.setCornerRadius(
+            view: self,
+            radius: params.cornerRadius
+        )
+
+        if applyVisibility {
+            transition.setAlpha(
+                view: self,
+                alpha: params.isVisible ? 1 : 0
+            )
+        }
     }
 
-    func update(params: NagiGlassParams) {
-        guard prepare(params: params) else {
-            return
-        }
-        applyGeometry(params: params)
+    func update(
+        params: NagiGlassParams,
+        transition: NagiTabTransition
+    ) {
+        _ = prepare(params: params)
+        applyGeometry(params: params, transition: transition)
     }
 }

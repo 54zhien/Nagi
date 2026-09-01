@@ -28,14 +28,19 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         weight: .regular
     )
 
+    private struct ActiveInput {
+        let container: UIView
+        let textField: UITextField
+        let clearButton: UIButton
+    }
+
     private let backgroundView: NagiGlassBackgroundView
     private let iconView: UIImageView
     private let placeholderLabel: UILabel
-    private let textField: UITextField
-    private let clearButton: UIButton
     private var close: (background: NagiGlassBackgroundView, button: UIButton)?
+    private var activeInput: ActiveInput?
     private var previousParams: NagiSearchParams?
-    private var isContentClippedDuringTransition = false
+    private var pendingQuery = ""
 
     var onActivate: (() -> Void)?
     var onCancel: (() -> Void)?
@@ -47,15 +52,15 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         self.backgroundView = NagiGlassBackgroundView(frame: .zero)
         self.iconView = UIImageView(image: UIImage(systemName: "magnifyingglass"))
         self.placeholderLabel = UILabel(frame: .zero)
-        self.textField = UITextField(frame: .zero)
-        self.clearButton = UIButton(type: .system)
         self.close = nil
+        self.activeInput = nil
         super.init(frame: frame)
 
         clipsToBounds = false
         isUserInteractionEnabled = true
 
         backgroundView.isUserInteractionEnabled = true
+        backgroundView.contentView.clipsToBounds = true
         addSubview(backgroundView)
 
         iconView.tintColor = .secondaryLabel
@@ -70,26 +75,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         placeholderLabel.adjustsFontForContentSizeCategory = true
         placeholderLabel.isUserInteractionEnabled = false
         backgroundView.contentView.addSubview(placeholderLabel)
-
-        textField.delegate = self
-        textField.backgroundColor = .clear
-        textField.borderStyle = .none
-        textField.clearButtonMode = .never
-        textField.font = .preferredFont(forTextStyle: .body)
-        textField.textColor = .label
-        textField.tintColor = nagiAccentColor
-        textField.returnKeyType = .search
-        textField.autocorrectionType = .no
-        textField.adjustsFontForContentSizeCategory = true
-        textField.accessibilityLabel = "搜索书名"
-        textField.addTarget(self, action: #selector(textDidChange), for: .editingChanged)
-        backgroundView.contentView.addSubview(textField)
-
-        clearButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        clearButton.tintColor = .secondaryLabel
-        clearButton.accessibilityLabel = "清除搜索"
-        clearButton.addTarget(self, action: #selector(clearQuery), for: .primaryActionTriggered)
-        backgroundView.contentView.addSubview(clearButton)
 
         let recognizer = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
         recognizer.cancelsTouchesInView = false
@@ -106,11 +91,13 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         guard params != previousParams else {
             return false
         }
+
         previousParams = params
         isActive = params.isActive
 
         if params.isActive {
             ensureCloseSurface(for: params)
+            ensureActiveInput()
         }
 
         let backgroundSize = params.backgroundFrame.size
@@ -124,6 +111,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             isVisible: true,
             reduceTransparency: params.reduceTransparency
         ))
+
         let closeChanged: Bool
         if let close {
             let closeSize = params.closeFrame.size
@@ -140,6 +128,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         } else {
             closeChanged = false
         }
+
         return backgroundChanged || closeChanged
     }
 
@@ -153,15 +142,18 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         let closeRadius = min(closeSize.width, closeSize.height) * 0.5
 
         transition.setFrame(view: backgroundView, frame: params.backgroundFrame)
-        backgroundView.applyGeometry(params: NagiGlassParams(
-            size: backgroundSize,
-            cornerRadius: backgroundRadius,
-            isDark: params.isDark,
-            tintColor: glassTintColor(isDark: params.isDark),
-            isInteractive: true,
-            isVisible: true,
-            reduceTransparency: params.reduceTransparency
-        ))
+        backgroundView.applyGeometry(
+            params: NagiGlassParams(
+                size: backgroundSize,
+                cornerRadius: backgroundRadius,
+                isDark: params.isDark,
+                tintColor: glassTintColor(isDark: params.isDark),
+                isInteractive: true,
+                isVisible: true,
+                reduceTransparency: params.reduceTransparency
+            ),
+            transition: transition
+        )
 
         if let close {
             transition.setBounds(
@@ -182,6 +174,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                     isVisible: params.isActive,
                     reduceTransparency: params.reduceTransparency
                 ),
+                transition: transition,
                 applyVisibility: false
             )
             transition.setCornerRadius(view: close.background, radius: closeRadius)
@@ -191,7 +184,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             close.button.isUserInteractionEnabled = params.isActive
         }
 
-        backgroundView.contentView.clipsToBounds = isContentClippedDuringTransition
+        backgroundView.contentView.clipsToBounds = true
         close?.background.contentView.clipsToBounds = true
         layoutControls(for: params, transition: transition)
     }
@@ -200,8 +193,14 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         guard completed, !params.isActive else {
             return
         }
+
         close?.background.removeFromSuperview()
         close = nil
+
+        if let activeInput {
+            activeInput.container.removeFromSuperview()
+            self.activeInput = nil
+        }
     }
 
     private func ensureCloseSurface(for params: NagiSearchParams) {
@@ -210,6 +209,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         let background = NagiGlassBackgroundView(frame: .zero)
         let button = UIButton(type: .system)
         background.isUserInteractionEnabled = true
+        background.contentView.clipsToBounds = true
         button.setImage(UIImage(systemName: "xmark"), for: .normal)
         button.tintColor = .secondaryLabel
         button.accessibilityLabel = "关闭搜索"
@@ -227,26 +227,78 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         close = (background: background, button: button)
     }
 
-    func setContentClipping(_ clipped: Bool) {
-        isContentClippedDuringTransition = clipped
-        backgroundView.contentView.clipsToBounds = clipped
+    private func ensureActiveInput() {
+        guard activeInput == nil else {
+            return
+        }
+
+        let container = UIView(frame: .zero)
+        container.backgroundColor = .clear
+        container.alpha = 0
+
+        let textField = UITextField(frame: .zero)
+        textField.delegate = self
+        textField.backgroundColor = .clear
+        textField.borderStyle = .none
+        textField.clearButtonMode = .never
+        textField.font = .preferredFont(forTextStyle: .body)
+        textField.textColor = .label
+        textField.tintColor = UIColor(named: "AccentColor") ?? .tintColor
+        textField.placeholder = "搜索书名"
+        textField.returnKeyType = .search
+        textField.autocorrectionType = .no
+        textField.adjustsFontForContentSizeCategory = true
+        textField.accessibilityLabel = "搜索书名"
+        textField.text = pendingQuery
+        textField.addTarget(
+            self,
+            action: #selector(textDidChange(_:)),
+            for: .editingChanged
+        )
+
+        let clearButton = UIButton(type: .system)
+        clearButton.setImage(
+            UIImage(systemName: "xmark.circle.fill"),
+            for: .normal
+        )
+        clearButton.tintColor = .secondaryLabel
+        clearButton.accessibilityLabel = "清除搜索"
+        clearButton.addTarget(
+            self,
+            action: #selector(clearQuery(_:)),
+            for: .primaryActionTriggered
+        )
+
+        container.addSubview(textField)
+        container.addSubview(clearButton)
+        backgroundView.contentView.addSubview(container)
+
+        activeInput = ActiveInput(
+            container: container,
+            textField: textField,
+            clearButton: clearButton
+        )
     }
 
     func setQuery(_ query: String) {
-        guard textField.text != query else {
+        pendingQuery = query
+
+        guard let textField = activeInput?.textField,
+              textField.text != query else {
             return
         }
+
         textField.text = query
-        updatePlaceholderVisibility()
+        updateClearButtonVisibility(using: .immediate)
     }
 
     @discardableResult
     func becomeSearchFirstResponder() -> Bool {
-        textField.becomeFirstResponder()
+        activeInput?.textField.becomeFirstResponder() ?? false
     }
 
     func resignSearchFirstResponder() {
-        textField.resignFirstResponder()
+        activeInput?.textField.resignFirstResponder()
     }
 
     private func layoutControls(for params: NagiSearchParams, transition: NagiTabTransition) {
@@ -263,29 +315,67 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             view: iconView,
             frame: CGRect(x: iconX, y: iconY, width: iconSize, height: iconSize)
         )
-        iconView.tintColor = active ? nagiAccentColor : .secondaryLabel
+        iconView.tintColor = .secondaryLabel
         transition.setAlpha(view: iconView, alpha: 1)
 
-        let fieldLeading: CGFloat = active ? 40 : 0
-        let trailingControls: CGFloat = active ? 48 : 0
-        let fieldWidth = max(0, backgroundBounds.width - fieldLeading - trailingControls)
-        let fieldFrame = CGRect(
-            x: fieldLeading,
+        let placeholderLeading: CGFloat = params.isExpandedStandaloneBar && !active ? 40 : 0
+        let placeholderFrame = CGRect(
+            x: placeholderLeading,
             y: 0,
-            width: fieldWidth,
+            width: max(0, backgroundBounds.width - placeholderLeading),
             height: backgroundBounds.height
         )
-        transition.setFrame(view: placeholderLabel, frame: fieldFrame)
-        transition.setFrame(view: textField, frame: fieldFrame)
-        let clearFrame = active
-            ? CGRect(
+        transition.setFrame(view: placeholderLabel, frame: placeholderFrame)
+        transition.setAlpha(
+            view: placeholderLabel,
+            alpha: !active && params.isExpandedStandaloneBar ? 1 : 0
+        )
+
+        if let input = activeInput {
+            transition.setFrame(
+                view: input.container,
+                frame: backgroundBounds
+            )
+
+            let fieldLeading: CGFloat = 40
+            let trailingControls: CGFloat = 48
+            let fieldFrame = CGRect(
+                x: fieldLeading,
+                y: 0,
+                width: max(
+                    0,
+                    backgroundBounds.width - fieldLeading - trailingControls
+                ),
+                height: backgroundBounds.height
+            )
+            transition.setFrame(view: input.textField, frame: fieldFrame)
+
+            let clearFrame = CGRect(
                 x: max(0, backgroundBounds.width - 48),
                 y: max(0, backgroundBounds.midY - 22),
                 width: 44,
                 height: 44
             )
-            : .zero
-        transition.setFrame(view: clearButton, frame: clearFrame)
+            transition.setFrame(view: input.clearButton, frame: clearFrame)
+
+            let inputAlphaTransition: NagiTabTransition = transition.isImmediate
+                ? .immediate
+                : .easeInOut(duration: 0.25)
+            inputAlphaTransition.setAlpha(
+                view: input.container,
+                alpha: params.isActive ? 1 : 0
+            )
+
+            let hasText = !(input.textField.text ?? "").isEmpty
+            inputAlphaTransition.setAlpha(
+                view: input.clearButton,
+                alpha: params.isActive && hasText ? 1 : 0
+            )
+
+            input.container.isUserInteractionEnabled = params.isActive
+            input.textField.isUserInteractionEnabled = params.isActive
+            input.clearButton.isUserInteractionEnabled = params.isActive
+        }
 
         if let close {
             let closeBounds = close.background.bounds
@@ -300,17 +390,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             )
             close.button.isUserInteractionEnabled = active
         }
-
-        transition.setAlpha(view: placeholderLabel, alpha: active ? 1 : 0)
-        transition.setAlpha(view: textField, alpha: active ? 1 : 0)
-        transition.setAlpha(
-            view: clearButton,
-            alpha: active && !(textField.text ?? "").isEmpty ? 1 : 0
-        )
-
-        textField.isUserInteractionEnabled = active
-        clearButton.isUserInteractionEnabled = active
-        updatePlaceholderVisibility(using: transition)
     }
 
     private func glassTintColor(isDark: Bool) -> UIColor {
@@ -319,43 +398,38 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             : UIColor.white.withAlphaComponent(0.1)
     }
 
-    private var nagiAccentColor: UIColor {
-        UIColor(named: "AccentColor") ?? .tintColor
-    }
-
-    private func updatePlaceholderVisibility() {
-        updatePlaceholderVisibility(using: .immediate)
-    }
-
-    private func updatePlaceholderVisibility(using transition: NagiTabTransition) {
-        guard isActive else {
-            transition.setAlpha(view: placeholderLabel, alpha: 0)
-            transition.setAlpha(view: clearButton, alpha: 0)
+    private func updateClearButtonVisibility(using transition: NagiTabTransition) {
+        guard let input = activeInput else {
             return
         }
-        let isEmpty = textField.text?.isEmpty ?? true
-        transition.setAlpha(view: placeholderLabel, alpha: isEmpty ? 1 : 0)
-        transition.setAlpha(view: clearButton, alpha: isEmpty ? 0 : 1)
+
+        let isEmpty = (input.textField.text ?? "").isEmpty
+        transition.setAlpha(
+            view: input.clearButton,
+            alpha: isActive && !isEmpty ? 1 : 0
+        )
     }
 
     @objc private func backgroundTapped() {
         if isActive {
-            textField.becomeFirstResponder()
+            activeInput?.textField.becomeFirstResponder()
         } else {
             onActivate?()
         }
     }
 
-    @objc private func textDidChange() {
-        updatePlaceholderVisibility()
-        onQueryChanged?(textField.text ?? "")
+    @objc private func textDidChange(_ sender: UITextField) {
+        pendingQuery = sender.text ?? ""
+        updateClearButtonVisibility(using: .immediate)
+        onQueryChanged?(pendingQuery)
     }
 
-    @objc private func clearQuery() {
-        textField.text = ""
-        updatePlaceholderVisibility()
+    @objc private func clearQuery(_ sender: UIButton) {
+        pendingQuery = ""
+        activeInput?.textField.text = ""
+        updateClearButtonVisibility(using: .immediate)
         onQueryChanged?("")
-        textField.becomeFirstResponder()
+        activeInput?.textField.becomeFirstResponder()
     }
 
     @objc private func cancelSearch() {
@@ -370,7 +444,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         var candidate = touch.view
         while let view = candidate {
-            if view is UIControl || view === textField {
+            if view is UIControl {
                 return false
             }
             candidate = view.superview

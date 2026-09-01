@@ -9,26 +9,52 @@
 import UIKit
 
 final class NagiGlassContainerView: UIView {
+    private let nativeParamsView: NagiEffectSettingsContainerView
     let effectView: UIVisualEffectView
-    let contentView: UIView
+
+    var contentView: UIView {
+        effectView.contentView
+    }
 
     init(spacing: CGFloat = 7) {
         let effect = UIGlassContainerEffect()
         effect.spacing = spacing
-        self.effectView = UIVisualEffectView(effect: effect)
-        self.contentView = effectView.contentView
+
+        let effectView = UIVisualEffectView(effect: effect)
+        let nativeParamsView = NagiEffectSettingsContainerView(frame: .zero)
+
+        self.effectView = effectView
+        self.nativeParamsView = nativeParamsView
         super.init(frame: .zero)
 
         isUserInteractionEnabled = true
-        addSubview(effectView)
+        clipsToBounds = false
+
+        nativeParamsView.addSubview(effectView)
+        addSubview(nativeParamsView)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        effectView.frame = bounds
+    func update(
+        size: CGSize,
+        isDark: Bool,
+        transition: NagiTabTransition
+    ) {
+        effectView.overrideUserInterfaceStyle = isDark ? .dark : .light
+
+        if isDark {
+            nativeParamsView.lumaMin = 0.0
+            nativeParamsView.lumaMax = 0.15
+        } else {
+            nativeParamsView.lumaMin = 0.8
+            nativeParamsView.lumaMax = 0.801
+        }
+
+        let frame = CGRect(origin: .zero, size: size)
+        transition.setFrame(view: nativeParamsView, frame: frame)
+        transition.setFrame(view: effectView, frame: frame)
     }
 }

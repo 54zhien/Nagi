@@ -2,7 +2,7 @@
 //  NagiTabBarItemView.swift
 //  Nagi
 //
-//  持久化的主 Tab 控件。它只负责图标和触控，不创建独立的 Glass，
+//  持久化的主 Tab 视觉内容。它不创建独立的 Glass，也不处理触控；
 //  选中状态由 RootTabBar 的单一 Liquid Lens 表达。
 //
 
@@ -19,8 +19,6 @@ final class NagiTabBarItemView: UIView {
     private let iconView: UIImageView
     private let isInteractive: Bool
     private let visualRole: VisualRole
-
-    var onActivate: (() -> Void)?
 
     private static let tabSymbolConfiguration = UIImage.SymbolConfiguration(
         pointSize: 22,
@@ -41,11 +39,10 @@ final class NagiTabBarItemView: UIView {
 
         isAccessibilityElement = false
         addSubview(button)
-        button.isUserInteractionEnabled = isInteractive
+        // RootTab selection is owned exclusively by NagiTabSelectionRecognizer.
+        // Keep this UIKit button only as a visual host; it never receives input.
+        button.isUserInteractionEnabled = false
         button.isAccessibilityElement = isInteractive
-        if isInteractive {
-            button.addTarget(self, action: #selector(activate), for: .primaryActionTriggered)
-        }
         button.accessibilityTraits = isInteractive ? [.button] : []
         button.contentHorizontalAlignment = .center
         button.contentVerticalAlignment = .center
@@ -86,21 +83,21 @@ final class NagiTabBarItemView: UIView {
         iconView.frame = bounds
     }
 
-    func update(isSelected: Bool, usesPrivateLens: Bool) {
+    func update(
+        isSelected: Bool,
+        usesPrivateLens: Bool,
+        isCompact: Bool = false
+    ) {
         switch visualRole {
         case .normal:
-            iconView.tintColor = (!usesPrivateLens && isSelected)
+            iconView.tintColor = (!usesPrivateLens && isSelected && !isCompact)
                 ? nagiAccentColor
                 : .secondaryLabel
         case .selected:
-            iconView.tintColor = nagiAccentColor
+            iconView.tintColor = isCompact ? .secondaryLabel : nagiAccentColor
         }
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
-    }
-
-    @objc private func activate() {
-        onActivate?()
     }
 
     private var nagiAccentColor: UIColor {

@@ -49,7 +49,11 @@ final class NagiTabBarView: UIView {
         self.glassContainer = NagiGlassContainerView(spacing: 7)
         let mainTabs: [AppTab] = [.home, .library, .settings]
         self.itemViews = mainTabs.map {
-            NagiTabBarItemView(tab: $0, visualRole: .normal)
+            NagiTabBarItemView(
+                tab: $0,
+                visualRole: .normal,
+                isInteractive: false
+            )
         }
         self.selectedItemViews = mainTabs.map {
             NagiTabBarItemView(tab: $0, visualRole: .selected, isInteractive: false)
@@ -76,17 +80,13 @@ final class NagiTabBarView: UIView {
         }
         liquidLensView.addGestureRecognizer(tabSelectionRecognizer)
 
-        for (index, itemView) in itemViews.enumerated() {
+        for itemView in itemViews {
+            itemView.isUserInteractionEnabled = false
             liquidLensView.contentView.addSubview(itemView)
-            itemView.onActivate = { [weak self] in
-                let tabs: [AppTab] = [.home, .library, .settings]
-                guard index < tabs.count else { return }
-                guard self?.selectionGestureState == nil else { return }
-                self?.onTabSelected?(tabs[index])
-            }
         }
 
         for selectedItemView in selectedItemViews {
+            selectedItemView.isUserInteractionEnabled = false
             liquidLensView.selectedContentView.addSubview(selectedItemView)
         }
 
@@ -159,6 +159,11 @@ final class NagiTabBarView: UIView {
         previousParams = nextParams
 
         let isDark = traitCollection.userInterfaceStyle == .dark
+        glassContainer.update(
+            size: layout.tabBarFrame.size,
+            isDark: isDark,
+            transition: transition
+        )
         let localSearchContainerFrame = localFrame(layout.searchContainerFrame, in: layout.tabBarFrame)
         let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.lensContainerFrame) }
         let selectedIndex = mainIndex(for: mode.previousTab ?? mode.selectedTab)
@@ -186,10 +191,8 @@ final class NagiTabBarView: UIView {
             from: oldParams?.layout,
             to: layout
         )
-        let shouldClipSearchContent = !transition.isImmediate && searchGeometryDidChange
-        searchView.setContentClipping(shouldClipSearchContent)
 
-        let itemAlphaTransition: NagiTabTransition = transition.isImmediate
+        let itemBlurTransition: NagiTabTransition = transition.isImmediate
             ? .immediate
             : .easeInOut(duration: 0.25)
         transition.perform { [weak self] in
@@ -212,14 +215,14 @@ final class NagiTabBarView: UIView {
             }
             self.updateItemSelectionPresentation(
                 displayedIndex: displayedIndex,
-                transition: itemAlphaTransition,
+                transition: transition,
+                blurTransition: itemBlurTransition,
                 scaleTransition: transition,
                 isSearchActive: layout.isSearchActive
             )
         } completion: { [weak self] completed in
             guard let self else { return }
             if generation == self.searchTransitionGeneration {
-                self.searchView.setContentClipping(false)
                 self.searchView.finishTransition(
                     params: searchParams,
                     completed: completed
@@ -449,9 +452,11 @@ final class NagiTabBarView: UIView {
     private func updateItemSelectionPresentation(
         displayedIndex: Int?,
         transition: NagiTabTransition = .immediate,
+        blurTransition: NagiTabTransition? = nil,
         scaleTransition: NagiTabTransition? = nil,
         isSearchActive: Bool = false
     ) {
+        let resolvedBlurTransition = blurTransition ?? transition
         let resolvedScaleTransition = scaleTransition ?? transition
         let selectedContentScale: CGFloat = selectionGestureState != nil && isLiftedStateEnabled
             ? 1.15
@@ -461,18 +466,20 @@ final class NagiTabBarView: UIView {
             let isSelected = displayedIndex == mainIndex(for: itemView.tab)
             itemView.update(
                 isSelected: isSelected,
-                usesPrivateLens: liquidLensView.usesPrivateLens
+                usesPrivateLens: liquidLensView.usesPrivateLens,
+                isCompact: isSearchActive
             )
             selectedItemView.update(
                 isSelected: isSelected,
-                usesPrivateLens: liquidLensView.usesPrivateLens
+                usesPrivateLens: liquidLensView.usesPrivateLens,
+                isCompact: isSearchActive
             )
 
             let isVisible = !isSearchActive || isSelected
             transition.setAlpha(view: itemView, alpha: isVisible ? 1 : 0)
-            transition.setBlur(layer: itemView.layer, radius: isVisible ? 0 : 10)
             transition.setAlpha(view: selectedItemView, alpha: isVisible ? 1 : 0)
-            transition.setBlur(layer: selectedItemView.layer, radius: isVisible ? 0 : 10)
+            resolvedBlurTransition.setBlur(layer: itemView.layer, radius: isVisible ? 0 : 10)
+            resolvedBlurTransition.setBlur(layer: selectedItemView.layer, radius: isVisible ? 0 : 10)
             resolvedScaleTransition.setScale(
                 view: selectedItemView,
                 scale: selectedContentScale
