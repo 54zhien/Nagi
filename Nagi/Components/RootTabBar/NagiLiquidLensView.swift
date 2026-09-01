@@ -132,7 +132,6 @@ final class NagiLiquidLensView: UIView {
     private var pendingParams: NagiLensParams?
     private var pendingCompletion: ((Bool) -> Void)?
     private var interactiveDisplayLink: CADisplayLink?
-    private var interactiveTargetCenter: CGPoint?
 
     var usesPrivateLens: Bool {
         nativeLensView != nil
@@ -229,49 +228,6 @@ final class NagiLiquidLensView: UIView {
         invoke(PrivateSelector.setOverridePunchoutView, on: nativeLensView, object: punchoutView)
     }
 
-    func beginInteractiveSelection() {
-        guard var params = currentParams, !params.isCollapsed else {
-            return
-        }
-
-        params.isLifted = true
-        currentParams = params
-        restingBackgroundView.alpha = 0
-        let liftedSize = nativeSize(for: params)
-        if let nativeLensView {
-            nativeLensView.bounds = CGRect(origin: .zero, size: liftedSize)
-            nativeLensView.center = CGPoint(
-                x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
-                y: params.selectionOrigin.y + params.selectionSize.height * 0.5
-            )
-            nativeLensView.alpha = 1
-        }
-        setNativeLifted(true, animated: true)
-        startInteractiveDisplayLink()
-    }
-
-    func updateInteractiveSelection(originX: CGFloat, hoveredIndex _: Int) {
-        guard var params = currentParams, !params.isCollapsed else {
-            return
-        }
-
-        params.selectionOrigin.x = originX
-        params.isLifted = true
-        currentParams = params
-
-        let targetCenter = CGPoint(
-            x: originX + params.selectionSize.width * 0.5,
-            y: params.selectionOrigin.y + params.selectionSize.height * 0.5
-        )
-        interactiveTargetCenter = targetCenter
-    }
-
-    func endInteractiveSelection() {
-        interactiveDisplayLink?.invalidate()
-        interactiveDisplayLink = nil
-        interactiveTargetCenter = nil
-    }
-
     func apply(
         params: NagiLensParams,
         transition: NagiTabTransition,
@@ -289,7 +245,9 @@ final class NagiLiquidLensView: UIView {
 
         let previousParams = currentParams
         currentParams = params
+        updateLiftedDisplayLink(isLifted: params.isLifted)
         let oldLifted = previousParams?.isLifted ?? false
+        let privateLiftChanged = nativeLensView != nil && oldLifted != params.isLifted
         let containerSizeChanged = previousParams.map { $0.size != params.size } ?? false
         let shouldClip = !transition.isImmediate && previousParams != nil && containerSizeChanged
         setResizeClipping(shouldClip)
@@ -314,7 +272,8 @@ final class NagiLiquidLensView: UIView {
             self.applyPresentationGeometry(
                 params: params,
                 mainGlassParams: mainGlassParams,
-                transition: transition
+                transition: transition,
+                privateLiftChanged: privateLiftChanged
             )
         }
 
@@ -346,7 +305,8 @@ final class NagiLiquidLensView: UIView {
     private func applyPresentationGeometry(
         params: NagiLensParams,
         mainGlassParams: NagiGlassParams,
-        transition: NagiTabTransition
+        transition: NagiTabTransition,
+        privateLiftChanged: Bool
     ) {
         let containerFrame = CGRect(origin: params.containerOrigin, size: params.size)
         transition.setFrame(view: dedicatedMainGlassContainer, frame: containerFrame)
@@ -400,26 +360,42 @@ final class NagiLiquidLensView: UIView {
                 x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
                 y: params.selectionOrigin.y + params.selectionSize.height * 0.5
             )
-            transition.setBounds(
-                view: nativeLensView,
-                bounds: CGRect(origin: .zero, size: newNativeSize)
+
+            let targetBounds = CGRect(
+                origin: .zero,
+                size: newNativeSize
             )
-            transition.setPosition(view: nativeLensView, position: newCenter)
+            let previousBounds = nativeLensView.bounds
+
+            if privateLiftChanged {
+                // _UILiquidLensView coordinates this bounds change from its
+                // setLifted(_:animated:alongsideAnimations:completion:) path.
+                nativeLensView.bounds = targetBounds
+                transition.setPosition(view: nativeLensView, position: newCenter)
+            } else {
+                // Keep ordinary resize geometry on the model layer and use
+                // Nagram's additive position compensation for width changes.
+                CATransaction.begin()
+                CATransaction.setDisableActions(true)
+                nativeLensView.bounds = targetBounds
+                CATransaction.commit()
+
+                transition.setPosition(view: nativeLensView, position: newCenter)
+
+                if !transition.isImmediate {
+                    let widthDelta = targetBounds.width - previousBounds.width
+                    if abs(widthDelta) > 0.001 {
+                        transition.animatePosition(
+                            layer: nativeLensView.layer,
+                            from: CGPoint(x: widthDelta * 0.5, y: 0),
+                            to: .zero,
+                            additive: true
+                        )
+                    }
+                }
+            }
             transition.setAlpha(view: nativeLensView, alpha: 1)
         }
-    }
-
-    private func nativeSize(for params: NagiLensParams) -> CGSize {
-        let effectiveInset: CGFloat
-        if params.isCollapsed {
-            effectiveInset = 0
-        } else {
-            effectiveInset = params.isLifted ? params.liftedInset : -params.inset
-        }
-        return CGSize(
-            width: max(0, params.selectionSize.width + effectiveInset * 2),
-            height: max(0, params.selectionSize.height + effectiveInset * 2)
-        )
     }
 
     private func setResizeClipping(_ clipped: Bool) {
@@ -427,56 +403,43 @@ final class NagiLiquidLensView: UIView {
         selectedContentView.clipsToBounds = clipped
     }
 
-    private func startInteractiveDisplayLink() {
-        guard interactiveDisplayLink == nil, nativeLensView != nil else {
-            return
-        }
+    private func updateLiftedDisplayLink(isLifted: Bool) {
+        if isLifted {
+            guard interactiveDisplayLink == nil,
+                  nativeLensView != nil else {
+                return
+            }
 
-        let displayLink = CADisplayLink(
-            target: self,
-            selector: #selector(updateInteractivePresentation(_:))
-        )
-        if #available(iOS 15.0, *) {
-            displayLink.preferredFrameRateRange = CAFrameRateRange(
-                minimum: 60,
-                maximum: 120,
-                preferred: 120
+            let displayLink = CADisplayLink(
+                target: self,
+                selector: #selector(updateLiftedLensPresentation(_:))
             )
+            if #available(iOS 15.0, *) {
+                displayLink.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 60,
+                    maximum: 120,
+                    preferred: 120
+                )
+            }
+            displayLink.add(to: .main, forMode: .common)
+            interactiveDisplayLink = displayLink
+        } else {
+            interactiveDisplayLink?.invalidate()
+            interactiveDisplayLink = nil
         }
-        displayLink.add(to: .main, forMode: .common)
-        interactiveDisplayLink = displayLink
     }
 
-    @objc private func updateInteractivePresentation(_ displayLink: CADisplayLink) {
-        guard let interactiveTargetCenter,
+    @objc private func updateLiftedLensPresentation(_ displayLink: CADisplayLink) {
+        guard !isApplyingParams,
+              let params = currentParams,
+              params.isLifted,
               let nativeLensView else {
             return
         }
-        nativeLensView.center = interactiveTargetCenter
-    }
 
-    private func setNativeLifted(_ lifted: Bool, animated: Bool) {
-        guard let nativeLensView,
-              let method = nativeLensView.method(for: PrivateSelector.setLifted) else {
-            return
-        }
-
-        typealias ObjCMethod = @convention(c) (
-            AnyObject,
-            Selector,
-            Bool,
-            Bool,
-            @escaping () -> Void,
-            (() -> Void)?
-        ) -> Void
-        let function = unsafeBitCast(method, to: ObjCMethod.self)
-        function(
-            nativeLensView,
-            PrivateSelector.setLifted,
-            lifted,
-            animated,
-            {},
-            nil
+        nativeLensView.center = CGPoint(
+            x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
+            y: params.selectionOrigin.y + params.selectionSize.height * 0.5
         )
     }
 

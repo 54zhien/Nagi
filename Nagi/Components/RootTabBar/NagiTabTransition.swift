@@ -240,6 +240,37 @@ enum NagiTabTransition {
         )
     }
 
+    func animatePosition(
+        layer: CALayer,
+        from: CGPoint,
+        to: CGPoint,
+        additive: Bool
+    ) {
+        guard !isImmediate else {
+            return
+        }
+
+        let animation = makeAnimation(
+            keyPath: "position",
+            fromValue: NSValue(cgPoint: from),
+            toValue: NSValue(cgPoint: to)
+        )
+
+        if let propertyAnimation = animation as? CAPropertyAnimation {
+            propertyAnimation.isAdditive = additive
+        }
+
+        let animationKey = additive
+            ? "nagi.transition.position.additive"
+            : nagiPositionAnimationKey
+        removeAnimation(from: layer, forKey: animationKey)
+        addAnimation(
+            animation,
+            to: layer,
+            forKey: animationKey
+        )
+    }
+
     func setAlpha(view: UIView, alpha: CGFloat) {
         let layer = view.layer
         let fromOpacity = presentationOpacity(for: layer, animationKey: nagiOpacityAnimationKey)
@@ -486,24 +517,27 @@ enum NagiTabTransition {
     ) -> CAAnimation {
         switch self {
         case let .spring(duration):
-            let animation = CASpringAnimation(keyPath: keyPath)
-            animation.mass = 1.0
-            animation.stiffness = 555.027
-            animation.damping = 47.118
-            animation.initialVelocity = 0.0
+            let animation = CABasicAnimation(keyPath: keyPath)
             animation.fromValue = fromValue
             animation.toValue = toValue
             animation.duration = duration
-            animation.timingFunction = CAMediaTimingFunction(name: .linear)
-            if animation.responds(to: NSSelectorFromString("setAllowsOverdamping:")) {
-                animation.setValue(false, forKey: "allowsOverdamping")
-            }
+            animation.timingFunction = CAMediaTimingFunction(
+                controlPoints: 0.380,
+                0.700,
+                0.125,
+                1.000
+            )
+            animation.isRemovedOnCompletion = true
+            animation.fillMode = .forwards
             if #available(iOS 15.0, *) {
-                animation.preferredFrameRateRange = CAFrameRateRange(
-                    minimum: 80,
-                    maximum: 120,
-                    preferred: 120
-                )
+                let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
+                if maximumFPS > 61.0 {
+                    animation.preferredFrameRateRange = CAFrameRateRange(
+                        minimum: 30.0,
+                        maximum: maximumFPS,
+                        preferred: maximumFPS
+                    )
+                }
             }
             return animation
         default:
@@ -518,8 +552,15 @@ enum NagiTabTransition {
 
     private var timingFunction: CAMediaTimingFunction {
         switch self {
-        case .immediate, .spring:
+        case .immediate:
             return CAMediaTimingFunction(name: .linear)
+        case .spring:
+            return CAMediaTimingFunction(
+                controlPoints: 0.380,
+                0.700,
+                0.125,
+                1.000
+            )
         case .easeInOut:
             return CAMediaTimingFunction(name: .easeInEaseOut)
         case let .keyboard(_, curve):
