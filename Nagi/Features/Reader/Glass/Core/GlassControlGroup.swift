@@ -113,13 +113,13 @@ final class GlassControlGroup<ID: Hashable>: UIView {
                 image: item.image,
                 accessibilityLabel: item.accessibilityLabel,
                 tintColor: item.tintColor,
-                fillColor: item.fillColor,
                 isEnabled: item.isEnabled,
                 reduceMotion: item.reduceMotion,
                 title: item.title,
                 isSelected: item.isSelected,
                 cornerRadius: item.cornerRadius,
-                contentColor: item.contentColor
+                contentColor: item.contentColor,
+                fillColor: item.fillColor
             )
             actionTargets[item.id]?.action = item.action
         }

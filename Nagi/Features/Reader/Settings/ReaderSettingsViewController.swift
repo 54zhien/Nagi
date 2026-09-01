@@ -446,13 +446,13 @@ final class ReaderSettingsViewController: UIViewController {
                 image: nil,
                 accessibilityLabel: "主题预设：\(preset.label)",
                 tintColor: nil,
-                fillColor: background,
                 isEnabled: true,
                 reduceMotion: latestReduceMotion,
                 title: preset.label,
                 isSelected: isSelected,
                 cornerRadius: 18,
-                contentColor: content
+                contentColor: content,
+                fillColor: background
             )
         }
     }

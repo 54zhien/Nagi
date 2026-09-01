@@ -56,7 +56,6 @@ final class GlassControlView: UIControl {
         highlightLayer.opacity = 0
         layer.addSublayer(highlightLayer)
 
-        selectedStrokeLayer.fillColor = UIColor.clear.cgColor
         selectedStrokeLayer.borderWidth = 2
         selectedStrokeLayer.opacity = 0
         layer.addSublayer(selectedStrokeLayer)
