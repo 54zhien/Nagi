@@ -51,7 +51,6 @@ private final class NagiLensRestingBackgroundView: UIVisualEffectView {
         layer.cornerCurve = .continuous
         backgroundColor = reduceTransparency ? .secondarySystemBackground : .clear
         update(isDark: isDark)
-        setNeedsLayout()
     }
 
     func update(isDark: Bool) {
