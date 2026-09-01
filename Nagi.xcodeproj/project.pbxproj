@@ -88,15 +88,6 @@
 		4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000093 /* GlassBackendConfiguration.swift */; };
 		4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */; };
 		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
-		4A0000000000000000000096 /* RootContainerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* RootContainerViewController.swift */; };
-		4A0000000000000000000097 /* RootContainerRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000097 /* RootContainerRepresentable.swift */; };
-		4A0000000000000000000098 /* RootTabState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000098 /* RootTabState.swift */; };
-		4A0000000000000000000099 /* SearchState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000099 /* SearchState.swift */; };
-		4A000000000000000000009A /* NagiBottomBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009A /* NagiBottomBarView.swift */; };
-		4A000000000000000000009B /* NagiBottomBarLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009B /* NagiBottomBarLayout.swift */; };
-		4A000000000000000000009C /* NagiBottomBarGlassView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009C /* NagiBottomBarGlassView.swift */; };
-		4A000000000000000000009D /* NagiSearchContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009D /* NagiSearchContainerView.swift */; };
-		4A000000000000000000009E /* KeyboardTransitionCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009E /* KeyboardTransitionCoordinator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -178,15 +169,6 @@
 		3A0000000000000000000093 /* GlassBackendConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBackendConfiguration.swift; sourceTree = "<group>"; };
 		3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceSignposts.swift; sourceTree = "<group>"; };
 		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
-		3A0000000000000000000096 /* RootContainerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContainerViewController.swift; sourceTree = "<group>"; };
-		3A0000000000000000000097 /* RootContainerRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootContainerRepresentable.swift; sourceTree = "<group>"; };
-		3A0000000000000000000098 /* RootTabState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabState.swift; sourceTree = "<group>"; };
-		3A0000000000000000000099 /* SearchState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchState.swift; sourceTree = "<group>"; };
-		3A000000000000000000009A /* NagiBottomBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiBottomBarView.swift; sourceTree = "<group>"; };
-		3A000000000000000000009B /* NagiBottomBarLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiBottomBarLayout.swift; sourceTree = "<group>"; };
-		3A000000000000000000009C /* NagiBottomBarGlassView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiBottomBarGlassView.swift; sourceTree = "<group>"; };
-		3A000000000000000000009D /* NagiSearchContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiSearchContainerView.swift; sourceTree = "<group>"; };
-		3A000000000000000000009E /* KeyboardTransitionCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardTransitionCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -216,7 +198,6 @@
 			isa = PBXGroup;
 			children = (
 				2A0000000000000000000003 /* App */,
-				2A0000000000000000000021 /* Components */,
 				2A0000000000000000000004 /* Views */,
 				2A0000000000000000000014 /* Resources */,
 				3A0000000000000000000006 /* Assets.xcassets */,
@@ -236,40 +217,8 @@
 			children = (
 				3A0000000000000000000001 /* NagiApp.swift */,
 				3A000000000000000000002D /* AppImportState.swift */,
-				2A0000000000000000000020 /* Root */,
 			);
 			path = App;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000020 /* Root */ = {
-			isa = PBXGroup;
-			children = (
-				3A0000000000000000000096 /* RootContainerViewController.swift */,
-				3A0000000000000000000097 /* RootContainerRepresentable.swift */,
-				3A0000000000000000000098 /* RootTabState.swift */,
-				3A0000000000000000000099 /* SearchState.swift */,
-			);
-			path = Root;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000021 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				2A0000000000000000000022 /* BottomBar */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000022 /* BottomBar */ = {
-			isa = PBXGroup;
-			children = (
-				3A000000000000000000009A /* NagiBottomBarView.swift */,
-				3A000000000000000000009B /* NagiBottomBarLayout.swift */,
-				3A000000000000000000009C /* NagiBottomBarGlassView.swift */,
-				3A000000000000000000009D /* NagiSearchContainerView.swift */,
-				3A000000000000000000009E /* KeyboardTransitionCoordinator.swift */,
-			);
-			path = BottomBar;
 			sourceTree = "<group>";
 		};
 		2A0000000000000000000004 /* Views */ = {
@@ -760,15 +709,6 @@
 				4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */,
 				4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */,
 				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
-				4A0000000000000000000096 /* RootContainerViewController.swift in Sources */,
-				4A0000000000000000000097 /* RootContainerRepresentable.swift in Sources */,
-				4A0000000000000000000098 /* RootTabState.swift in Sources */,
-				4A0000000000000000000099 /* SearchState.swift in Sources */,
-				4A000000000000000000009A /* NagiBottomBarView.swift in Sources */,
-				4A000000000000000000009B /* NagiBottomBarLayout.swift in Sources */,
-				4A000000000000000000009C /* NagiBottomBarGlassView.swift in Sources */,
-				4A000000000000000000009D /* NagiSearchContainerView.swift in Sources */,
-				4A000000000000000000009E /* KeyboardTransitionCoordinator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -862,7 +802,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 107;
+			CURRENT_PROJECT_VERSION = 108;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -871,7 +811,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.35.0;
+			MARKETING_VERSION = 0.35.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -888,7 +828,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 107;
+			CURRENT_PROJECT_VERSION = 108;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -897,7 +837,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.35.0;
+			MARKETING_VERSION = 0.35.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

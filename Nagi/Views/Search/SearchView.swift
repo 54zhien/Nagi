@@ -10,8 +10,10 @@ import SwiftData
 
 struct SearchView: View {
     @Query(sort: \Book.title) private var books: [Book]
-    let state: SearchState
+    @Binding var searchText: String
     @State private var selectedBook: Book?
+    @State private var effectiveQuery = ""
+    @State private var queryTask: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -27,6 +29,13 @@ struct SearchView: View {
             if let selectedBook {
                 ReaderView(book: selectedBook)
             }
+        }
+        .onChange(of: searchText, initial: true) { _, newValue in
+            scheduleQueryUpdate(for: newValue)
+        }
+        .onDisappear {
+            queryTask?.cancel()
+            queryTask = nil
         }
     }
 
@@ -44,7 +53,7 @@ struct SearchView: View {
                 ContentUnavailableView {
                     searchUnavailableLabel("未找到书籍")
                 } description: {
-                    Text("没有找到书名中包含“\(state.query)”的书籍")
+                    Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
                     searchHeader
@@ -89,7 +98,7 @@ struct SearchView: View {
     }
 
     private var searchTerms: [String] {
-        state.query
+        effectiveQuery
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
     }
@@ -107,9 +116,30 @@ struct SearchView: View {
             }
         }
     }
+
+    private func scheduleQueryUpdate(for query: String) {
+        queryTask?.cancel()
+
+        guard !query.isEmpty else {
+            queryTask = nil
+            effectiveQuery = ""
+            return
+        }
+
+        queryTask = Task { @MainActor in
+            do {
+                try await Task.sleep(for: .milliseconds(120))
+            } catch {
+                return
+            }
+
+            guard !Task.isCancelled else { return }
+            effectiveQuery = query
+        }
+    }
 }
 
 #Preview {
-    SearchView(state: SearchState())
+    SearchView(searchText: .constant(""))
         .modelContainer(Persistence.container)
 }
