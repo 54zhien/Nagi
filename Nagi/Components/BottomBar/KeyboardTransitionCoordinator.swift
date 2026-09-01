@@ -47,8 +47,8 @@ final class KeyboardTransitionCoordinator {
     private func handle(_ notification: Notification) {
         guard let owner else { return }
 
-        let endFrame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)
-            ?.cgRectValue ?? .null
+        let endFrame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
+            ?? .null
         let duration = (notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? NSNumber)
             .map { $0.doubleValue } ?? 0.25
         let curveRawValue = (notification.userInfo?[UIResponder.keyboardAnimationCurveUserInfoKey] as? NSNumber)
