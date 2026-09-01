@@ -19,6 +19,15 @@ struct NagiSearchParams: Equatable {
 }
 
 final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureRecognizerDelegate {
+    private static let normalSearchSymbolConfiguration = UIImage.SymbolConfiguration(
+        pointSize: 22,
+        weight: .medium
+    )
+    private static let activeSearchSymbolConfiguration = UIImage.SymbolConfiguration(
+        pointSize: 20,
+        weight: .regular
+    )
+
     private let backgroundView: NagiGlassBackgroundView
     private let closeBackgroundView: NagiGlassBackgroundView
     private let iconView: UIImageView
@@ -53,14 +62,14 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         addSubview(backgroundView)
         addSubview(closeBackgroundView)
 
-        iconView.tintColor = .secondaryLabel
-        iconView.contentMode = .scaleAspectFit
-        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 18, weight: .regular)
+        iconView.tintColor = nagiAccentColor.withAlphaComponent(0.65)
+        iconView.contentMode = .center
+        iconView.preferredSymbolConfiguration = Self.normalSearchSymbolConfiguration
         iconView.isUserInteractionEnabled = false
         backgroundView.contentView.addSubview(iconView)
 
         placeholderLabel.text = "搜索书名"
-        placeholderLabel.textColor = .secondaryLabel
+        placeholderLabel.textColor = nagiAccentColor.withAlphaComponent(0.65)
         placeholderLabel.font = .preferredFont(forTextStyle: .body)
         placeholderLabel.adjustsFontForContentSizeCategory = true
         placeholderLabel.isUserInteractionEnabled = false
@@ -71,8 +80,8 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         textField.borderStyle = .none
         textField.clearButtonMode = .never
         textField.font = .preferredFont(forTextStyle: .body)
-        textField.textColor = .label
-        textField.tintColor = .tintColor
+        textField.textColor = nagiAccentColor
+        textField.tintColor = nagiAccentColor
         textField.returnKeyType = .search
         textField.autocorrectionType = .no
         textField.adjustsFontForContentSizeCategory = true
@@ -81,13 +90,13 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         backgroundView.contentView.addSubview(textField)
 
         clearButton.setImage(UIImage(systemName: "xmark.circle.fill"), for: .normal)
-        clearButton.tintColor = .secondaryLabel
+        clearButton.tintColor = nagiAccentColor.withAlphaComponent(0.75)
         clearButton.accessibilityLabel = "清除搜索"
         clearButton.addTarget(self, action: #selector(clearQuery), for: .primaryActionTriggered)
         backgroundView.contentView.addSubview(clearButton)
 
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
-        closeButton.tintColor = .secondaryLabel
+        closeButton.tintColor = nagiAccentColor.withAlphaComponent(0.75)
         closeButton.accessibilityLabel = "关闭搜索"
         closeButton.addTarget(self, action: #selector(cancelSearch), for: .primaryActionTriggered)
         closeBackgroundView.contentView.addSubview(closeButton)
@@ -142,7 +151,11 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         let closeRadius = min(closeSize.width, closeSize.height) * 0.5
 
         backgroundView.frame = params.backgroundFrame
-        closeBackgroundView.frame = params.closeFrame
+        closeBackgroundView.bounds = CGRect(origin: .zero, size: closeSize)
+        closeBackgroundView.center = CGPoint(
+            x: params.closeFrame.midX,
+            y: params.closeFrame.midY
+        )
         backgroundView.applyGeometry(params: NagiGlassParams(
             size: backgroundSize,
             cornerRadius: backgroundRadius,
@@ -193,11 +206,15 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         let closeBounds = closeBackgroundView.bounds
         let active = params.isActive
 
-        let iconSize: CGFloat = active ? 20 : 24
+        let iconSize: CGFloat = active ? 20 : 22
         let iconX = active ? 12 : backgroundBounds.midX - iconSize * 0.5
         let iconY = backgroundBounds.midY - iconSize * 0.5
+        iconView.preferredSymbolConfiguration = active
+            ? Self.activeSearchSymbolConfiguration
+            : Self.normalSearchSymbolConfiguration
         iconView.frame = CGRect(x: iconX, y: iconY, width: iconSize, height: iconSize)
-        iconView.alpha = active ? 1 : 0.9
+        iconView.tintColor = nagiAccentColor.withAlphaComponent(active ? 1 : 0.65)
+        iconView.alpha = 1
 
         let fieldLeading: CGFloat = active ? 40 : 0
         let trailingControls: CGFloat = active ? 48 : 0
@@ -244,6 +261,10 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         isDark
             ? UIColor.white.withAlphaComponent(0.025)
             : UIColor.white.withAlphaComponent(0.1)
+    }
+
+    private var nagiAccentColor: UIColor {
+        UIColor(named: "AccentColor") ?? .tintColor
     }
 
     private func updatePlaceholderVisibility() {

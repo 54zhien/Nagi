@@ -102,6 +102,7 @@
 		4A00000000000000000000AA /* NagiLiquidLensView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AA /* NagiLiquidLensView.swift */; };
 		4A00000000000000000000AB /* NagiTabTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AB /* NagiTabTransition.swift */; };
 		4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AC /* NagiTabBarMetrics.swift */; };
+		4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -197,6 +198,7 @@
 		3A00000000000000000000AA /* NagiLiquidLensView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiLiquidLensView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AB /* NagiTabTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabTransition.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AC /* NagiTabBarMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarMetrics.swift; sourceTree = "<group>"; };
+		3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabSelectionRecognizer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -282,6 +284,7 @@
 				3A00000000000000000000AA /* NagiLiquidLensView.swift */,
 				3A00000000000000000000AB /* NagiTabTransition.swift */,
 				3A00000000000000000000AC /* NagiTabBarMetrics.swift */,
+				3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */,
 			);
 			path = RootTabBar;
 			sourceTree = "<group>";
@@ -789,6 +792,7 @@
 				4A00000000000000000000AA /* NagiLiquidLensView.swift in Sources */,
 				4A00000000000000000000AB /* NagiTabTransition.swift in Sources */,
 				4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */,
+				4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -882,7 +886,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 118;
+			CURRENT_PROJECT_VERSION = 119;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -891,7 +895,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.36.1;
+			MARKETING_VERSION = 0.36.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -908,7 +912,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 118;
+			CURRENT_PROJECT_VERSION = 119;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -917,7 +921,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.36.1;
+			MARKETING_VERSION = 0.36.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

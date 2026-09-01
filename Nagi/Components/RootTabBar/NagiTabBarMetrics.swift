@@ -33,7 +33,8 @@ enum NagiTabBarMetrics {
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
     static let horizontalMargin: CGFloat = 16
-    static let keyboardLift: CGFloat = 8
+    static let normalBottomSpacing: CGFloat = 4
+    static let keyboardSpacing: CGFloat = 8
 
     static func calculateLayout(
         bounds: CGRect,
@@ -68,9 +69,9 @@ enum NagiTabBarMetrics {
 
         let bottomY: CGFloat
         if let keyboardTop, state.isSearchVisible, keyboardOverlap > 0 {
-            bottomY = keyboardTop - keyboardLift
+            bottomY = keyboardTop - keyboardSpacing
         } else {
-            bottomY = bounds.maxY - max(safeAreaInsets.bottom + keyboardLift, keyboardLift)
+            bottomY = bounds.maxY - safeAreaInsets.bottom - normalBottomSpacing
         }
 
         let normalBarWidth = max(0, bounds.width - horizontalMargin * 2)

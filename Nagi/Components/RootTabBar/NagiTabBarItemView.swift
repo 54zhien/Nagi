@@ -15,7 +15,11 @@ final class NagiTabBarItemView: UIView {
     private let isInteractive: Bool
 
     var onActivate: (() -> Void)?
-    var onPressChanged: ((Bool) -> Void)?
+
+    private static let tabSymbolConfiguration = UIImage.SymbolConfiguration(
+        pointSize: 22,
+        weight: .medium
+    )
 
     init(tab: AppTab, isInteractive: Bool = true) {
         self.tab = tab
@@ -30,26 +34,20 @@ final class NagiTabBarItemView: UIView {
         button.isAccessibilityElement = isInteractive
         if isInteractive {
             button.addTarget(self, action: #selector(activate), for: .primaryActionTriggered)
-            button.addTarget(self, action: #selector(pressBegan), for: .touchDown)
-            button.addTarget(
-                self,
-                action: #selector(pressEnded),
-                for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit]
-            )
         }
         button.accessibilityTraits = isInteractive ? [.button] : []
         button.contentHorizontalAlignment = .center
         button.contentVerticalAlignment = .center
 
         iconView.isUserInteractionEnabled = false
-        iconView.contentMode = .scaleAspectFit
+        iconView.contentMode = .center
         button.addSubview(iconView)
         button.imageView?.isHidden = true
 
         switch tab {
         case .home:
             button.accessibilityLabel = "主页"
-            iconView.image = UIImage(named: "homeIcon") ?? UIImage(systemName: "house")
+            iconView.image = UIImage(systemName: "apple.books")
         case .library:
             button.accessibilityLabel = "书库"
             iconView.image = UIImage(systemName: "books.vertical")
@@ -61,7 +59,7 @@ final class NagiTabBarItemView: UIView {
             iconView.image = UIImage(systemName: "magnifyingglass")
         }
 
-        iconView.preferredSymbolConfiguration = UIImage.SymbolConfiguration(pointSize: 21, weight: .medium)
+        iconView.preferredSymbolConfiguration = Self.tabSymbolConfiguration
         update(isSelected: false)
     }
 
@@ -72,17 +70,13 @@ final class NagiTabBarItemView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         button.frame = bounds
-        iconView.frame = CGRect(
-            x: bounds.midX - 12,
-            y: bounds.midY - 12,
-            width: 24,
-            height: 24
-        )
+        iconView.frame = bounds
     }
 
     func update(isSelected: Bool, showsSelectedAppearance: Bool? = nil) {
         let isVisuallySelected = showsSelectedAppearance ?? isSelected
-        iconView.tintColor = isVisuallySelected ? .label : .secondaryLabel
+        let alpha: CGFloat = isVisuallySelected ? 1 : 0.55
+        iconView.tintColor = nagiAccentColor.withAlphaComponent(alpha)
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
     }
@@ -91,11 +85,7 @@ final class NagiTabBarItemView: UIView {
         onActivate?()
     }
 
-    @objc private func pressBegan() {
-        onPressChanged?(true)
-    }
-
-    @objc private func pressEnded() {
-        onPressChanged?(false)
+    private var nagiAccentColor: UIColor {
+        UIColor(named: "AccentColor") ?? .tintColor
     }
 }
