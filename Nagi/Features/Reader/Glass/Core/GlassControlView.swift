@@ -11,9 +11,12 @@ import UIKit
 @MainActor
 final class GlassControlView: UIControl {
     private let surfaceView: GlassSurfaceView
+    private let fillView = UIView()
     private let iconView = UIImageView()
     private let titleLabel = UILabel()
+    private let menuButton = UIButton(type: .system)
     private let highlightLayer = CAGradientLayer()
+    private let selectedStrokeLayer = CALayer()
     private let touchDriver = GlassTouchDriver()
 
     private var currentState: GlassState?
@@ -34,6 +37,11 @@ final class GlassControlView: UIControl {
         backgroundColor = .clear
         clipsToBounds = false
 
+        fillView.isUserInteractionEnabled = false
+        fillView.isOpaque = false
+        fillView.isHidden = true
+        addSubview(fillView)
+
         surfaceView.isUserInteractionEnabled = false
         addSubview(surfaceView)
 
@@ -48,6 +56,11 @@ final class GlassControlView: UIControl {
         highlightLayer.opacity = 0
         layer.addSublayer(highlightLayer)
 
+        selectedStrokeLayer.fillColor = UIColor.clear.cgColor
+        selectedStrokeLayer.borderWidth = 2
+        selectedStrokeLayer.opacity = 0
+        layer.addSublayer(selectedStrokeLayer)
+
         iconView.contentMode = .center
         iconView.isUserInteractionEnabled = false
         iconView.accessibilityElementsHidden = true
@@ -60,6 +73,13 @@ final class GlassControlView: UIControl {
         titleLabel.isUserInteractionEnabled = false
         titleLabel.accessibilityElementsHidden = true
         addSubview(titleLabel)
+
+        menuButton.backgroundColor = .clear
+        menuButton.isHidden = true
+        menuButton.isUserInteractionEnabled = false
+        menuButton.isAccessibilityElement = false
+        menuButton.accessibilityElementsHidden = true
+        addSubview(menuButton)
     }
 
     @available(*, unavailable)
@@ -76,7 +96,8 @@ final class GlassControlView: UIControl {
         title: String? = nil,
         isSelected: Bool = false,
         cornerRadius: CGFloat? = nil,
-        contentColor: UIColor? = nil
+        contentColor: UIColor? = nil,
+        fillColor: UIColor? = nil
     ) {
         let imageChanged: Bool
         if let currentImage = iconView.image {
@@ -94,6 +115,8 @@ final class GlassControlView: UIControl {
         titleLabel.isHidden = title == nil
         titleLabel.textColor = contentColor ?? tintColor ?? .label
         titleLabel.font = .preferredFont(forTextStyle: title == nil ? .body : .subheadline)
+        fillView.backgroundColor = fillColor
+        fillView.isHidden = fillColor == nil
         preferredCornerRadius = cornerRadius
         if self.accessibilityLabel != accessibilityLabel {
             self.accessibilityLabel = accessibilityLabel
@@ -126,6 +149,28 @@ final class GlassControlView: UIControl {
             surfaceView.update(state)
             currentState = state
         }
+
+        selectedStrokeLayer.borderColor = (contentColor ?? tintColor ?? .label)
+            .withAlphaComponent(0.84)
+            .cgColor
+        selectedStrokeLayer.opacity = isSelected ? 1 : 0
+        setNeedsLayout()
+    }
+
+    /// Uses UIButton's public UIMenu support while keeping this view's
+    /// existing persistent GlassControlView surface and accessibility label.
+    func setPrimaryMenu(_ menu: UIMenu?) {
+        menuButton.menu = menu
+        menuButton.showsMenuAsPrimaryAction = menu != nil
+        menuButton.isUserInteractionEnabled = menu != nil
+        menuButton.isHidden = menu == nil
+        menuButton.isAccessibilityElement = menu != nil
+        menuButton.accessibilityElementsHidden = menu == nil
+        menuButton.accessibilityLabel = accessibilityLabel
+        menuButton.accessibilityValue = accessibilityValue
+        menuButton.accessibilityTraits = accessibilityTraits
+        isAccessibilityElement = menu == nil
+        setNeedsLayout()
     }
 
     private var resolvedCornerRadius: CGFloat {
@@ -254,13 +299,18 @@ final class GlassControlView: UIControl {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        fillView.frame = bounds
         surfaceView.frame = bounds
         iconView.frame = bounds
 
         let radius = resolvedCornerRadius
+        fillView.layer.cornerRadius = radius
+        fillView.layer.cornerCurve = .continuous
         surfaceView.setCornerRadius(radius)
         highlightLayer.frame = bounds
         highlightLayer.cornerRadius = radius
+        selectedStrokeLayer.frame = bounds.insetBy(dx: 1, dy: 1)
+        selectedStrokeLayer.cornerRadius = max(0, radius - 1)
 
         if !iconView.isHidden, !titleLabel.isHidden {
             let iconWidth: CGFloat = 22
@@ -282,5 +332,7 @@ final class GlassControlView: UIControl {
             iconView.frame = bounds
             titleLabel.frame = .zero
         }
+
+        menuButton.frame = bounds
     }
 }

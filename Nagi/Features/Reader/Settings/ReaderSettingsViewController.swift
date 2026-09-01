@@ -4,15 +4,13 @@
 //
 //  UIKit implementation of the reader's medium settings surface.  SwiftUI
 //  continues to own sheet presentation and the custom editor; this controller
-//  owns the persistent controls and the scrollable settings layout.
+//  owns the persistent controls and the fixed medium-sheet layout.
 //
 
 import SwiftUI
 import UIKit
 
 private enum ReaderSettingsControlID: Hashable {
-    case fontSmaller
-    case fontLarger
     case transition
     case appearance
     case original
@@ -50,9 +48,10 @@ final class ReaderSettingsViewController: UIViewController {
     var onBeforeMutation: ((ReaderVisualMutationKind) -> Void)?
     var onSystemBrightnessChanged: ((Double) -> Void)?
 
-    private let scrollView = UIScrollView()
     private let contentView = UIView()
-    private let topControlGroup = GlassControlGroup<ReaderSettingsControlID>(spacing: 2)
+    private let fontSizeStepperControl = ReaderFontSizeStepperControl()
+    private let transitionControl = GlassControlView()
+    private let appearanceControl = GlassControlView()
     private let presetControlGroup = GlassControlGroup<ReaderSettingsControlID>(spacing: 10)
     private let customControl = GlassControlView()
     private let brightnessSlider = UISlider()
@@ -93,21 +92,18 @@ final class ReaderSettingsViewController: UIViewController {
         super.viewDidLoad()
 
         view.backgroundColor = .clear
-        scrollView.backgroundColor = .clear
-        scrollView.showsVerticalScrollIndicator = false
-        scrollView.alwaysBounceVertical = true
-        scrollView.contentInsetAdjustmentBehavior = .never
-        view.addSubview(scrollView)
 
         contentView.backgroundColor = .clear
         contentView.isOpaque = false
-        scrollView.addSubview(contentView)
+        view.addSubview(contentView)
 
         indicatorView.alpha = 0
         indicatorView.isUserInteractionEnabled = false
         indicatorView.accessibilityElementsHidden = true
 
-        contentView.addSubview(topControlGroup)
+        contentView.addSubview(fontSizeStepperControl)
+        contentView.addSubview(transitionControl)
+        contentView.addSubview(appearanceControl)
         contentView.addSubview(indicatorView)
         contentView.addSubview(minimumBrightnessImageView)
         contentView.addSubview(brightnessSlider)
@@ -198,134 +194,129 @@ final class ReaderSettingsViewController: UIViewController {
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
 
-        scrollView.frame = view.bounds
-        let width = max(0, view.bounds.width - 36)
-        let horizontalInset: CGFloat = 18
-        let topHeight: CGFloat = 44
-        let topFrame = CGRect(x: horizontalInset, y: 8, width: width, height: topHeight)
-        topControlGroup.frame = topFrame
-
+        contentView.frame = view.bounds
+        let width = max(0, view.bounds.width - Layout.horizontalInset * 2)
         let fontGroupWidth = max(0, width - 116)
-        let fontItemWidth = max(0, fontGroupWidth / 2)
-        topControlGroup.setItemFrames([
-            .fontSmaller: CGRect(x: 0, y: 0, width: fontItemWidth, height: topHeight),
-            .fontLarger: CGRect(
-                x: fontItemWidth,
-                y: 0,
-                width: max(0, fontGroupWidth - fontItemWidth),
-                height: topHeight
-            ),
-            .transition: CGRect(x: fontGroupWidth + 10, y: 0, width: 48, height: topHeight),
-            .appearance: CGRect(x: fontGroupWidth + 68, y: 0, width: 48, height: topHeight)
-        ])
+        let topY = Layout.topY
+        let topHeight = Layout.topHeight
 
-        let indicatorY: CGFloat = 58
+        fontSizeStepperControl.frame = CGRect(
+            x: Layout.horizontalInset,
+            y: topY,
+            width: fontGroupWidth,
+            height: topHeight
+        )
+        transitionControl.frame = CGRect(
+            x: Layout.horizontalInset + fontGroupWidth + 10,
+            y: topY,
+            width: 48,
+            height: topHeight
+        )
+        appearanceControl.frame = CGRect(
+            x: Layout.horizontalInset + fontGroupWidth + 68,
+            y: topY,
+            width: 48,
+            height: topHeight
+        )
+
         indicatorView.frame = CGRect(
-            x: horizontalInset,
-            y: indicatorY,
+            x: Layout.horizontalInset,
+            y: Layout.indicatorY,
             width: fontGroupWidth,
             height: 8
         )
         layoutIndicatorDots()
 
-        let brightnessY: CGFloat = 84
-        let brightnessHeight: CGFloat = 44
         minimumBrightnessImageView.frame = CGRect(
-            x: horizontalInset + 4,
-            y: brightnessY,
+            x: Layout.horizontalInset + 4,
+            y: Layout.brightnessY,
             width: 20,
-            height: brightnessHeight
+            height: Layout.brightnessHeight
         )
         maximumBrightnessImageView.frame = CGRect(
-            x: horizontalInset + width - 24,
-            y: brightnessY,
+            x: Layout.horizontalInset + width - 24,
+            y: Layout.brightnessY,
             width: 20,
-            height: brightnessHeight
+            height: Layout.brightnessHeight
         )
         brightnessSlider.frame = CGRect(
-            x: horizontalInset + 36,
-            y: brightnessY,
+            x: Layout.horizontalInset + 36,
+            y: Layout.brightnessY,
             width: max(0, width - 72),
-            height: brightnessHeight
+            height: Layout.brightnessHeight
         )
 
-        let presetY: CGFloat = 142
-        let presetHeight: CGFloat = 208
         presetControlGroup.frame = CGRect(
-            x: horizontalInset,
-            y: presetY,
+            x: Layout.horizontalInset,
+            y: Layout.presetY,
             width: width,
-            height: presetHeight
+            height: Layout.presetHeight
         )
         let presetWidth = max(0, (width - 20) / 3)
         presetControlGroup.setItemFrames([
-            .original: CGRect(x: 0, y: 0, width: presetWidth, height: presetHeight),
+            .original: CGRect(x: 0, y: 0, width: presetWidth, height: Layout.presetHeight),
             .quiet: CGRect(
                 x: presetWidth + 10,
                 y: 0,
                 width: presetWidth,
-                height: presetHeight
+                height: Layout.presetHeight
             ),
             .paper: CGRect(
                 x: (presetWidth + 10) * 2,
                 y: 0,
                 width: presetWidth,
-                height: presetHeight
+                height: Layout.presetHeight
             )
         ])
 
         customControl.frame = CGRect(
-            x: horizontalInset,
-            y: 368,
+            x: Layout.horizontalInset,
+            y: Layout.customY,
             width: width,
-            height: 48
+            height: Layout.customHeight
         )
+    }
 
-        let contentHeight: CGFloat = 438
-        contentView.frame = CGRect(x: 0, y: 0, width: view.bounds.width, height: contentHeight)
-        scrollView.contentSize = contentView.bounds.size
+    private enum Layout {
+        static let horizontalInset: CGFloat = 18
+        static let topY: CGFloat = 8
+        static let topHeight: CGFloat = 44
+        static let indicatorY: CGFloat = 58
+        static let brightnessY: CGFloat = 84
+        static let brightnessHeight: CGFloat = 44
+        static let presetY: CGFloat = 142
+        static let presetHeight: CGFloat = 208
+        static let customY: CGFloat = 368
+        static let customHeight: CGFloat = 48
+    }
+
+    private enum IconMetrics {
+        static let fontSmaller: CGFloat = 18
+        static let fontLarger: CGFloat = 27
+        static let topTransition: CGFloat = 23
+        static let topAppearance: CGFloat = 23
+        static let menuTransition: CGFloat = 20
+        static let menuAppearance: CGFloat = 20
     }
 
     private var accentColor: UIColor {
         UIColor(named: "AccentColor") ?? .systemBlue
     }
 
-    private var symbolConfiguration: UIImage.SymbolConfiguration {
-        UIImage.SymbolConfiguration(pointSize: 24, weight: .regular)
+    private func symbolConfiguration(pointSize: CGFloat) -> UIImage.SymbolConfiguration {
+        UIImage.SymbolConfiguration(pointSize: pointSize, weight: .regular)
     }
 
     private func configurePersistentControls() {
-        topControlGroup.update(items: [
-            .init(
-                id: .fontSmaller,
-                image: nil,
-                accessibilityLabel: "字号小",
-                tintColor: accentColor,
-                action: { [weak self] in self?.adjustFontSize(by: -1) }
-            ),
-            .init(
-                id: .fontLarger,
-                image: nil,
-                accessibilityLabel: "字号大",
-                tintColor: accentColor,
-                action: { [weak self] in self?.adjustFontSize(by: 1) }
-            ),
-            .init(
-                id: .transition,
-                image: nil,
-                accessibilityLabel: "翻页方式",
-                tintColor: .label,
-                action: { [weak self] in self?.presentTransitionMenu() }
-            ),
-            .init(
-                id: .appearance,
-                image: nil,
-                accessibilityLabel: "外观模式",
-                tintColor: .label,
-                action: { [weak self] in self?.presentAppearanceMenu() }
-            )
-        ])
-        topControlGroup.accessibilityLabel = "字号、翻页和外观"
+        fontSizeStepperControl.onDecrease = { [weak self] in
+            self?.adjustFontSize(by: -1)
+        }
+        fontSizeStepperControl.onIncrease = { [weak self] in
+            self?.adjustFontSize(by: 1)
+        }
+
+        transitionControl.accessibilityLabel = "翻页方式"
+        appearanceControl.accessibilityLabel = "外观模式"
 
         presetControlGroup.update(items: ReaderThemePreset.allCases.map { preset in
             .init(
@@ -357,22 +348,14 @@ final class ReaderSettingsViewController: UIViewController {
         let largerIndex = min(ReaderFontSize.indicatorCount - 1, currentFontIndex + 1)
         let accessibilityValue = "当前字号 \(Int(latestPreferences.fontSize.rounded())) 磅"
 
-        topControlGroup.control(for: .fontSmaller)?.update(
-            image: UIImage(named: "readerFontSizeSmaller")?.withRenderingMode(.alwaysTemplate),
-            accessibilityLabel: "字号小",
+        fontSizeStepperControl.update(
+            isSmallerEnabled: smallerIndex != currentFontIndex,
+            isLargerEnabled: largerIndex != currentFontIndex,
+            smallerPointSize: IconMetrics.fontSmaller,
+            largerPointSize: IconMetrics.fontLarger,
             tintColor: accentColor,
-            isEnabled: smallerIndex != currentFontIndex,
-            reduceMotion: latestReduceMotion
+            accessibilityValue: accessibilityValue
         )
-        topControlGroup.control(for: .fontLarger)?.update(
-            image: UIImage(named: "readerFontSizeLarger")?.withRenderingMode(.alwaysTemplate),
-            accessibilityLabel: "字号大",
-            tintColor: accentColor,
-            isEnabled: largerIndex != currentFontIndex,
-            reduceMotion: latestReduceMotion
-        )
-        topControlGroup.control(for: .fontSmaller)?.accessibilityValue = accessibilityValue
-        topControlGroup.control(for: .fontLarger)?.accessibilityValue = accessibilityValue
 
         for (index, dot) in indicatorDots.enumerated() {
             dot.backgroundColor = index <= currentFontIndex
@@ -383,32 +366,70 @@ final class ReaderSettingsViewController: UIViewController {
 
     private func updateTransitionControl() {
         let transition = latestPreferences.pageTransition
-        topControlGroup.control(for: .transition)?.update(
+        transitionControl.update(
             image: UIImage(
                 systemName: transition.systemImage,
-                withConfiguration: symbolConfiguration
+                withConfiguration: symbolConfiguration(
+                    pointSize: IconMetrics.topTransition
+                )
             ),
             accessibilityLabel: "翻页方式",
             tintColor: .label,
             isEnabled: true,
             reduceMotion: latestReduceMotion
         )
-        topControlGroup.control(for: .transition)?.accessibilityValue = transition.label
+        transitionControl.accessibilityValue = transition.label
+        transitionControl.setPrimaryMenu(UIMenu(
+            title: "翻页方式",
+            children: ReaderPageTransition.allCases.map { option in
+                UIAction(
+                    title: option.label,
+                    image: UIImage(
+                        systemName: option.systemImage,
+                        withConfiguration: symbolConfiguration(
+                            pointSize: IconMetrics.menuTransition
+                        )
+                    ),
+                    state: option == transition ? .on : .off
+                ) { [weak self] _ in
+                    self?.select(transition: option)
+                }
+            }
+        ))
     }
 
     private func updateAppearanceControl() {
         let appearance = latestPreferences.appearanceMode
-        topControlGroup.control(for: .appearance)?.update(
+        appearanceControl.update(
             image: UIImage(
                 systemName: appearance.systemImage,
-                withConfiguration: symbolConfiguration
+                withConfiguration: symbolConfiguration(
+                    pointSize: IconMetrics.topAppearance
+                )
             ),
             accessibilityLabel: "外观模式",
             tintColor: .label,
             isEnabled: true,
             reduceMotion: latestReduceMotion
         )
-        topControlGroup.control(for: .appearance)?.accessibilityValue = appearance.label
+        appearanceControl.accessibilityValue = appearance.label
+        appearanceControl.setPrimaryMenu(UIMenu(
+            title: "外观模式",
+            children: ReaderAppearanceMode.allCases.map { option in
+                UIAction(
+                    title: option.label,
+                    image: UIImage(
+                        systemName: option.systemImage,
+                        withConfiguration: symbolConfiguration(
+                            pointSize: IconMetrics.menuAppearance
+                        )
+                    ),
+                    state: option == appearance ? .on : .off
+                ) { [weak self] _ in
+                    self?.select(appearance: option)
+                }
+            }
+        ))
     }
 
     private func updateThemeControls() {
@@ -424,7 +445,8 @@ final class ReaderSettingsViewController: UIViewController {
             presetControlGroup.control(for: controlID(for: preset))?.update(
                 image: nil,
                 accessibilityLabel: "主题预设：\(preset.label)",
-                tintColor: background,
+                tintColor: nil,
+                fillColor: background,
                 isEnabled: true,
                 reduceMotion: latestReduceMotion,
                 title: preset.label,
@@ -498,47 +520,6 @@ final class ReaderSettingsViewController: UIViewController {
     private func select(preset: ReaderThemePreset) {
         guard model.preferences.themePreset != preset else { return }
         enqueueMutation(.preset(preset))
-    }
-
-    private func presentTransitionMenu() {
-        guard let source = topControlGroup.control(for: .transition) else { return }
-        let alert = UIAlertController(title: "翻页方式", message: nil, preferredStyle: .actionSheet)
-        for transition in ReaderPageTransition.allCases {
-            let action = UIAlertAction(
-                title: transition.label,
-                style: .default
-            ) { [weak self] _ in
-                self?.select(transition: transition)
-            }
-            alert.addAction(action)
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        configurePopover(alert, sourceView: source)
-        present(alert, animated: !latestReduceMotion)
-    }
-
-    private func presentAppearanceMenu() {
-        guard let source = topControlGroup.control(for: .appearance) else { return }
-        let alert = UIAlertController(title: "外观模式", message: nil, preferredStyle: .actionSheet)
-        for appearance in ReaderAppearanceMode.allCases {
-            let action = UIAlertAction(
-                title: appearance.label,
-                style: .default
-            ) { [weak self] _ in
-                self?.select(appearance: appearance)
-            }
-            alert.addAction(action)
-        }
-        alert.addAction(UIAlertAction(title: "取消", style: .cancel))
-        configurePopover(alert, sourceView: source)
-        present(alert, animated: !latestReduceMotion)
-    }
-
-    private func configurePopover(_ alert: UIAlertController, sourceView: UIView) {
-        guard let popover = alert.popoverPresentationController else { return }
-        popover.sourceView = sourceView
-        popover.sourceRect = sourceView.bounds
-        popover.permittedArrowDirections = [.up, .down]
     }
 
     private func select(transition: ReaderPageTransition) {

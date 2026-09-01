@@ -16,6 +16,7 @@ final class GlassControlGroup<ID: Hashable>: UIView {
         let image: UIImage?
         let accessibilityLabel: String
         let tintColor: UIColor?
+        let fillColor: UIColor?
         let isEnabled: Bool
         let reduceMotion: Bool
         let title: String?
@@ -35,12 +36,14 @@ final class GlassControlGroup<ID: Hashable>: UIView {
             isSelected: Bool = false,
             cornerRadius: CGFloat? = nil,
             contentColor: UIColor? = nil,
+            fillColor: UIColor? = nil,
             action: (() -> Void)? = nil
         ) {
             self.id = id
             self.image = image
             self.accessibilityLabel = accessibilityLabel
             self.tintColor = tintColor
+            self.fillColor = fillColor
             self.isEnabled = isEnabled
             self.reduceMotion = reduceMotion
             self.title = title
@@ -110,6 +113,7 @@ final class GlassControlGroup<ID: Hashable>: UIView {
                 image: item.image,
                 accessibilityLabel: item.accessibilityLabel,
                 tintColor: item.tintColor,
+                fillColor: item.fillColor,
                 isEnabled: item.isEnabled,
                 reduceMotion: item.reduceMotion,
                 title: item.title,
