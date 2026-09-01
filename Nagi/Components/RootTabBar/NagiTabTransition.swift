@@ -190,13 +190,42 @@ enum NagiTabTransition {
             options.insert(.allowUserInteraction)
         }
 
-        UIView.animate(
-            withDuration: duration,
-            delay: delay,
-            options: options,
-            animations: changes,
-            completion: completion
-        )
+        let context = currentContext()
+        context?.registerAnimation()
+
+        var didComplete = false
+        let animationCompletion: (Bool) -> Void = { finished in
+            guard !didComplete else { return }
+            didComplete = true
+            completion?(finished)
+            context?.animationDidStop(finished: finished)
+        }
+
+        switch self {
+        case .spring:
+            // Nagram enters UIKit's spring animation transaction for native
+            // views. Its private layer override makes the damping argument
+            // effectively critically damped; 1.0 is the public UIKit
+            // equivalent while the existing Nagi property transition keeps
+            // its own timing curve.
+            UIView.animate(
+                withDuration: duration,
+                delay: delay,
+                usingSpringWithDamping: 1.0,
+                initialSpringVelocity: 0.0,
+                options: options,
+                animations: changes,
+                completion: animationCompletion
+            )
+        default:
+            UIView.animate(
+                withDuration: duration,
+                delay: delay,
+                options: options,
+                animations: changes,
+                completion: animationCompletion
+            )
+        }
     }
 
     func setFrame(view: UIView, frame: CGRect) {
