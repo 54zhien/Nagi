@@ -151,6 +151,54 @@ enum NagiTabTransition {
         context.finishIfPossible()
     }
 
+    /// Run geometry that belongs to a UIKit-native view in UIKit's own
+    /// animation transaction. The property-based helpers below remain the
+    /// source of truth for ordinary Nagi views; this adapter is specifically
+    /// for UIVisualEffectView and other UIKit views whose native implementation
+    /// observes the UIView animation transaction itself.
+    func animateView(
+        allowUserInteraction: Bool = true,
+        delay: TimeInterval = 0,
+        _ changes: @escaping () -> Void,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        guard !isImmediate else {
+            CATransaction.begin()
+            CATransaction.setDisableActions(true)
+            changes()
+            CATransaction.commit()
+            completion?(true)
+            return
+        }
+
+        var options: UIView.AnimationOptions
+        switch self {
+        case .easeInOut:
+            options = [.curveEaseInOut]
+        case .spring:
+            // Nagram uses this native UIKit curve slot for its spring
+            // transaction. Nagi's existing property transition continues to
+            // own its explicit 0.380/0.700/0.125/1.000 curve.
+            options = UIView.AnimationOptions(rawValue: 7 << 16)
+        case let .keyboard(_, curve):
+            options = curve
+        case .immediate:
+            options = []
+        }
+
+        if allowUserInteraction {
+            options.insert(.allowUserInteraction)
+        }
+
+        UIView.animate(
+            withDuration: duration,
+            delay: delay,
+            options: options,
+            animations: changes,
+            completion: completion
+        )
+    }
+
     func setFrame(view: UIView, frame: CGRect) {
         let targetFrame = frame.integral
         let layer = view.layer

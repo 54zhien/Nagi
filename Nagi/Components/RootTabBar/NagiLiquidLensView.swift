@@ -245,7 +245,9 @@ final class NagiLiquidLensView: UIView {
         currentParams = params
         updateLiftedDisplayLink(isLifted: params.isLifted)
         let oldLifted = previousParams?.isLifted ?? false
-        let privateLiftChanged = nativeLensView != nil && oldLifted != params.isLifted
+        let privateLiftChanged =
+            nativeLensView?.responds(to: PrivateSelector.setLifted) == true &&
+            oldLifted != params.isLifted
         let containerGeometryChanged =
             previousParams == nil ||
             previousParams?.size != params.size ||
@@ -283,9 +285,7 @@ final class NagiLiquidLensView: UIView {
             )
         }
 
-        guard let nativeLensView,
-              oldLifted != params.isLifted,
-              nativeLensView.responds(to: PrivateSelector.setLifted) else {
+        guard privateLiftChanged else {
             transition.perform(applyAnimations) { [weak self] completed in
                 guard let self else {
                     completion?(completed)
@@ -300,6 +300,12 @@ final class NagiLiquidLensView: UIView {
         }
 
         isApplyingParams = true
+        // Keep the params that are currently being handed to UIKit in the
+        // same pending slot as Nagram. A touch update arriving while
+        // setLifted defers its alongside callback replaces this value with
+        // the newest params instead of starting another nested lift.
+        pendingParams = params
+        pendingCompletion = nil
         transition.perform(applyAnimations)
 
         let alongsideAnimations = { [weak self] in
@@ -388,12 +394,14 @@ final class NagiLiquidLensView: UIView {
         let previousBounds = nativeLensView.bounds
 
         if !privateLiftChanged {
-            // Keep ordinary resize geometry on the model layer and use
-            // Nagram's additive position compensation for width changes.
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
-            nativeLensView.bounds = targetBounds
-            CATransaction.commit()
+            // Nagram lets UIKit animate the native Lens bounds, then uses an
+            // additive position correction to keep the selected content
+            // visually anchored while its width changes.
+            transition.animateView {
+                nativeLensView.bounds = targetBounds
+            }
+
+            transition.setPosition(view: nativeLensView, position: newCenter)
 
             if !transition.isImmediate {
                 let widthDelta = targetBounds.width - previousBounds.width
@@ -408,10 +416,10 @@ final class NagiLiquidLensView: UIView {
             }
         }
 
-        // The center is always an ordinary property transition. During a
-        // private lift, only bounds are deferred to setLifted's alongside
-        // callback so the private Lens owns its size animation.
-        transition.setPosition(view: nativeLensView, position: newCenter)
+        // During a private lift, bounds and center are both completed by the
+        // Nagram setLifted path. The center is animated after its alongside
+        // callback in invokeLifted(...), rather than being moved ahead of the
+        // private Lens transaction.
         transition.setAlpha(view: nativeLensView, alpha: 1)
     }
 
@@ -507,6 +515,10 @@ final class NagiLiquidLensView: UIView {
         let function = unsafeBitCast(method, to: ObjCMethod.self)
         var didProcessUpdate = false
         var shouldScheduleUpdate = false
+        let newCenter = CGPoint(
+            x: params.selectionOrigin.x + params.selectionSize.width * 0.5,
+            y: params.selectionOrigin.y + params.selectionSize.height * 0.5
+        )
 
         function(
             nativeLensView,
@@ -520,6 +532,15 @@ final class NagiLiquidLensView: UIView {
 
                 didProcessUpdate = true
 
+                // UIKit may invoke alongside after setLifted returns. In
+                // that case the native center must start from this callback,
+                // just as it does in the synchronous Nagram path.
+                if shouldScheduleUpdate {
+                    transition.animateView {
+                        nativeLensView.center = newCenter
+                    }
+                }
+
                 // If UIKit delays alongside, a newer touch update may already
                 // be waiting. Release the reentrancy guard on the next main
                 // turn and apply only the newest pending params.
@@ -530,6 +551,7 @@ final class NagiLiquidLensView: UIView {
                         self.isApplyingParams = false
 
                         guard let pendingParams = self.pendingParams else {
+                            self.pendingCompletion = nil
                             return
                         }
 
@@ -538,11 +560,15 @@ final class NagiLiquidLensView: UIView {
                         self.pendingParams = nil
                         self.pendingCompletion = nil
 
-                        self.apply(
-                            params: pendingParams,
-                            transition: transition,
-                            completion: pendingCompletion
-                        )
+                        if pendingParams == params {
+                            pendingCompletion?(true)
+                        } else {
+                            self.apply(
+                                params: pendingParams,
+                                transition: transition,
+                                completion: pendingCompletion
+                            )
+                        }
                     }
                 }
             },
@@ -561,6 +587,9 @@ final class NagiLiquidLensView: UIView {
         if didProcessUpdate {
             // alongside already ran synchronously, so the next touch-move may
             // update the Lens immediately instead of waiting for Lift to end.
+            transition.animateView {
+                nativeLensView.center = newCenter
+            }
             isApplyingParams = false
 
             if let pendingParams {
@@ -569,11 +598,15 @@ final class NagiLiquidLensView: UIView {
                 self.pendingParams = nil
                 self.pendingCompletion = nil
 
-                apply(
-                    params: pendingParams,
-                    transition: transition,
-                    completion: pendingCompletion
-                )
+                if pendingParams == params {
+                    pendingCompletion?(true)
+                } else {
+                    apply(
+                        params: pendingParams,
+                        transition: transition,
+                        completion: pendingCompletion
+                    )
+                }
             }
         } else {
             // UIKit has not called alongside yet. Keep the guard until that

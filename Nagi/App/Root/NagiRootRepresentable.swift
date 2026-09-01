@@ -13,6 +13,11 @@ struct NagiRootRepresentable: UIViewControllerRepresentable {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func makeUIViewController(context: Context) -> NagiRootViewController {
+        // Install the iOS 26 backdrop hook before the first persistent Glass
+        // hierarchy is created. The settings container also retries from
+        // didMoveToWindow if UIKit has not exposed its private backdrop class
+        // at this point yet.
+        NagiGlassEffectRuntime.installIfNeeded()
         NagiRootViewController(
             reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency

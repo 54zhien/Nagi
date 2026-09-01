@@ -38,6 +38,31 @@ final class NagiGlassContainerView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard alpha != 0,
+              !isHidden,
+              isUserInteractionEnabled else {
+            return nil
+        }
+
+        for view in contentView.subviews.reversed() {
+            if let result = view.hitTest(
+                convert(point, to: view),
+                with: event
+            ), result.isUserInteractionEnabled {
+                return result
+            }
+        }
+
+        guard let result = contentView.hitTest(
+            convert(point, to: contentView),
+            with: event
+        ), result !== contentView else {
+            return nil
+        }
+        return result
+    }
+
     func update(
         size: CGSize,
         isDark: Bool,
@@ -55,6 +80,10 @@ final class NagiGlassContainerView: UIView {
 
         let frame = CGRect(origin: .zero, size: size)
         transition.setFrame(view: nativeParamsView, frame: frame)
-        transition.setFrame(view: effectView, frame: frame)
+        if effectView.frame != frame {
+            transition.animateView {
+                self.effectView.frame = frame
+            }
+        }
     }
 }

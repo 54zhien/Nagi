@@ -208,22 +208,51 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         let background = NagiGlassBackgroundView(frame: .zero)
         let button = UIButton(type: .system)
+        let closeSize = params.closeFrame.size
+        let closeRadius = min(closeSize.width, closeSize.height) * 0.5
+        let closeGlassParams = NagiGlassParams(
+            size: closeSize,
+            cornerRadius: closeRadius,
+            isDark: params.isDark,
+            tintColor: glassTintColor(isDark: params.isDark),
+            isInteractive: true,
+            isVisible: true,
+            reduceTransparency: params.reduceTransparency
+        )
+
+        // Fully initialize the native Glass before the surface is inserted
+        // into the active search hierarchy. This gives the first animated
+        // frame a real 48pt effect view, content view, corner radius and luma
+        // range instead of starting from the zero-sized initializer state.
+        _ = background.prepare(params: closeGlassParams)
+        background.applyGeometry(
+            params: closeGlassParams,
+            transition: .immediate,
+            applyVisibility: false
+        )
+
         background.isUserInteractionEnabled = true
         background.contentView.clipsToBounds = true
         button.setImage(UIImage(systemName: "xmark"), for: .normal)
         button.tintColor = .secondaryLabel
         button.accessibilityLabel = "关闭搜索"
         button.addTarget(self, action: #selector(cancelSearch), for: .primaryActionTriggered)
+        button.frame = CGRect(
+            x: max(0, closeSize.width * 0.5 - 22),
+            y: max(0, closeSize.height * 0.5 - 22),
+            width: min(44, closeSize.width),
+            height: min(44, closeSize.height)
+        )
         background.contentView.addSubview(button)
-        addSubview(background)
 
-        background.bounds = CGRect(origin: .zero, size: params.closeFrame.size)
+        background.bounds = CGRect(origin: .zero, size: closeSize)
         background.center = CGPoint(
             x: params.closeFrame.midX,
             y: params.closeFrame.midY
         )
         background.transform = CGAffineTransform(scaleX: 0.001, y: 0.001)
         background.alpha = 0
+        addSubview(background)
         close = (background: background, button: button)
     }
 

@@ -48,16 +48,25 @@ final class NagiEffectSettingsContainerView: UIView {
 
     override init(frame: CGRect) {
         super.init(frame: frame)
-        NagiGlassEffectRuntime.installIfNeeded()
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
+
+    override func didMoveToWindow() {
+        if window != nil {
+            NagiGlassEffectRuntime.installIfNeeded()
+        }
+        super.didMoveToWindow()
+    }
 }
 
-private enum NagiGlassEffectRuntime {
-    private static let installOnce: Void = {
+enum NagiGlassEffectRuntime {
+    private static var isInstalled = false
+
+    static func installIfNeeded() {
+        guard !isInstalled else { return }
         guard #available(iOS 26.0, *) else {
             return
         }
@@ -113,10 +122,7 @@ private enum NagiGlassEffectRuntime {
 
         let replacement = imp_implementationWithBlock(block)
         method_setImplementation(method, replacement)
-    }()
-
-    static func installIfNeeded() {
-        _ = installOnce
+        isInstalled = true
     }
 
     private static func findEffectContainer(
@@ -148,6 +154,8 @@ final class NagiGlassBackgroundView: UIView {
     private var previousParams: NagiGlassParams?
     private var currentEffectKey: String?
     private var currentTintColor: UIColor?
+    private var hasPendingEffect = false
+    private var pendingEffect: UIVisualEffect?
 
     override init(frame: CGRect) {
         let glassEffect = UIGlassEffect(style: .regular)
@@ -181,6 +189,19 @@ final class NagiGlassBackgroundView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {
+        guard isUserInteractionEnabled,
+              !isHidden,
+              alpha != 0 else {
+            return nil
+        }
+
+        return effectView.hitTest(
+            convert(point, to: effectView),
+            with: event
+        )
+    }
+
     @discardableResult
     func prepare(params: NagiGlassParams) -> Bool {
         guard params != previousParams else {
@@ -206,7 +227,8 @@ final class NagiGlassBackgroundView: UIView {
             let effect = UIGlassEffect(style: .regular)
             effect.tintColor = params.tintColor
             effect.isInteractive = params.isInteractive
-            effectView.effect = effect
+            pendingEffect = effect
+            hasPendingEffect = true
             currentEffectKey = effectKey
             currentTintColor = params.tintColor
         }
@@ -224,7 +246,8 @@ final class NagiGlassBackgroundView: UIView {
         fallbackView.isHidden = !useFallback
 
         if useFallback {
-            effectView.effect = nil
+            pendingEffect = nil
+            hasPendingEffect = true
         }
 
         return true
@@ -239,7 +262,20 @@ final class NagiGlassBackgroundView: UIView {
 
         transition.setFrame(view: fallbackView, frame: targetFrame)
         transition.setFrame(view: nativeParamsView, frame: targetFrame)
-        transition.setFrame(view: effectView, frame: targetFrame)
+        if effectView.frame != targetFrame {
+            transition.animateView {
+                self.effectView.frame = targetFrame
+            }
+        }
+
+        if hasPendingEffect {
+            let effect = pendingEffect
+            hasPendingEffect = false
+            pendingEffect = nil
+            transition.animateView {
+                self.effectView.effect = effect
+            }
+        }
 
         transition.setCornerRadius(
             view: fallbackView,
