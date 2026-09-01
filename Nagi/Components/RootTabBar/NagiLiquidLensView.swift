@@ -649,8 +649,4 @@ final class NagiLiquidLensView: UIView {
         function(object, selector, boolean)
     }
 
-    private func invoke(setCollapsed collapsed: Bool, on object: AnyObject) {
-        guard object.responds(to: PrivateSelector.setCollapsed) else { return }
-        invoke(PrivateSelector.setCollapsed, on: object, boolean: collapsed)
-    }
 }

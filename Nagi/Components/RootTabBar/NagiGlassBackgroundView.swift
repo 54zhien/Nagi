@@ -73,7 +73,10 @@ private enum NagiGlassEffectRuntime {
             return
         }
 
-        let typeEncoding = String(cString: method_getTypeEncoding(method))
+        guard let typeEncodingPointer = method_getTypeEncoding(method) else {
+            return
+        }
+        let typeEncoding = String(cString: typeEncodingPointer)
         guard typeEncoding == "v32@0:8@16d24" else {
             return
         }
