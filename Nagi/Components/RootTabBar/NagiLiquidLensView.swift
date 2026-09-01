@@ -104,7 +104,8 @@ final class NagiLiquidLensView: UIView {
         self.dedicatedMainGlassContainer = UIView(frame: .zero)
         self.mainSurface = NagiGlassBackgroundView(frame: .zero)
         self.selectionSurface = NagiGlassBackgroundView(frame: .zero)
-        self.restingBackgroundView = NagiLensRestingBackgroundView(frame: .zero)
+        let restingBackgroundView = NagiLensRestingBackgroundView(frame: .zero)
+        self.restingBackgroundView = restingBackgroundView
         self.nativeLensView = Self.makePrivateLensView(restingBackground: restingBackgroundView)
         super.init(frame: frame)
 
