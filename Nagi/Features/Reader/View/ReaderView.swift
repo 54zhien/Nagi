@@ -134,7 +134,7 @@ private struct ReaderSessionView: View {
         .toolbar(.hidden, for: .tabBar)
         .onChange(of: colorScheme) { _, newValue in
             guard model.preferences.appearanceMode == .system else { return }
-            transitionCoordinator.begin(reduceMotion: reduceMotion)
+            transitionCoordinator.begin(kind: .theme, reduceMotion: reduceMotion)
             model.updateSystemAppearance(isDark: newValue == .dark)
         }
         .onChange(of: scenePhase) { _, newValue in
@@ -146,8 +146,8 @@ private struct ReaderSessionView: View {
             await model.restoreFromForeground(isDark: colorScheme == .dark)
         }
         .onChange(of: model.stateRevision) { _, _ in
-            transitionCoordinator.readerStateDidUpdate {
-                await model.waitForVisualUpdate()
+            transitionCoordinator.readerStateDidUpdate { kind in
+                await model.waitForVisualUpdate(for: kind)
             }
         }
         .onDisappear {
@@ -184,8 +184,8 @@ private struct ReaderSessionView: View {
                 onCustomSettings: {
                     showCustomSettings = true
                 },
-                onBeforeMutation: {
-                    transitionCoordinator.begin(reduceMotion: reduceMotion)
+                onBeforeMutation: { kind in
+                    transitionCoordinator.begin(kind: kind, reduceMotion: reduceMotion)
                 },
                 onSystemBrightnessChanged: { value in
                     systemBrightness = value
@@ -224,7 +224,10 @@ private struct ReaderSessionView: View {
                 previewBackgroundColor: model.backgroundColor,
                 isLoadingPreview: model.isLoadingPreview,
                 onCommit: {
-                    transitionCoordinator.begin(reduceMotion: reduceMotion)
+                    transitionCoordinator.begin(
+                        kind: model.visualMutationKind(for: $0),
+                        reduceMotion: reduceMotion
+                    )
                     model.apply($0)
                 }
             )

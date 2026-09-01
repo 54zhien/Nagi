@@ -25,6 +25,17 @@ private enum PendingReaderMutation {
     case preset(ReaderThemePreset)
     case transition(ReaderPageTransition)
     case appearance(ReaderAppearanceMode)
+
+    var visualMutationKind: ReaderVisualMutationKind {
+        switch self {
+        case .fontStep:
+            return .font
+        case .preset, .appearance:
+            return .theme
+        case .transition:
+            return .geometry
+        }
+    }
 }
 
 @MainActor
@@ -36,7 +47,7 @@ final class ReaderSettingsViewController: UIViewController {
     private var latestReduceMotion: Bool
 
     var onCustomSettings: (() -> Void)?
-    var onBeforeMutation: (() -> Void)?
+    var onBeforeMutation: ((ReaderVisualMutationKind) -> Void)?
     var onSystemBrightnessChanged: ((Double) -> Void)?
 
     private let scrollView = UIScrollView()
@@ -587,7 +598,12 @@ final class ReaderSettingsViewController: UIViewController {
             self.deferredMutationTask = nil
             guard !mutations.isEmpty else { return }
 
-            self.onBeforeMutation?()
+            let mutationKind = mutations
+                .dropFirst()
+                .reduce(mutations[0].visualMutationKind) {
+                    $0.merged(with: $1.visualMutationKind)
+                }
+            self.onBeforeMutation?(mutationKind)
             for mutation in mutations {
                 self.apply(mutation)
             }
@@ -684,7 +700,7 @@ struct ReaderSettingsViewControllerRepresentable: UIViewControllerRepresentable 
     let isDarkAppearance: Bool
     let reduceMotion: Bool
     let onCustomSettings: () -> Void
-    let onBeforeMutation: () -> Void
+    let onBeforeMutation: (ReaderVisualMutationKind) -> Void
     let onSystemBrightnessChanged: (Double) -> Void
 
     func makeUIViewController(context: Context) -> ReaderSettingsViewController {

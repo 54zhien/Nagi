@@ -85,7 +85,8 @@ final class TextKitRenderer: ReaderRenderer {
         )
     }
 
-    func waitForVisualUpdate() async {
+    func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async {
+        _ = kind
         await Task.yield()
     }
 
@@ -250,8 +251,8 @@ final class ReadiumRenderer: ReaderRenderer {
         )
     }
 
-    func waitForVisualUpdate() async {
-        await model.waitForVisualUpdate()
+    func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async {
+        await model.waitForVisualUpdate(for: kind)
     }
 
     func restoreFromForeground(isDark: Bool) async {

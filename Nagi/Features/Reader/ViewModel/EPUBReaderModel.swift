@@ -319,6 +319,7 @@ final class EPUBReaderModel {
         self?.commitPreferences(preferences, generation: generation)
     }
     private var readerOverrideRefreshTask: Task<Void, Never>?
+    private var preloadedReaderOverrideTask: Task<Void, Never>?
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
     private var hasLoaded = false
@@ -330,6 +331,8 @@ final class EPUBReaderModel {
     private var viewportDisplayScale: CGFloat = 0
     private var latestPreferenceGeneration: UInt64 = 0
     private var latestOverrideRequestGeneration: UInt64 = 0
+    private var pendingVisualMutationKind: ReaderVisualMutationKind?
+    private var latestCommittedVisualMutationKind: ReaderVisualMutationKind = .full
 
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
@@ -492,15 +495,18 @@ final class EPUBReaderModel {
         }
     }
 
-    /// Waits until the current Readium document reflects the target theme and
-    /// app-owned reflowable overrides. Readium's public submitPreferences API
-    /// does not expose a completion callback in this version, so the document
-    /// state itself is used as the completion signal.
-    func waitForVisualUpdate() async {
+    /// Waits only for the part of the visible document that the mutation can
+    /// affect. Readium's public submitPreferences API does not expose a
+    /// completion callback, so the current WebView gets a two-frame readiness
+    /// check after the visible override has been submitted. Geometry changes
+    /// are native navigator work and intentionally do not enter JavaScript.
+    func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async {
         guard let navigator, isReflowable else { return }
 
         _ = await mutationScheduler.waitForPendingCommit()
         guard !Task.isCancelled else { return }
+
+        let effectiveKind = kind == .full ? latestCommittedVisualMutationKind : kind
 
         let generation = latestPreferenceGeneration
 
@@ -508,39 +514,15 @@ final class EPUBReaderModel {
             await overrideTask.value
         }
 
-        guard generation == latestPreferenceGeneration else { return }
+        guard generation == latestPreferenceGeneration, !Task.isCancelled else { return }
 
-        let retryDelays: [UInt64] = [
-            0,
-            24_000_000,
-            48_000_000,
-            96_000_000,
-            192_000_000,
-            320_000_000,
-        ]
-        let script = makeVisualReadinessScript()
-
-        for delay in retryDelays {
-            if delay > 0 {
-                do {
-                    try await Task.sleep(nanoseconds: delay)
-                } catch {
-                    return
-                }
-            }
-
-            guard !Task.isCancelled else { return }
-
-            let result = await navigator.evaluateJavaScript(script)
-            guard case let .success(value) = result,
-                  let readiness = value as? String,
-                  readiness == "ready"
-            else {
-                continue
-            }
-
+        guard effectiveKind != .geometry else {
+            await Task.yield()
             return
         }
+
+        let readinessScript = makeVisualReadinessScript(for: effectiveKind)
+        await navigator.waitForNagiReaderReadiness(readinessScript)
     }
 
     /// Re-applies the complete Readium preference set after WebKit returns
@@ -551,7 +533,10 @@ final class EPUBReaderModel {
         guard !Task.isCancelled, hasLoaded, navigator != nil else { return }
 
         systemIsDark = isDark
-        mutationScheduler.enqueue(makePreferences())
+        // Foreground restoration is one of the explicit lifecycle points at
+        // which Readium may have rebuilt its internal hierarchy.
+        applyVisibleReaderBaseAppearance()
+        enqueuePreferencesMutation(kind: .full)
         mutationScheduler.flush()
         guard !Task.isCancelled else { return }
 
@@ -559,7 +544,7 @@ final class EPUBReaderModel {
             await refreshTask.value
         }
         guard !Task.isCancelled else { return }
-        await waitForVisualUpdate()
+        await waitForVisualUpdate(for: .full)
     }
 
     /// Commits the latest in-memory EPUB location before the reader is
@@ -609,7 +594,7 @@ final class EPUBReaderModel {
         guard systemIsDark != isDark else { return }
         systemIsDark = isDark
         guard appearanceMode == .system else { return }
-        schedulePreferencesCommit(commitBehavior: .immediate)
+        schedulePreferencesCommit(kind: .theme, commitBehavior: .immediate)
     }
 
     func selectPageTransition(_ transition: EPUBPageTransitionMode) {
@@ -618,7 +603,7 @@ final class EPUBReaderModel {
             flowMode = transition == .scroll ? .scroll : .paged
         }
         persistPreferences()
-        schedulePreferencesCommit(commitBehavior: .immediate)
+        schedulePreferencesCommit(kind: .geometry, commitBehavior: .immediate)
     }
 
     func selectAppearance(_ appearance: EPUBAppearanceMode) {
@@ -626,7 +611,7 @@ final class EPUBReaderModel {
             appearanceMode = appearance
         }
         persistPreferences()
-        schedulePreferencesCommit(commitBehavior: .immediate)
+        schedulePreferencesCommit(kind: .theme, commitBehavior: .immediate)
     }
 
     func setFontScale(_ scale: Double) {
@@ -635,7 +620,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit()
+        schedulePreferencesCommit(kind: .font)
     }
 
     func apply(preset: EPUBReaderPreset) {
@@ -647,7 +632,7 @@ final class EPUBReaderModel {
             brightness = 1
         }
         persistPreferences()
-        schedulePreferencesCommit(commitBehavior: .immediate)
+        schedulePreferencesCommit(kind: .theme, commitBehavior: .immediate)
     }
 
     func makeDraft() -> EPUBReaderDraft {
@@ -664,6 +649,7 @@ final class EPUBReaderModel {
     }
 
     func apply(_ draft: EPUBReaderDraft) {
+        let previousPreferences = readerPreferences
         withPreferenceUpdatesSuspended {
             fontFamily = draft.fontFamily
             boldText = draft.boldText
@@ -676,7 +662,10 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit(commitBehavior: .immediate)
+        schedulePreferencesCommit(
+            kind: Self.visualMutationKind(from: previousPreferences, to: readerPreferences),
+            commitBehavior: .immediate
+        )
     }
 
     var readerPreferences: ReaderPreferences {
@@ -703,6 +692,7 @@ final class EPUBReaderModel {
         preferences: ReaderPreferences,
         commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
     ) {
+        let previousPreferences = readerPreferences
         withPreferenceUpdatesSuspended {
             fontScale = min(
                 max(preferences.fontSize / ReaderFontSize.defaultValue, ReaderFontSize.minimumScale),
@@ -725,7 +715,10 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit(commitBehavior: commitBehavior)
+        schedulePreferencesCommit(
+            kind: Self.visualMutationKind(from: previousPreferences, to: readerPreferences),
+            commitBehavior: commitBehavior
+        )
         onStateChange?()
     }
 
@@ -737,6 +730,8 @@ final class EPUBReaderModel {
         mutationScheduler.cancel()
         readerOverrideRefreshTask?.cancel()
         readerOverrideRefreshTask = nil
+        preloadedReaderOverrideTask?.cancel()
+        preloadedReaderOverrideTask = nil
         previewTask?.cancel()
         previewTask = nil
         navigator?.delegate = nil
@@ -758,7 +753,7 @@ final class EPUBReaderModel {
             selectedPreset = nil
         }
         persistPreferences()
-        schedulePreferencesCommit(commitBehavior: .immediate)
+        schedulePreferencesCommit(kind: .full, commitBehavior: .immediate)
     }
 
     private func loadTableOfContents(from publication: Publication) async {
@@ -816,7 +811,7 @@ final class EPUBReaderModel {
     private func preferencesDidChange() {
         guard !suppressPreferenceUpdates else { return }
         persistPreferences()
-        enqueuePreferencesMutation()
+        enqueuePreferencesMutation(kind: .full)
     }
 
     private func persistPreferencesIfNeeded() {
@@ -825,9 +820,10 @@ final class EPUBReaderModel {
     }
 
     private func schedulePreferencesCommit(
+        kind: ReaderVisualMutationKind = .full,
         commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
     ) {
-        enqueuePreferencesMutation()
+        enqueuePreferencesMutation(kind: kind)
         if commitBehavior == .immediate {
             mutationScheduler.flush()
         }
@@ -836,17 +832,60 @@ final class EPUBReaderModel {
     /// Captures the complete Readium preference value before the scheduler
     /// yields.  The delayed task therefore coalesces immutable snapshots
     /// instead of consulting this mutable model later.
-    private func enqueuePreferencesMutation() {
+    private func enqueuePreferencesMutation(kind: ReaderVisualMutationKind? = nil) {
         guard navigator != nil else { return }
+        if let kind {
+            pendingVisualMutationKind = pendingVisualMutationKind?.merged(with: kind) ?? kind
+        }
         mutationScheduler.enqueue(makePreferences())
     }
 
     private func commitPreferences(_ preferences: EPUBPreferences, generation: UInt64) {
         guard let navigator else { return }
+        let mutationKind = pendingVisualMutationKind ?? .full
+        pendingVisualMutationKind = nil
+        latestCommittedVisualMutationKind = mutationKind
         latestPreferenceGeneration = generation
         navigator.submitPreferences(preferences)
-        applyVisibleReaderBaseAppearance()
         refreshVisibleReaderOverrides(generation: generation)
+    }
+
+    private static func visualMutationKind(
+        from previous: ReaderPreferences,
+        to next: ReaderPreferences
+    ) -> ReaderVisualMutationKind {
+        var kind: ReaderVisualMutationKind?
+
+        func include(_ candidate: ReaderVisualMutationKind) {
+            kind = kind?.merged(with: candidate) ?? candidate
+        }
+
+        if previous.themePreset != next.themePreset
+            || previous.appearanceMode != next.appearanceMode {
+            include(.theme)
+        }
+
+        if previous.fontSize != next.fontSize
+            || previous.fontFamily != next.fontFamily
+            || previous.boldText != next.boldText {
+            include(.font)
+        }
+
+        if previous.lineHeight != next.lineHeight
+            || previous.characterSpacing != next.characterSpacing
+            || previous.wordSpacing != next.wordSpacing
+            || previous.publisherStyles != next.publisherStyles {
+            include(.typography)
+        }
+
+        if previous.pageMargins != next.pageMargins
+            || previous.paragraphIndent != next.paragraphIndent
+            || previous.pageTransition != next.pageTransition
+            || previous.showBookTitleInPageHeader != next.showBookTitleInPageHeader {
+            include(.geometry)
+        }
+
+        return kind ?? .full
     }
 
     private func makePreferences() -> EPUBPreferences {
@@ -861,6 +900,8 @@ final class EPUBReaderModel {
             // avoids Readium's background preference rule, which clears
             // publisher backgrounds on descendant elements.
             backgroundColor: navigatorBackgroundColor,
+            // Font selection is a first-class Readium preference. Publisher
+            // styles only disable the app-owned spacing rules below.
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
             fontWeight: boldText ? 1.75 : fontFamily.readiumFontWeight,
@@ -889,15 +930,17 @@ final class EPUBReaderModel {
         )
     }
 
-    /// Re-applies all app-owned reflowable rules to the currently presented
-    /// and already preloaded resources. The font rule remains a publisher-CSS
-    /// fallback; the bundled @font-face declarations remain the resource
-    /// authority.
-    private func refreshVisibleReaderOverrides(generation: UInt64? = nil) {
+    /// Applies app-owned rules to the current spread first. Preloaded spreads
+    /// are updated by a separate task after the visible task has completed so
+    /// a large preload set never delays a preference transition.
+    private func refreshVisibleReaderOverrides(
+        generation: UInt64? = nil
+    ) {
         readerOverrideRefreshTask?.cancel()
+        preloadedReaderOverrideTask?.cancel()
+        preloadedReaderOverrideTask = nil
         guard let navigator, isReflowable else { return }
 
-        applyVisibleReaderBaseAppearance()
         latestOverrideRequestGeneration &+= 1
         let requestGeneration = latestOverrideRequestGeneration
         let script = makeReaderOverrideScript(requestGeneration: requestGeneration)
@@ -907,7 +950,7 @@ final class EPUBReaderModel {
             if let generation {
                 guard self.latestPreferenceGeneration == generation else { return }
             }
-            await navigator.applyNagiReaderOverrides(script)
+            await navigator.applyNagiReaderOverridesToVisible(script)
             if let generation {
                 guard !Task.isCancelled,
                       self.latestOverrideRequestGeneration == requestGeneration,
@@ -916,11 +959,27 @@ final class EPUBReaderModel {
                 guard !Task.isCancelled,
                       self.latestOverrideRequestGeneration == requestGeneration else { return }
             }
+
+            self.preloadedReaderOverrideTask = Task { @MainActor [weak self, weak navigator] in
+                // Give the visible document its next run-loop turn before
+                // touching any off-screen WebView.
+                await Task.yield()
+                guard let self, let navigator,
+                      !Task.isCancelled,
+                      self.latestOverrideRequestGeneration == requestGeneration else { return }
+                if let generation {
+                    guard self.latestPreferenceGeneration == generation else { return }
+                }
+                await navigator.applyNagiReaderOverridesToPreloaded(script)
+            }
+
         }
     }
 
     private func makeReaderOverrideScript(requestGeneration: UInt64) -> String {
-        let publisherFontFamily = Self.javascriptStringLiteral(fontFamily.readiumFamilyName)
+        let publisherFontFamily = Self.javascriptStringLiteral(
+            Self.cssFontFamilyValue(for: fontFamily)
+        )
         let lineHeightValue = Self.javascriptStringLiteral(
             Self.cssDecimal(ReaderLayoutMetrics.clampLineHeight(lineHeight))
         )
@@ -931,19 +990,22 @@ final class EPUBReaderModel {
             Self.cssEmSpacing(for: wordSpacing, range: ReaderLayoutMetrics.wordSpacingRange)
         )
         let typographyEnabled = publisherStyles ? "false" : "true"
+        let themeMarker = Self.javascriptStringLiteral(readiumThemeAppearanceMarker ?? "light")
         let overrideGeneration = String(requestGeneration)
         return """
         (() => {
             const styleID = "nagi-reader-reader-overrides";
+            const styleVersion = "2";
             const requestGeneration = \(overrideGeneration);
-            const publisherFontFamily = \(publisherFontFamily);
+            const appFontFamily = \(publisherFontFamily);
             const lineHeight = \(lineHeightValue);
             const letterSpacing = \(letterSpacingValue);
             const wordSpacing = \(wordSpacingValue);
             const typographyEnabled = \(typographyEnabled);
+            const themeMarker = \(themeMarker);
             const root = document.documentElement;
 
-            if (!root) {
+            if (!root || !document.body) {
                 return;
             }
 
@@ -960,75 +1022,81 @@ final class EPUBReaderModel {
                 );
             }
 
-            const previous = document.getElementById(styleID);
-            if (previous) previous.remove();
-
-            const style = document.createElement("style");
-            style.id = styleID;
             root.setAttribute("data-nagi-reader-overrides", "true");
-
-            const rootSelector = ":root[data-nagi-reader-overrides]";
-            const bodySelector = rootSelector + " body";
-            const fontSelectors = [
-                rootSelector,
-                bodySelector,
-                bodySelector + " *"
-            ];
-            const typographySelectors = [
-                bodySelector,
-                bodySelector + " p",
-                bodySelector + " li",
-                bodySelector + " div",
-                bodySelector + " dt",
-                bodySelector + " dd",
-                bodySelector + " blockquote",
-                bodySelector + " section",
-                bodySelector + " article",
-                bodySelector + " span",
-                bodySelector + " td",
-                bodySelector + " th",
-                bodySelector + " h1",
-                bodySelector + " h2",
-                bodySelector + " h3",
-                bodySelector + " h4",
-                bodySelector + " h5",
-                bodySelector + " h6"
-            ];
-
-            const rules = [
-                [rootSelector, bodySelector].join(", ")
-                    + " { background: transparent !important; }",
-                fontSelectors.join(", ")
-                    + " { font-family: "
-                    + JSON.stringify(publisherFontFamily)
-                    + " !important; }"
-            ];
+            root.setAttribute("data-nagi-reader-theme-marker", themeMarker);
+            root.style.setProperty("--nagi-line-height", lineHeight);
+            root.style.setProperty("--nagi-letter-spacing", letterSpacing);
+            root.style.setProperty("--nagi-word-spacing", wordSpacing);
+            root.style.setProperty("--nagi-font-family", appFontFamily);
 
             if (typographyEnabled) {
-                rules.push(
-                    typographySelectors.join(", ")
-                        + " { line-height: "
-                        + JSON.stringify(lineHeight)
-                        + " !important; letter-spacing: "
-                        + JSON.stringify(letterSpacing)
-                        + " !important; word-spacing: "
-                        + JSON.stringify(wordSpacing)
-                        + " !important; }"
-                );
+                root.setAttribute("data-nagi-reader-typography", "app");
+            } else {
+                root.removeAttribute("data-nagi-reader-typography");
             }
+            root.setAttribute("data-nagi-reader-font", "app");
 
-            style.textContent = rules.join("\\n");
-            (document.head || root).appendChild(style);
+            let style = document.getElementById(styleID);
+            if (!style || style.getAttribute("data-nagi-reader-style-version") !== styleVersion) {
+                if (style) style.remove();
+                style = document.createElement("style");
+                style.id = styleID;
+                style.setAttribute("data-nagi-reader-style-version", styleVersion);
+
+                const rootSelector = ":root[data-nagi-reader-overrides]";
+                const bodySelector = rootSelector + " body";
+                const excludedSubtreeSelector = [
+                    ":not(code)", ":not(code *)",
+                    ":not(pre)", ":not(pre *)",
+                    ":not(kbd)", ":not(kbd *)",
+                    ":not(samp)", ":not(samp *)",
+                    ":not(svg)", ":not(svg *)",
+                    ":not(math)", ":not(math *)",
+                    ":not([data-nagi-reader-preserve])",
+                    ":not([data-nagi-reader-special])",
+                    ":not(.icon)", ":not(.iconfont)", ":not(.icon-font)",
+                    ":not([class^='icon-'])",
+                    ":not([class*=' icon-'])"
+                ].join("");
+                const contentSelectors = [
+                    "body",
+                    "body *"
+                ].map(selector => selector + excludedSubtreeSelector);
+                const appFontSelectors = contentSelectors.map(
+                    selector => rootSelector + "[data-nagi-reader-font='app'] " + selector
+                );
+                const appTypographySelectors = contentSelectors.map(
+                    selector => rootSelector + "[data-nagi-reader-typography='app'] " + selector
+                );
+
+                style.textContent = [
+                    [rootSelector, bodySelector].join(", ")
+                        + " { background: transparent !important; background-image: none !important; }",
+                    rootSelector + " {"
+                        + " --nagi-line-height: 1;"
+                        + " --nagi-letter-spacing: 0em;"
+                        + " --nagi-word-spacing: 0em;"
+                        + " --nagi-font-family: -apple-system, sans-serif;"
+                        + " }",
+                    appFontSelectors.join(", ")
+                        + " { font-family: var(--nagi-font-family) !important; }",
+                    appTypographySelectors.join(", ")
+                        + " { line-height: var(--nagi-line-height) !important;"
+                        + " letter-spacing: var(--nagi-letter-spacing) !important;"
+                        + " word-spacing: var(--nagi-word-spacing) !important; }"
+                ].join("\\n");
+                (document.head || root).appendChild(style);
+            }
         })();
         """
     }
 
-    private func makeVisualReadinessScript() -> String {
+    private func makeVisualReadinessScript(for kind: ReaderVisualMutationKind) -> String {
         let expectedTextColor = Self.javascriptStringLiteral(
             Self.cssColorLiteral(readerContentUIColor)
         )
         let expectedThemeMarker = Self.javascriptStringLiteral(
-            readiumThemeAppearanceMarker ?? ""
+            readiumThemeAppearanceMarker ?? "light"
         )
         let expectedFontFamily = Self.javascriptStringLiteral(fontFamily.readiumFamilyName)
         let expectedLineHeight = Self.cssDecimal(
@@ -1043,26 +1111,29 @@ final class EPUBReaderModel {
                 ReaderLayoutMetrics.wordSpacingRange.upperBound) / 100
         )
         let typographyEnabled = publisherStyles ? "false" : "true"
+        let mutationKind: String
+        switch kind {
+        case .theme: mutationKind = "theme"
+        case .typography: mutationKind = "typography"
+        case .font: mutationKind = "font"
+        case .geometry: mutationKind = "geometry"
+        case .full: mutationKind = "full"
+        }
 
         return """
         (() => {
-            if (
-                document.readyState !== "complete"
-                || !document.documentElement
-                || !document.body
-            ) {
+            const root = document.documentElement;
+            const body = document.body;
+            if (!root || !body) {
                 return "";
             }
 
-            const root = document.documentElement;
-            const body = document.body;
             const rootStyle = getComputedStyle(root);
             const bodyStyle = getComputedStyle(body);
             const sample = body.querySelector(
                 "p, li, div, dt, dd, blockquote, section, article, span, td, th"
             ) || body;
             const sampleStyle = getComputedStyle(sample);
-            const styleText = root.getAttribute("style") || "";
             const expectedThemeMarker = \(expectedThemeMarker);
             const expectedTextColor = \(expectedTextColor);
             const expectedFontFamily = \(expectedFontFamily);
@@ -1070,6 +1141,7 @@ final class EPUBReaderModel {
             const expectedLetterSpacing = \(expectedLetterSpacing);
             const expectedWordSpacing = \(expectedWordSpacing);
             const typographyEnabled = \(typographyEnabled);
+            const mutationKind = "\(mutationKind)";
 
             const isTransparent = (value) => {
                 const normalized = value.replace(/\\s+/g, "").toLowerCase();
@@ -1099,16 +1171,11 @@ final class EPUBReaderModel {
             ].some(value => value.toLowerCase().includes(expectedFontFamily.toLowerCase()));
 
             const expectedColor = normalizeColor(expectedTextColor);
-            const textReady = [
-                rootStyle.color,
-                bodyStyle.color,
-                sampleStyle.color
-            ].every(value => normalizeColor(value) === expectedColor);
+            const textReady = [bodyStyle.color, sampleStyle.color]
+                .every(value => normalizeColor(value) === expectedColor);
 
-            const themeReady = expectedThemeMarker.length > 0
-                ? styleText.includes(expectedThemeMarker)
-                : !styleText.includes("readium-night-on")
-                    && !styleText.includes("readium-sepia-on");
+            const themeReady = root.getAttribute("data-nagi-reader-theme-marker")
+                === expectedThemeMarker;
 
             const sampleFontSize = parseFloat(sampleStyle.fontSize)
                 || parseFloat(bodyStyle.fontSize)
@@ -1129,18 +1196,25 @@ final class EPUBReaderModel {
                 expectedWordSpacing * sampleFontSize,
                 0.25
             );
-            const typographyReady = !typographyEnabled
-                || (lineHeightReady && letterSpacingReady && wordSpacingReady);
-
-            return root.getAttribute("data-nagi-reader-overrides") === "true"
-                && themeReady
+            const typographyReady = !typographyEnabled || (
+                root.getAttribute("data-nagi-reader-typography") === "app"
+                    && lineHeightReady
+                    && letterSpacingReady
+                    && wordSpacingReady
+            );
+            const appFontReady = root.getAttribute("data-nagi-reader-font") === "app"
+                && fontReady;
+            const surfaceReady = root.getAttribute("data-nagi-reader-overrides") === "true"
                 && isTransparent(rootStyle.backgroundColor)
                 && isTransparent(bodyStyle.backgroundColor)
                 && rootStyle.backgroundImage === "none"
-                && bodyStyle.backgroundImage === "none"
-                && fontReady
-                && textReady
-                && typographyReady
+                && bodyStyle.backgroundImage === "none";
+
+            if (!surfaceReady) return "";
+            if (mutationKind === "theme") return themeReady && textReady ? "ready" : "";
+            if (mutationKind === "font") return appFontReady ? "ready" : "";
+            if (mutationKind === "typography") return typographyReady ? "ready" : "";
+            return themeReady && textReady && appFontReady && typographyReady
                 ? "ready"
                 : "";
         })();
@@ -1168,6 +1242,15 @@ final class EPUBReaderModel {
     ) -> String {
         let clampedValue = min(max(value, range.lowerBound), range.upperBound)
         return "\(cssDecimal(clampedValue / 100))em"
+    }
+
+    private static func cssFontFamilyValue(for family: EPUBFontFamily) -> String {
+        switch family {
+        case .original, .pingFang:
+            return "-apple-system, BlinkMacSystemFont, sans-serif"
+        case .song, .kai, .yuan:
+            return "\(family.readiumFamilyName), -apple-system, sans-serif"
+        }
     }
 
     private static func cssColorLiteral(_ color: UIColor) -> String {

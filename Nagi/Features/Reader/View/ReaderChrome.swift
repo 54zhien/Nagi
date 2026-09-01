@@ -301,8 +301,8 @@ private enum ReaderControlMetrics {
 /// snapshot is presentation state, not a reading preference or persisted data.
 @MainActor
 final class ReaderTransitionCoordinator {
-    private static let settleNanoseconds: UInt64 = 80_000_000
-    private static let maximumTransitionNanoseconds: UInt64 = 900_000_000
+    private static let settleNanoseconds: UInt64 = 40_000_000
+    private static let maximumTransitionNanoseconds: UInt64 = 500_000_000
     private static let fadeDuration: TimeInterval = 0.15
 
     private weak var captureAnchor: UIView?
@@ -313,6 +313,7 @@ final class ReaderTransitionCoordinator {
     private var fallbackTask: Task<Void, Never>?
     private var transitionToken = 0
     private var isTransitionActive = false
+    private var activeMutationKind: ReaderVisualMutationKind = .full
     private var reduceMotion = false
 
     func register(captureAnchor: UIView) {
@@ -323,16 +324,19 @@ final class ReaderTransitionCoordinator {
         self.snapshotHost = snapshotHost
     }
 
-    /// Captures the visible reader before the model submits the new theme.
-    /// Replacing an in-flight snapshot keeps rapid theme taps deterministic.
-    func begin(reduceMotion: Bool) {
+    /// Captures the visible reader only for mutations whose repaint can expose
+    /// an intermediate surface. Typography and geometry are allowed to
+    /// reflow directly so their controls remain responsive.
+    func begin(kind: ReaderVisualMutationKind, reduceMotion: Bool) {
         transitionToken &+= 1
         cancelTasks()
         removeSnapshot()
 
+        activeMutationKind = kind
         self.reduceMotion = reduceMotion
         isTransitionActive = false
 
+        guard kind == .theme || kind == .font || kind == .full else { return }
         guard let host = snapshotHost else { return }
 
         host.layoutIfNeeded()
@@ -383,19 +387,26 @@ final class ReaderTransitionCoordinator {
     }
 
     /// Called after the model has synchronized its new native state. The
-    /// supplied async check waits for Readium's current document to become
-    /// available again, then one more short interval lets WebKit paint it.
+    /// supplied check receives the mutation kind so typography can settle on
+    /// its own narrow path without waiting for theme/font readiness.
     func readerStateDidUpdate(
-        waitForContent: @escaping @MainActor () async -> Void
+        waitForContent: @escaping @MainActor (ReaderVisualMutationKind) async -> Void
     ) {
-        guard isTransitionActive else { return }
+        let kind = activeMutationKind
+        let shouldWait = isTransitionActive || kind == .typography || kind == .geometry
+        guard shouldWait else { return }
 
         finishTask?.cancel()
         let token = transitionToken
         finishTask = Task { @MainActor [weak self] in
-            await waitForContent()
+            await waitForContent(kind)
 
             guard !Task.isCancelled else { return }
+
+            guard self?.isTransitionActive == true else {
+                self?.activeMutationKind = .full
+                return
+            }
 
             do {
                 try await Task.sleep(nanoseconds: Self.settleNanoseconds)
@@ -412,6 +423,7 @@ final class ReaderTransitionCoordinator {
         transitionToken &+= 1
         cancelTasks()
         isTransitionActive = false
+        activeMutationKind = .full
         removeSnapshot()
     }
 
@@ -456,6 +468,7 @@ final class ReaderTransitionCoordinator {
 
         if reduceMotion {
             removeSnapshot()
+            activeMutationKind = .full
             return
         }
 
@@ -469,6 +482,7 @@ final class ReaderTransitionCoordinator {
             guard let self, self.transitionToken == token else { return }
             cover?.removeFromSuperview()
             self.activeCover = nil
+            self.activeMutationKind = .full
         }
     }
 

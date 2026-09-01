@@ -496,6 +496,25 @@ enum ReaderPreferenceCommitBehavior: Sendable, Equatable {
     case immediate
 }
 
+/// Describes which part of the reader surface is expected to settle after a
+/// preference mutation.  Keeping this separate from the preference payload
+/// prevents a line-spacing change from waiting on unrelated theme or font
+/// signals (and lets the transition layer choose a cover only when a repaint
+/// actually needs one).
+enum ReaderVisualMutationKind: Sendable, Equatable {
+    case theme
+    case typography
+    case font
+    case geometry
+    case full
+
+    func merged(with other: Self) -> Self {
+        guard self != other else { return self }
+        if self == .full || other == .full { return .full }
+        return .full
+    }
+}
+
 @MainActor
 protocol ReaderRenderer: AnyObject {
     var document: ReaderDocument? { get }
@@ -523,7 +542,7 @@ protocol ReaderRenderer: AnyObject {
         onToggleControls: @escaping () -> Void,
         onSwipeStart: @escaping () -> Void
     ) -> AnyView
-    func waitForVisualUpdate() async
+    func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async
     func restoreFromForeground(isDark: Bool) async
     @discardableResult
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets, displayScale: CGFloat) -> Bool
@@ -623,8 +642,8 @@ final class ReaderEngine {
         )
     }
 
-    func waitForVisualUpdate() async {
-        await renderer.waitForVisualUpdate()
+    func waitForVisualUpdate(for kind: ReaderVisualMutationKind = .full) async {
+        await renderer.waitForVisualUpdate(for: kind)
     }
 
     func restoreFromForeground(isDark: Bool) async {
@@ -754,8 +773,8 @@ final class ReaderViewModel {
         )
     }
 
-    func waitForVisualUpdate() async {
-        await engine.waitForVisualUpdate()
+    func waitForVisualUpdate(for kind: ReaderVisualMutationKind = .full) async {
+        await engine.waitForVisualUpdate(for: kind)
     }
 
     func restoreFromForeground(isDark: Bool) async {
@@ -842,6 +861,31 @@ final class ReaderViewModel {
             wordSpacing: preferences.wordSpacing,
             publisherStyles: preferences.publisherStyles
         )
+    }
+
+    func visualMutationKind(for draft: ReaderCustomizationDraft) -> ReaderVisualMutationKind {
+        var kind: ReaderVisualMutationKind?
+
+        func include(_ candidate: ReaderVisualMutationKind) {
+            kind = kind?.merged(with: candidate) ?? candidate
+        }
+
+        if preferences.fontFamily != draft.fontFamily
+            || preferences.boldText != draft.boldText {
+            include(.font)
+        }
+        if preferences.lineHeight != draft.lineHeight
+            || preferences.characterSpacing != draft.characterSpacing
+            || preferences.wordSpacing != draft.wordSpacing
+            || preferences.publisherStyles != draft.publisherStyles {
+            include(.typography)
+        }
+        if preferences.pageMargins != draft.pageMargins
+            || preferences.paragraphIndent != draft.paragraphIndent {
+            include(.geometry)
+        }
+
+        return kind ?? .full
     }
 
     func apply(_ draft: ReaderCustomizationDraft) {

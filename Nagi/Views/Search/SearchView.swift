@@ -10,7 +10,7 @@ import SwiftData
 
 struct SearchView: View {
     @Query(sort: \Book.title) private var books: [Book]
-    @Binding var searchText: String
+    let state: SearchState
     @State private var selectedBook: Book?
 
     var body: some View {
@@ -44,7 +44,7 @@ struct SearchView: View {
                 ContentUnavailableView {
                     searchUnavailableLabel("未找到书籍")
                 } description: {
-                    Text("没有找到书名中包含“\(searchText)”的书籍")
+                    Text("没有找到书名中包含“\(state.query)”的书籍")
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
                     searchHeader
@@ -89,7 +89,7 @@ struct SearchView: View {
     }
 
     private var searchTerms: [String] {
-        searchText
+        state.query
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
     }
@@ -110,6 +110,6 @@ struct SearchView: View {
 }
 
 #Preview {
-    SearchView(searchText: .constant(""))
+    SearchView(state: SearchState())
         .modelContainer(Persistence.container)
 }
