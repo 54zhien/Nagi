@@ -179,19 +179,22 @@ final class NagiTabBarView: UIView {
             reduceTransparency: reduceTransparency
         )
 
-        searchView.prepare(params: searchParams)
+        let searchParamsChanged = searchView.prepare(params: searchParams)
         searchTransitionGeneration += 1
         let generation = searchTransitionGeneration
-        let shouldClipSearchContent = !transition.isImmediate && searchGeometryChanged(
+        let searchGeometryDidChange = searchGeometryChanged(
             from: oldParams?.layout,
             to: layout
         )
+        let shouldClipSearchContent = !transition.isImmediate && searchGeometryDidChange
         searchView.setContentClipping(shouldClipSearchContent)
 
         transition.animate { [weak self] in
             guard let self else { return }
             NagiTabTransition.setFrame(self.searchView, localSearchContainerFrame)
-            self.searchView.applyInternalGeometry(params: searchParams)
+            if searchParamsChanged || searchGeometryDidChange || oldParams == nil {
+                self.searchView.applyInternalGeometry(params: searchParams)
+            }
             self.liquidLensView.contentView.isUserInteractionEnabled = !layout.isSearchActive
 
             for ((itemView, selectedItemView), itemFrame) in zip(
