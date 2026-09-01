@@ -12,16 +12,32 @@ struct NagiTabBarParams: Equatable {
     var layout: NagiTabBarLayout
     var mode: NagiRootTabMode
     var reduceTransparency: Bool
+    var selectionGestureIndex: Int?
+}
+
+private enum NagiSelectionGestureState: Equatable {
+    case pressing(index: Int)
+
+    var index: Int {
+        switch self {
+        case let .pressing(index):
+            return index
+        }
+    }
 }
 
 final class NagiTabBarView: UIView {
     private let glassContainer: NagiGlassContainerView
     private let mainSurface: NagiGlassBackgroundView
-    private let mainContentView: UIView
     private let itemViews: [NagiTabBarItemView]
+    private let selectedItemViews: [NagiTabBarItemView]
     private let searchView: NagiNavigationSearchView
     private let liquidLensView: NagiLiquidLensView
     private var previousParams: NagiTabBarParams?
+    private var currentLayout: NagiTabBarLayout?
+    private var currentMode: NagiRootTabMode?
+    private var selectionGestureState: NagiSelectionGestureState?
+    private let isLiftedStateEnabled = true
     private var lastTraitStyle: UIUserInterfaceStyle
 
     var onTabSelected: ((AppTab) -> Void)?
@@ -32,8 +48,9 @@ final class NagiTabBarView: UIView {
     init() {
         self.glassContainer = NagiGlassContainerView(spacing: 7)
         self.mainSurface = NagiGlassBackgroundView(frame: .zero)
-        self.mainContentView = UIView(frame: .zero)
-        self.itemViews = [AppTab.home, AppTab.library, AppTab.settings].map { NagiTabBarItemView(tab: $0) }
+        let mainTabs: [AppTab] = [.home, .library, .settings]
+        self.itemViews = mainTabs.map { NagiTabBarItemView(tab: $0) }
+        self.selectedItemViews = mainTabs.map { NagiTabBarItemView(tab: $0, isInteractive: false) }
         self.searchView = NagiNavigationSearchView(frame: .zero)
         self.liquidLensView = NagiLiquidLensView(frame: .zero)
         self.lastTraitStyle = .unspecified
@@ -49,18 +66,23 @@ final class NagiTabBarView: UIView {
         addSubview(glassContainer)
         glassContainer.contentView.addSubview(mainSurface)
         glassContainer.contentView.addSubview(liquidLensView.selectionSurface)
-        glassContainer.contentView.addSubview(mainContentView)
         glassContainer.contentView.addSubview(liquidLensView)
         glassContainer.contentView.addSubview(searchView)
 
-        mainContentView.isUserInteractionEnabled = true
         for (index, itemView) in itemViews.enumerated() {
-            mainContentView.addSubview(itemView)
+            liquidLensView.contentView.addSubview(itemView)
             itemView.onActivate = { [weak self] in
                 let tabs: [AppTab] = [.home, .library, .settings]
                 guard index < tabs.count else { return }
                 self?.onTabSelected?(tabs[index])
             }
+            itemView.onPressChanged = { [weak self] isPressed in
+                self?.updateSelectionGesture(isPressed: isPressed, index: index)
+            }
+        }
+
+        for selectedItemView in selectedItemViews {
+            liquidLensView.selectedContentView.addSubview(selectedItemView)
         }
 
         searchView.onActivate = { [weak self] in
@@ -75,8 +97,8 @@ final class NagiTabBarView: UIView {
 
         liquidLensView.configure(
             liftedContainerView: glassContainer.contentView,
-            liftedContentView: itemViews[0],
-            punchoutView: mainContentView
+            liftedContentView: liquidLensView.selectedContentView,
+            punchoutView: liquidLensView.contentView
         )
     }
 
@@ -114,7 +136,15 @@ final class NagiTabBarView: UIView {
         reduceTransparency: Bool,
         transition: NagiTabTransition
     ) {
-        let params = NagiTabBarParams(layout: layout, mode: mode, reduceTransparency: reduceTransparency)
+        currentLayout = layout
+        currentMode = mode
+
+        let params = NagiTabBarParams(
+            layout: layout,
+            mode: mode,
+            reduceTransparency: reduceTransparency,
+            selectionGestureIndex: selectionGestureState?.index
+        )
         guard params != previousParams else {
             return
         }
@@ -123,9 +153,16 @@ final class NagiTabBarView: UIView {
         let isDark = traitCollection.userInterfaceStyle == .dark
         let localMainFrame = localFrame(layout.mainTabsFrame, in: layout.tabBarFrame)
         let localSearchFrame = localFrame(layout.searchFrame, in: layout.tabBarFrame)
-        let localLensFrame = localFrame(layout.lensFrame, in: layout.tabBarFrame)
-        let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.tabBarFrame) }
+        let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.mainTabsFrame) }
         let selectedTab = mode.selectedTab
+        let selectedIndex = mainIndex(for: selectedTab)
+        let displayedIndex = selectionGestureState?.index ?? selectedIndex
+        let lensFrame = displayedIndex.flatMap { index in
+            guard layout.itemFrames.indices.contains(index) else { return nil }
+            return localFrame(layout.itemFrames[index], in: layout.tabBarFrame)
+        } ?? .zero
+        let isLifted = selectionGestureState != nil && isLiftedStateEnabled
+        let isLensVisible = !layout.isSearchExpanded && !lensFrame.isEmpty
         let mainGlassParams = NagiGlassParams(
             size: localMainFrame.size,
             cornerRadius: NagiTabBarMetrics.barHeight * 0.5,
@@ -144,10 +181,6 @@ final class NagiTabBarView: UIView {
             reduceTransparency: reduceTransparency
         )
 
-        if selectedTab != .search, let selectedIndex = mainIndex(for: selectedTab) {
-            liquidLensView.setTarget(itemViews[selectedIndex])
-        }
-
         mainSurface.prepare(params: mainGlassParams)
         searchView.prepare(params: searchParams)
 
@@ -155,13 +188,21 @@ final class NagiTabBarView: UIView {
             guard let self else { return }
             self.glassContainer.frame = self.bounds
             self.mainSurface.applyGeometry(params: mainGlassParams)
-            self.mainContentView.frame = localMainFrame
-            self.mainContentView.alpha = layout.isSearchExpanded ? 0 : 1
-            self.mainContentView.isUserInteractionEnabled = !layout.isSearchExpanded
+            self.liquidLensView.contentView.frame = localMainFrame
+            self.liquidLensView.selectedContentView.frame = localMainFrame
+            self.liquidLensView.contentView.isUserInteractionEnabled = !layout.isSearchExpanded
 
-            for (itemView, itemFrame) in zip(self.itemViews, localItemFrames) {
+            for ((itemView, selectedItemView), itemFrame) in zip(
+                zip(self.itemViews, self.selectedItemViews),
+                localItemFrames
+            ) {
                 itemView.frame = itemFrame
-                itemView.update(isSelected: itemView.tab == selectedTab)
+                itemView.update(
+                    isSelected: !self.liquidLensView.usesPrivateLens && displayedIndex == self.mainIndex(for: itemView.tab)
+                )
+                selectedItemView.frame = itemFrame
+                selectedItemView.update(isSelected: displayedIndex == self.mainIndex(for: selectedItemView.tab))
+                selectedItemView.alpha = displayedIndex == self.mainIndex(for: selectedItemView.tab) ? 1 : 0
             }
 
             self.searchView.applyGeometry(params: searchParams)
@@ -170,8 +211,9 @@ final class NagiTabBarView: UIView {
 
         liquidLensView.apply(
             params: NagiLensParams(
-                baseFrame: localLensFrame,
-                isLifted: !layout.isSearchExpanded && selectedTab != .search,
+                baseFrame: lensFrame,
+                isVisible: isLensVisible,
+                isLifted: isLifted,
                 reduceTransparency: reduceTransparency
             ),
             transition: transition
@@ -194,13 +236,36 @@ final class NagiTabBarView: UIView {
     private func applyLocalGeometry(_ layout: NagiTabBarLayout) {
         glassContainer.frame = bounds
         mainSurface.frame = localFrame(layout.mainTabsFrame, in: layout.tabBarFrame)
-        mainContentView.frame = localFrame(layout.mainTabsFrame, in: layout.tabBarFrame)
+        liquidLensView.contentView.frame = localFrame(layout.mainTabsFrame, in: layout.tabBarFrame)
+        liquidLensView.selectedContentView.frame = liquidLensView.contentView.frame
         searchView.frame = localFrame(layout.searchFrame, in: layout.tabBarFrame)
         liquidLensView.frame = bounds
         liquidLensView.selectionSurface.frame = localFrame(layout.lensFrame, in: layout.tabBarFrame)
-        for (itemView, itemFrame) in zip(itemViews, layout.itemFrames.map({ localFrame($0, in: layout.tabBarFrame) })) {
+        let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.mainTabsFrame) }
+        for ((itemView, selectedItemView), itemFrame) in zip(
+            zip(itemViews, selectedItemViews),
+            localItemFrames
+        ) {
             itemView.frame = itemFrame
+            selectedItemView.frame = itemFrame
         }
+    }
+
+    private func updateSelectionGesture(isPressed: Bool, index: Int) {
+        let nextState: NagiSelectionGestureState? = isPressed ? .pressing(index: index) : nil
+        guard nextState != selectionGestureState else { return }
+        selectionGestureState = nextState
+
+        guard let currentLayout, let currentMode else { return }
+        let transition: NagiTabTransition = isPressed
+            ? .spring(duration: 0.2, damping: 0.86, velocity: 0.1)
+            : .spring(duration: 0.22, damping: 0.88, velocity: 0.1)
+        update(
+            layout: currentLayout,
+            mode: currentMode,
+            reduceTransparency: previousParams?.reduceTransparency ?? false,
+            transition: transition
+        )
     }
 
     private func localFrame(_ frame: CGRect, in barFrame: CGRect) -> CGRect {

@@ -12,19 +12,32 @@ final class NagiTabBarItemView: UIView {
     let tab: AppTab
     private let button: UIButton
     private let iconView: UIImageView
+    private let isInteractive: Bool
 
     var onActivate: (() -> Void)?
+    var onPressChanged: ((Bool) -> Void)?
 
-    init(tab: AppTab) {
+    init(tab: AppTab, isInteractive: Bool = true) {
         self.tab = tab
         self.button = UIButton(type: .system)
         self.iconView = UIImageView(frame: .zero)
+        self.isInteractive = isInteractive
         super.init(frame: .zero)
 
         isAccessibilityElement = false
         addSubview(button)
-        button.addTarget(self, action: #selector(activate), for: .primaryActionTriggered)
-        button.accessibilityTraits = [.button]
+        button.isUserInteractionEnabled = isInteractive
+        button.isAccessibilityElement = isInteractive
+        if isInteractive {
+            button.addTarget(self, action: #selector(activate), for: .primaryActionTriggered)
+            button.addTarget(self, action: #selector(pressBegan), for: .touchDown)
+            button.addTarget(
+                self,
+                action: #selector(pressEnded),
+                for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit]
+            )
+        }
+        button.accessibilityTraits = isInteractive ? [.button] : []
         button.contentHorizontalAlignment = .center
         button.contentVerticalAlignment = .center
 
@@ -69,10 +82,19 @@ final class NagiTabBarItemView: UIView {
 
     func update(isSelected: Bool) {
         iconView.tintColor = isSelected ? .label : .secondaryLabel
+        guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
     }
 
     @objc private func activate() {
         onActivate?()
+    }
+
+    @objc private func pressBegan() {
+        onPressChanged?(true)
+    }
+
+    @objc private func pressEnded() {
+        onPressChanged?(false)
     }
 }

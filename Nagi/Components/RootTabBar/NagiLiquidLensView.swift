@@ -11,6 +11,7 @@ import UIKit
 
 struct NagiLensParams: Equatable {
     var baseFrame: CGRect
+    var isVisible: Bool
     var isLifted: Bool
     var reduceTransparency: Bool
 }
@@ -28,6 +29,8 @@ final class NagiLiquidLensView: UIView {
     }
 
     let selectionSurface: NagiGlassBackgroundView
+    let contentView: UIView
+    let selectedContentView: UIView
     private let nativeLensView: UIView?
     private var currentParams: NagiLensParams?
     private var isApplyingParams = false
@@ -46,10 +49,24 @@ final class NagiLiquidLensView: UIView {
 
     override init(frame: CGRect) {
         self.selectionSurface = NagiGlassBackgroundView(frame: .zero)
+        self.contentView = UIView(frame: .zero)
+        self.selectedContentView = UIView(frame: .zero)
         self.nativeLensView = Self.makePrivateLensView()
         super.init(frame: frame)
 
-        isUserInteractionEnabled = false
+        // The persistent normal content lives inside this view. The lens and
+        // selected-content layers remain non-interactive, while the normal
+        // item controls receive the touch that drives lifted state.
+        isUserInteractionEnabled = true
+        contentView.isUserInteractionEnabled = true
+        contentView.backgroundColor = .clear
+        contentView.isOpaque = false
+        selectedContentView.isUserInteractionEnabled = false
+        selectedContentView.backgroundColor = .clear
+        selectedContentView.isOpaque = false
+        addSubview(selectedContentView)
+        addSubview(contentView)
+
         selectionSurface.isUserInteractionEnabled = false
         selectionSurface.alpha = 0
         addSubview(selectionSurface)
@@ -89,13 +106,6 @@ final class NagiLiquidLensView: UIView {
         invoke(PrivateSelector.setOverridePunchoutView, on: nativeLensView, object: punchoutView)
     }
 
-    func setTarget(_ view: UIView) {
-        guard let nativeLensView else {
-            return
-        }
-        invoke(PrivateSelector.setLiftedContentView, on: nativeLensView, object: view)
-    }
-
     func apply(params: NagiLensParams, transition: NagiTabTransition) {
         if isApplyingParams {
             pendingParams = params
@@ -107,7 +117,7 @@ final class NagiLiquidLensView: UIView {
         let oldLifted = currentParams?.isLifted ?? false
         currentParams = params
 
-        let selectionVisible = !usesPrivateLens && params.isLifted && !params.baseFrame.isEmpty
+        let selectionVisible = !usesPrivateLens && params.isVisible && !params.baseFrame.isEmpty
         let selectionGlassParams = NagiGlassParams(
             size: params.baseFrame.size,
             cornerRadius: min(params.baseFrame.width, params.baseFrame.height) * 0.5,
@@ -144,16 +154,16 @@ final class NagiLiquidLensView: UIView {
 
     private func applyGeometry(_ params: NagiLensParams, animated: Bool) {
         guard let nativeLensView else { return }
-        let inset: CGFloat = params.isLifted ? 4 : -4
+        let expansion: CGFloat = params.isLifted ? 4 : 0
         nativeLensView.bounds = CGRect(
             origin: .zero,
             size: CGSize(
-                width: max(0, params.baseFrame.width + inset * 2),
-                height: max(0, params.baseFrame.height + inset * 2)
+                width: max(0, params.baseFrame.width + expansion * 2),
+                height: max(0, params.baseFrame.height + expansion * 2)
             )
         )
         nativeLensView.center = CGPoint(x: params.baseFrame.midX, y: params.baseFrame.midY)
-        nativeLensView.alpha = params.isLifted ? 1 : 0
+        nativeLensView.alpha = params.isVisible && !params.baseFrame.isEmpty ? 1 : 0
     }
 
     private func invokeLifted(params: NagiLensParams, transition: NagiTabTransition) {

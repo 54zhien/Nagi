@@ -15,7 +15,6 @@ struct NagiTabBarLayout: Equatable {
     var closeFrame: CGRect
     var itemFrames: [CGRect]
     var lensFrame: CGRect
-    var contentBottomInset: CGFloat
     var isSearchExpanded: Bool
 }
 
@@ -23,19 +22,12 @@ enum NagiTabBarMetrics {
     static let innerInset: CGFloat = 4
     static let itemHeight: CGFloat = 56
     static let barHeight: CGFloat = 64
+    static let searchDiameter: CGFloat = 64
     static let standaloneGap: CGFloat = 8
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
     static let horizontalMargin: CGFloat = 16
     static let keyboardLift: CGFloat = 8
-
-    static var mainTabsWidth: CGFloat {
-        innerInset * 2 + itemHeight * CGFloat(mainItemCount)
-    }
-
-    static var normalBarWidth: CGFloat {
-        mainTabsWidth + standaloneGap + barHeight
-    }
 
     static func calculateLayout(
         bounds: CGRect,
@@ -51,7 +43,6 @@ enum NagiTabBarMetrics {
                 closeFrame: .zero,
                 itemFrames: Array(repeating: .zero, count: mainItemCount),
                 lensFrame: .zero,
-                contentBottomInset: 0,
                 isSearchExpanded: state.isSearchExpanded
             )
         }
@@ -88,9 +79,6 @@ enum NagiTabBarMetrics {
                 width: barFrame.width,
                 height: activeSearchHeight
             )
-            let insetFromVisibleBottom = keyboardOverlap > 0
-                ? keyboardOverlap + keyboardLift
-                : max(0, bounds.maxY - barFrame.minY - safeAreaInsets.bottom)
 
             return NagiTabBarLayout(
                 tabBarFrame: barFrame,
@@ -99,24 +87,31 @@ enum NagiTabBarMetrics {
                 closeFrame: searchFrame,
                 itemFrames: Array(repeating: .zero, count: mainItemCount),
                 lensFrame: .zero,
-                contentBottomInset: insetFromVisibleBottom,
                 isSearchExpanded: true
             )
         }
 
-        let width = min(normalBarWidth, max(0, bounds.width - horizontalMargin * 2))
+        // The original Nagi system TabView uses the available width for the
+        // complete floating bar. Keep the search surface independent, then
+        // distribute the remaining main capsule width across the three tabs.
+        let normalBarWidth = max(0, bounds.width - horizontalMargin * 2)
+        let mainTabsWidth = max(0, normalBarWidth - standaloneGap - searchDiameter)
+        let width = normalBarWidth
         let barFrame = CGRect(
             x: bounds.midX - width * 0.5,
             y: bottomY - barHeight,
             width: width,
             height: barHeight
         )
-        let actualMainWidth = max(0, min(mainTabsWidth, width - barHeight - standaloneGap))
-        let mainFrame = CGRect(x: barFrame.minX, y: barFrame.minY, width: actualMainWidth, height: barHeight)
-        let searchX = min(barFrame.maxX - barHeight, mainFrame.maxX + standaloneGap)
-        let searchFrame = CGRect(x: searchX, y: barFrame.minY, width: barHeight, height: barHeight)
-        let itemWidth = actualMainWidth > innerInset * 2
-            ? (actualMainWidth - innerInset * 2) / CGFloat(mainItemCount)
+        let mainFrame = CGRect(x: barFrame.minX, y: barFrame.minY, width: mainTabsWidth, height: barHeight)
+        let searchFrame = CGRect(
+            x: mainFrame.maxX + standaloneGap,
+            y: barFrame.minY,
+            width: searchDiameter,
+            height: searchDiameter
+        )
+        let itemWidth = mainTabsWidth > innerInset * 2
+            ? (mainTabsWidth - innerInset * 2) / CGFloat(mainItemCount)
             : 0
         let itemFrames = (0..<mainItemCount).map { index in
             CGRect(
@@ -134,7 +129,6 @@ enum NagiTabBarMetrics {
         case .search: selectedIndex = 0
         }
         let selectedFrame = itemFrames.indices.contains(selectedIndex) ? itemFrames[selectedIndex] : .zero
-        let contentBottomInset = max(0, bounds.maxY - barFrame.minY - safeAreaInsets.bottom)
 
         return NagiTabBarLayout(
             tabBarFrame: barFrame,
@@ -143,7 +137,6 @@ enum NagiTabBarMetrics {
             closeFrame: .zero,
             itemFrames: itemFrames,
             lensFrame: selectedFrame,
-            contentBottomInset: contentBottomInset,
             isSearchExpanded: false
         )
     }

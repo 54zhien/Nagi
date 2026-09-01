@@ -16,6 +16,7 @@ final class NagiRootViewController: UIViewController {
 
     let state = NagiRootState()
     private var hostingControllers: [AppTab: UIHostingController<AnyView>] = [:]
+    private var pageHosts: [AppTab: NagiRootPageHostView] = [:]
     private var keyboardCoordinator: NagiKeyboardLayoutCoordinator?
     private var currentLayoutState = NagiRootLayoutState.initial
     private var reduceMotion: Bool
@@ -34,7 +35,10 @@ final class NagiRootViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        view.backgroundColor = .systemBackground
+        // Each persistent page host owns a full-bleed page background. The
+        // root itself must not become a visible strip around SwiftUI content.
+        view.backgroundColor = .clear
+        view.isOpaque = false
         contentContainerView.backgroundColor = .clear
         contentContainerView.clipsToBounds = false
         view.addSubview(contentContainerView)
@@ -75,16 +79,31 @@ final class NagiRootViewController: UIViewController {
     private func installPersistentChildren() {
         let tabs: [AppTab] = [.home, .library, .settings, .search]
         for tab in tabs {
+            let pageHost = NagiRootPageHostView(backgroundColor: pageBackgroundColor(for: tab))
+            pageHosts[tab] = pageHost
+            contentContainerView.addSubview(pageHost)
+
             let controller = makeHostingController(for: tab)
             hostingControllers[tab] = controller
             addChild(controller)
             controller.view.backgroundColor = .clear
+            controller.view.isOpaque = false
             controller.view.frame = contentContainerView.bounds
-            contentContainerView.addSubview(controller.view)
+            pageHost.contentView.addSubview(controller.view)
             controller.didMove(toParent: self)
-            controller.view.alpha = tab == .home ? 1 : 0
-            controller.view.isHidden = tab != .home
+            pageHost.alpha = tab == .home ? 1 : 0
+            pageHost.isHidden = tab != .home
+            pageHost.isUserInteractionEnabled = tab == .home
             controller.view.isUserInteractionEnabled = tab == .home
+        }
+    }
+
+    private func pageBackgroundColor(for tab: AppTab) -> UIColor {
+        switch tab {
+        case .settings:
+            return .systemGroupedBackground
+        case .home, .library, .search:
+            return .systemBackground
         }
     }
 
@@ -185,18 +204,20 @@ final class NagiRootViewController: UIViewController {
         let visibleTab = tab
         for (childTab, controller) in hostingControllers {
             let isVisible = childTab == visibleTab
-            controller.view.isHidden = false
+            guard let pageHost = pageHosts[childTab] else { continue }
+            pageHost.isHidden = false
+            pageHost.isUserInteractionEnabled = isVisible
             controller.view.isUserInteractionEnabled = isVisible
         }
         transition.animate { [weak self] in
             guard let self else { return }
-            for (childTab, controller) in self.hostingControllers {
-                controller.view.alpha = childTab == visibleTab ? 1 : 0
+            for (childTab, pageHost) in self.pageHosts {
+                pageHost.alpha = childTab == visibleTab ? 1 : 0
             }
         } completion: { [weak self] completed in
             guard let self, completed else { return }
-            for (childTab, controller) in self.hostingControllers where childTab != visibleTab {
-                controller.view.isHidden = true
+            for (childTab, pageHost) in self.pageHosts where childTab != visibleTab {
+                pageHost.isHidden = true
             }
         }
     }
@@ -236,14 +257,11 @@ final class NagiRootViewController: UIViewController {
             guard let self else { return }
             NagiTabTransition.setFrame(self.contentContainerView, self.view.bounds)
             NagiTabTransition.setFrame(self.tabBarView, layout.tabBarFrame)
-            for controller in self.hostingControllers.values {
-                NagiTabTransition.setFrame(controller.view, self.contentContainerView.bounds)
-                controller.additionalSafeAreaInsets = UIEdgeInsets(
-                    top: 0,
-                    left: 0,
-                    bottom: layout.contentBottomInset,
-                    right: 0
-                )
+            for (tab, pageHost) in self.pageHosts {
+                NagiTabTransition.setFrame(pageHost, self.contentContainerView.bounds)
+                if let controller = self.hostingControllers[tab] {
+                    NagiTabTransition.setFrame(controller.view, self.contentContainerView.bounds)
+                }
             }
         }
 
