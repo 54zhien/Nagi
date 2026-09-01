@@ -2,7 +2,7 @@
 //  NagiApp.swift
 //  Nagi
 //
-//  App 入口 + 根 Tab 视图（底部 tab 栏，搜索分离式）
+//  App 入口。正式 Root 由持久化 UIKit 容器承载。
 //
 
 import SwiftUI
@@ -10,11 +10,21 @@ import SwiftData
 
 @main
 struct NagiApp: App {
+    @State private var importState = AppImportState.shared
+
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            NagiRootRepresentable()
                 .onOpenURL { url in
                     handleIncomingFile(url)
+                }
+                .alert("导入", isPresented: Binding(
+                    get: { importState.message != nil },
+                    set: { if !$0 { importState.message = nil } }
+                )) {
+                    Button("好", role: .cancel) {}
+                } message: {
+                    Text(importState.message ?? "")
                 }
         }
         .modelContainer(Persistence.container)
@@ -40,67 +50,4 @@ struct NagiApp: App {
             }
         }
     }
-}
-
-// MARK: - 根 Tab 视图
-
-/// 底部 tab 栏：主页 / 书库 / 设置 / 搜索
-/// - 搜索 tab 通过 `role: .search` 与其它 tab 分离，独立分隔显示
-struct RootTabView: View {
-    @State private var selection: AppTab = .home
-    @State private var searchText = ""
-    // Keep search presentation independent from tab selection. The binding is
-    // observed by SwiftUI, but we do not set it when selecting the search tab,
-    // which preserves the existing no-auto-keyboard behavior.
-    @State private var isSearchPresented = false
-    @State private var importState = AppImportState.shared
-
-    var body: some View {
-        tabView
-            .alert("导入", isPresented: Binding(
-                get: { importState.message != nil },
-                set: { if !$0 { importState.message = nil } }
-            )) {
-                Button("好", role: .cancel) {}
-            } message: {
-                Text(importState.message ?? "")
-            }
-    }
-
-    private var tabView: some View {
-        TabView(selection: $selection) {
-            Tab("主页", image: "homeIcon", value: .home) {
-                HomeView()
-            }
-
-            Tab("书库", systemImage: "books.vertical", value: .library) {
-                LibraryView()
-            }
-
-            Tab("设置", systemImage: "gearshape", value: .settings) {
-                SettingsView()
-            }
-
-            Tab("搜索", systemImage: "magnifyingglass", value: .search, role: .search) {
-                SearchView(searchText: $searchText)
-            }
-        }
-        .searchable(
-            text: $searchText,
-            isPresented: $isSearchPresented,
-            prompt: "搜索书名"
-        )
-        .tabViewStyle(.sidebarAdaptable)
-        .tabViewSearchActivation(.automatic)
-    }
-}
-
-// MARK: - Tab 标识
-
-/// 底部 tab 栏的四个 tab，作为 TabView 的 selection 值类型。
-enum AppTab: Hashable {
-    case home
-    case library
-    case settings
-    case search
 }
