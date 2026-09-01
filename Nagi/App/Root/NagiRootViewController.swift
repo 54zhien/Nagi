@@ -164,7 +164,6 @@ final class NagiRootViewController: UIViewController {
         tabBarView.becomeSearchFirstResponder()
 
         state.mode = .searchActive
-        reconcileLayout(transition: .immediate)
     }
 
     private func cancelSearch(to targetTab: AppTab? = nil) {
@@ -241,7 +240,7 @@ final class NagiRootViewController: UIViewController {
             keyboardFrame: currentLayoutState.keyboardFrame,
             mode: state.mode
         )
-        guard nextState != currentLayoutState || tabBarView.frame != .zero else {
+        guard nextState != currentLayoutState || tabBarView.frame == .zero else {
             return
         }
 

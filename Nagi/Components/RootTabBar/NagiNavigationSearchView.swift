@@ -122,7 +122,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     }
 
     func applyGeometry(params: NagiSearchParams) {
-        frame.size = params.size
         let radius = params.isExpanded ? params.size.height * 0.5 : min(params.size.width, params.size.height) * 0.5
         backgroundView.frame = bounds
         backgroundView.applyGeometry(params: NagiGlassParams(

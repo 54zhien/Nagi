@@ -110,9 +110,6 @@ final class NagiTabBarView: UIView {
         super.layoutSubviews()
         glassContainer.frame = bounds
         liquidLensView.frame = bounds
-        if let previousParams {
-            applyLocalGeometry(previousParams.layout)
-        }
     }
 
     private func handleTraitCollectionChange(_ previousTraitCollection: UITraitCollection) {
@@ -209,6 +206,7 @@ final class NagiTabBarView: UIView {
                 selectedItemView.alpha = displayedIndex == self.mainIndex(for: selectedItemView.tab) ? 1 : 0
             }
 
+            NagiTabTransition.setFrame(self.searchView, localSearchFrame)
             self.searchView.applyGeometry(params: searchParams)
             self.searchView.alpha = mode.isSearchVisible || !layout.isSearchExpanded ? 1 : 0
         }
@@ -235,24 +233,6 @@ final class NagiTabBarView: UIView {
     @discardableResult
     func becomeSearchFirstResponder() -> Bool {
         searchView.becomeSearchFirstResponder()
-    }
-
-    private func applyLocalGeometry(_ layout: NagiTabBarLayout) {
-        glassContainer.frame = bounds
-        mainSurface.frame = localFrame(layout.mainTabsFrame, in: layout.tabBarFrame)
-        liquidLensView.contentView.frame = localFrame(layout.mainTabsFrame, in: layout.tabBarFrame)
-        liquidLensView.selectedContentView.frame = liquidLensView.contentView.frame
-        searchView.frame = localFrame(layout.searchFrame, in: layout.tabBarFrame)
-        liquidLensView.frame = bounds
-        liquidLensView.selectionSurface.frame = localFrame(layout.lensFrame, in: layout.tabBarFrame)
-        let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.mainTabsFrame) }
-        for ((itemView, selectedItemView), itemFrame) in zip(
-            zip(itemViews, selectedItemViews),
-            localItemFrames
-        ) {
-            itemView.frame = itemFrame
-            selectedItemView.frame = itemFrame
-        }
     }
 
     private func updateSelectionGesture(isPressed: Bool, index: Int) {
