@@ -78,9 +78,9 @@ final class NagiTabBarView: UIView {
         glassContainer.contentView.addSubview(searchView)
         tabSelectionRecognizer.addTarget(self, action: #selector(handleTabSelectionGesture(_:)))
         tabSelectionRecognizer.shouldBeginAtLocation = { [weak self] location in
-            self?.mainIndex(at: location, requiresMainFrameHit: true) != nil
+            self?.shouldBeginTabSelectionGesture(at: location) ?? false
         }
-        liquidLensView.addGestureRecognizer(tabSelectionRecognizer)
+        addGestureRecognizer(tabSelectionRecognizer)
 
         for itemView in itemViews {
             itemView.isUserInteractionEnabled = false
@@ -111,6 +111,21 @@ final class NagiTabBarView: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
+        if super.point(inside: point, with: event) {
+            return true
+        }
+
+        guard let currentLayout, currentLayout.isSearchActive else {
+            return false
+        }
+        let collapsedMainFrame = localFrame(
+            currentLayout.mainTabsFrame,
+            in: currentLayout.tabBarFrame
+        )
+        return collapsedMainFrame.contains(point)
     }
 
     override func layoutSubviews() {
@@ -281,7 +296,33 @@ final class NagiTabBarView: UIView {
         searchView.becomeSearchFirstResponder()
     }
 
+    private func shouldBeginTabSelectionGesture(at location: CGPoint) -> Bool {
+        guard let currentLayout else {
+            return false
+        }
+
+        if currentLayout.isSearchActive {
+            let collapsedMainFrame = localFrame(
+                currentLayout.mainTabsFrame,
+                in: currentLayout.tabBarFrame
+            )
+            return collapsedMainFrame.contains(location)
+        }
+
+        return mainIndex(at: location, requiresMainFrameHit: true) != nil
+    }
+
     @objc private func handleTabSelectionGesture(_ recognizer: NagiTabSelectionRecognizer) {
+        if currentSearchState.isActive {
+            switch recognizer.state {
+            case .ended, .cancelled:
+                onSearchCancelled?()
+            default:
+                break
+            }
+            return
+        }
+
         switch recognizer.state {
         case .began:
             beginTabSelection(at: recognizer.initialLocation)
