@@ -20,6 +20,9 @@ final class NagiRootViewController: UIViewController {
             action: #selector(handleSearchOverlayDismissTap(_:))
         )
         recognizer.cancelsTouchesInView = false
+        // The transparent dim interaction only exists while an empty Search
+        // is actively presented.
+        recognizer.isEnabled = false
         return recognizer
     }()
 
@@ -169,7 +172,11 @@ final class NagiRootViewController: UIViewController {
             self?.cancelSearch()
         }
         tabBarView.onSearchQueryChanged = { [weak self] query in
-            self?.state.searchText = query
+            guard let self else { return }
+
+            self.state.searchText = query
+            self.searchOverlayDismissTapGesture.isEnabled =
+                query.isEmpty && self.state.mode.isSearchActive
         }
     }
 
@@ -218,6 +225,9 @@ final class NagiRootViewController: UIViewController {
         searchExitLayoutCompleted = false
         searchOverlayExitCompleted = false
         state.mode = .searchExiting(previous: target)
+        // Nagram hides the dim interaction once Search is no longer in the
+        // active-search phase.
+        searchOverlayDismissTapGesture.isEnabled = false
 
         let transition = effectiveTransition(.spring(duration: 0.5))
         // Reveal the destination under the Search overlay. The overlay still
@@ -272,6 +282,8 @@ final class NagiRootViewController: UIViewController {
 
         searchOverlayView.isHidden = false
         searchOverlayView.isUserInteractionEnabled = true
+        searchOverlayDismissTapGesture.isEnabled =
+            state.searchText.isEmpty && state.mode.isSearchActive
         // The overlay itself stays transparent and fully active. Nagram's
         // Bottom Contacts Search does not perform an opaque background fade.
         searchOverlayView.alpha = 1
@@ -303,7 +315,7 @@ final class NagiRootViewController: UIViewController {
             return
         }
 
-        guard state.mode.isSearchVisible else {
+        guard state.mode.isSearchActive else {
             return
         }
 
@@ -317,6 +329,7 @@ final class NagiRootViewController: UIViewController {
     }
 
     private func dismissSearchOverlay(completion: @escaping () -> Void) {
+        searchOverlayDismissTapGesture.isEnabled = false
         searchOverlayView.isUserInteractionEnabled = false
 
         guard !reduceMotion else {
