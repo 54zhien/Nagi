@@ -240,6 +240,8 @@ final class NagiLiquidLensView: UIView {
             return
         }
 
+        let isFirstTime = currentParams == nil
+        let effectiveTransition: NagiTabTransition = isFirstTime ? .immediate : transition
         let previousParams = appliedLensParams
         currentParams = params
         appliedLensParams = params
@@ -252,7 +254,7 @@ final class NagiLiquidLensView: UIView {
             previousParams == nil ||
             previousParams?.size != params.size ||
             previousParams?.containerOrigin != params.containerOrigin
-        let shouldClip = !transition.isImmediate && previousParams != nil && containerGeometryChanged
+        let shouldClip = !effectiveTransition.isImmediate && previousParams != nil && containerGeometryChanged
         setResizeClipping(shouldClip)
 
         let mainCornerRadius = min(params.size.width, params.size.height) * 0.5
@@ -274,19 +276,19 @@ final class NagiLiquidLensView: UIView {
             self.applyPresentationGeometry(
                 params: params,
                 mainGlassParams: mainGlassParams,
-                transition: transition,
+                transition: effectiveTransition,
                 mainGlassChanged: mainGlassChanged,
                 containerGeometryChanged: containerGeometryChanged
             )
             self.applyNativeLensGeometry(
                 params: params,
-                transition: transition,
+                transition: effectiveTransition,
                 privateLiftChanged: privateLiftChanged
             )
         }
 
         guard privateLiftChanged else {
-            transition.perform(applyAnimations) { [weak self] completed in
+            effectiveTransition.perform(applyAnimations) { [weak self] completed in
                 guard let self, completed, self.currentParams == params else { return }
                 self.setResizeClipping(false)
             }
@@ -299,7 +301,7 @@ final class NagiLiquidLensView: UIView {
         // setLifted defers its alongside callback replaces this value with
         // the newest params instead of starting another nested lift.
         pendingParams = params
-        transition.perform(applyAnimations)
+        effectiveTransition.perform(applyAnimations)
 
         let alongsideAnimations = { [weak self] in
             guard let self,
@@ -311,7 +313,7 @@ final class NagiLiquidLensView: UIView {
 
         invokeLifted(
             params: params,
-            transition: transition,
+            transition: effectiveTransition,
             alongsideAnimations: alongsideAnimations
         )
     }
