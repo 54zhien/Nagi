@@ -16,22 +16,28 @@ struct SearchView: View {
 
     var body: some View {
         searchContent
-        .transaction { transaction in
-            transaction.animation = nil
-        }
-        .fullScreenCover(
-            isPresented: Binding(
-                get: { selectedBook != nil },
-                set: { if !$0 { selectedBook = nil } }
-            )
-        ) {
-            if let selectedBook {
-                ReaderView(book: selectedBook)
+            // Root already owns keyboard geometry through
+            // NagiKeyboardLayoutCoordinator. Do not let SwiftUI apply a
+            // second keyboard safe-area resize to this transparent overlay;
+            // otherwise the hosting background is exposed below the Search
+            // surface while the keyboard is being presented/dismissed.
+            .ignoresSafeArea(.keyboard, edges: .bottom)
+            .transaction { transaction in
+                transaction.animation = nil
             }
-        }
-        .onChange(of: searchText, initial: true) { _, newValue in
-            effectiveQuery = newValue
-        }
+            .fullScreenCover(
+                isPresented: Binding(
+                    get: { selectedBook != nil },
+                    set: { if !$0 { selectedBook = nil } }
+                )
+            ) {
+                if let selectedBook {
+                    ReaderView(book: selectedBook)
+                }
+            }
+            .onChange(of: searchText, initial: true) { _, newValue in
+                effectiveQuery = newValue
+            }
     }
 
     private var searchContent: some View {
@@ -110,13 +116,16 @@ struct SearchView: View {
             searchTerms.allSatisfy { term in
                 book.title.range(
                     of: term,
-                    options: [.caseInsensitive, .diacriticInsensitive, .widthInsensitive],
+                    options: [
+                        .caseInsensitive,
+                        .diacriticInsensitive,
+                        .widthInsensitive
+                    ],
                     locale: .current
                 ) != nil
             }
         }
     }
-
 }
 
 #Preview {
