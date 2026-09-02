@@ -18,7 +18,7 @@ struct NagiRootRepresentable: UIViewControllerRepresentable {
         // didMoveToWindow if UIKit has not exposed its private backdrop class
         // at this point yet.
         NagiGlassEffectRuntime.installIfNeeded()
-        NagiRootViewController(
+        return NagiRootViewController(
             reduceMotion: reduceMotion,
             reduceTransparency: reduceTransparency
         )
