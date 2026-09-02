@@ -13,10 +13,11 @@ import UIKit
 
 private var nagiTransitionAnimationDelegatesKey: UInt8 = 0
 private let nagiBlurAnimationKey = "nagi.transition.blur"
-private let nagiPositionAnimationKey = "nagi.transition.position"
-private let nagiBoundsAnimationKey = "nagi.transition.bounds"
-private let nagiOpacityAnimationKey = "nagi.transition.opacity"
-private let nagiTransformAnimationKey = "nagi.transition.transform"
+private let nagiPositionAnimationKey = "position"
+private let nagiBoundsAnimationKey = "bounds.size"
+private let nagiFullBoundsAnimationKey = "bounds"
+private let nagiOpacityAnimationKey = "opacity"
+private let nagiTransformAnimationKey = "transform"
 private let nagiCornerRadiusAnimationKey = "nagi.transition.cornerRadius"
 private let nagiTransitionContextThreadKey = "NagiTabTransition.context"
 private let nagiScreenScale = UIScreen.main.scale
@@ -379,22 +380,15 @@ enum NagiTabTransition {
             for: layer,
             animationKeys: [
                 nagiPositionAnimationKey,
-                "position",
-                nagiBoundsAnimationKey,
-                "bounds",
-                "bounds.size"
+                nagiFullBoundsAnimationKey,
+                nagiBoundsAnimationKey
             ]
         )
         let fromBounds = presentationBounds(
             for: layer,
-            animationKeys: [nagiBoundsAnimationKey, "bounds", "bounds.size"]
+            animationKeys: [nagiBoundsAnimationKey, nagiFullBoundsAnimationKey]
         )
 
-        removeAnimation(from: layer, forKey: nagiPositionAnimationKey)
-        removeAnimation(from: layer, forKey: nagiBoundsAnimationKey)
-        removeAnimation(from: layer, forKey: "position")
-        removeAnimation(from: layer, forKey: "bounds")
-        removeAnimation(from: layer, forKey: "bounds.size")
         setModelValue {
             if view.transform == .identity {
                 view.frame = targetFrame
@@ -404,10 +398,15 @@ enum NagiTabTransition {
             }
         }
 
-        guard !isImmediate else { return }
+        guard !isImmediate else {
+            removeAnimation(from: layer, forKey: nagiPositionAnimationKey)
+            removeAnimation(from: layer, forKey: nagiBoundsAnimationKey)
+            removeAnimation(from: layer, forKey: nagiFullBoundsAnimationKey)
+            return
+        }
 
         let toPosition = layer.position
-        let toBounds = layer.bounds
+        let toBoundsSize = layer.bounds.size
         if fromPosition != toPosition {
             addAnimation(
                 makeAnimation(
@@ -419,12 +418,12 @@ enum NagiTabTransition {
                 forKey: nagiPositionAnimationKey
             )
         }
-        if fromBounds != toBounds {
+        if fromBounds.size != toBoundsSize {
             addAnimation(
                 makeAnimation(
-                    keyPath: "bounds",
-                    fromValue: NSValue(cgRect: fromBounds),
-                    toValue: NSValue(cgRect: toBounds)
+                    keyPath: nagiBoundsAnimationKey,
+                    fromValue: NSValue(cgSize: fromBounds.size),
+                    toValue: NSValue(cgSize: toBoundsSize)
                 ),
                 to: layer,
                 forKey: nagiBoundsAnimationKey
@@ -436,26 +435,40 @@ enum NagiTabTransition {
         let layer = view.layer
         let fromBounds = presentationBounds(
             for: layer,
-            animationKeys: [nagiBoundsAnimationKey, "bounds", "bounds.size"]
+            animationKeys: [nagiBoundsAnimationKey, nagiFullBoundsAnimationKey]
         )
-        removeAnimation(from: layer, forKey: nagiBoundsAnimationKey)
-        removeAnimation(from: layer, forKey: "bounds")
-        removeAnimation(from: layer, forKey: "bounds.size")
         setModelValue {
             view.bounds = bounds
         }
 
-        guard !isImmediate else { return }
+        guard !isImmediate else {
+            removeAnimation(from: layer, forKey: nagiBoundsAnimationKey)
+            removeAnimation(from: layer, forKey: nagiFullBoundsAnimationKey)
+            return
+        }
+
         let toBounds = layer.bounds
         guard fromBounds != toBounds else { return }
+        let boundsAnimationKey = fromBounds.origin == toBounds.origin
+            ? nagiBoundsAnimationKey
+            : nagiFullBoundsAnimationKey
+        let fromValue: NSValue
+        let toValue: NSValue
+        if boundsAnimationKey == nagiBoundsAnimationKey {
+            fromValue = NSValue(cgSize: fromBounds.size)
+            toValue = NSValue(cgSize: toBounds.size)
+        } else {
+            fromValue = NSValue(cgRect: fromBounds)
+            toValue = NSValue(cgRect: toBounds)
+        }
         addAnimation(
             makeAnimation(
-                keyPath: "bounds",
-                fromValue: NSValue(cgRect: fromBounds),
-                toValue: NSValue(cgRect: toBounds)
+                keyPath: boundsAnimationKey,
+                fromValue: fromValue,
+                toValue: toValue
             ),
             to: layer,
-            forKey: nagiBoundsAnimationKey
+            forKey: boundsAnimationKey
         )
     }
 
@@ -463,15 +476,17 @@ enum NagiTabTransition {
         let layer = view.layer
         let fromPosition = presentationPosition(
             for: layer,
-            animationKeys: [nagiPositionAnimationKey, "position"]
+            animationKeys: [nagiPositionAnimationKey]
         )
-        removeAnimation(from: layer, forKey: nagiPositionAnimationKey)
-        removeAnimation(from: layer, forKey: "position")
         setModelValue {
             layer.position = position
         }
 
-        guard !isImmediate else { return }
+        guard !isImmediate else {
+            removeAnimation(from: layer, forKey: nagiPositionAnimationKey)
+            return
+        }
+
         let toPosition = layer.position
         guard fromPosition != toPosition else { return }
         addAnimation(
@@ -508,7 +523,9 @@ enum NagiTabTransition {
         let animationKey = additive
             ? "nagi.transition.position.additive"
             : nagiPositionAnimationKey
-        removeAnimation(from: layer, forKey: animationKey)
+        if additive {
+            removeAnimation(from: layer, forKey: animationKey)
+        }
         addAnimation(
             animation,
             to: layer,
@@ -524,15 +541,14 @@ enum NagiTabTransition {
         let layer = view.layer
         let fromOpacity = presentationOpacity(
             for: layer,
-            animationKeys: [nagiOpacityAnimationKey, "opacity"]
+            animationKeys: [nagiOpacityAnimationKey]
         )
-        removeAnimation(from: layer, forKey: nagiOpacityAnimationKey)
-        removeAnimation(from: layer, forKey: "opacity")
         setModelValue {
             view.alpha = alpha
         }
 
         guard !isImmediate else {
+            removeAnimation(from: layer, forKey: nagiOpacityAnimationKey)
             completion?(true)
             return
         }
@@ -562,15 +578,14 @@ enum NagiTabTransition {
         let layer = view.layer
         let fromTransform = presentationTransform(
             for: layer,
-            animationKeys: [nagiTransformAnimationKey, "transform"]
+            animationKeys: [nagiTransformAnimationKey]
         )
-        removeAnimation(from: layer, forKey: nagiTransformAnimationKey)
-        removeAnimation(from: layer, forKey: "transform")
         setModelValue {
             view.transform = CGAffineTransform(scaleX: scale, y: scale)
         }
 
         guard !isImmediate else {
+            removeAnimation(from: layer, forKey: nagiTransformAnimationKey)
             completion?(true)
             return
         }
