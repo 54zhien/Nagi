@@ -14,6 +14,7 @@ struct NagiTabBarParams: Equatable {
     var searchState: NagiTabBarSearchState
     var reduceTransparency: Bool
     var selectionGestureIndex: Int?
+    var selectionGestureX: CGFloat?
     var overrideSelectedIndex: Int?
 }
 
@@ -154,6 +155,7 @@ final class NagiTabBarView: UIView {
             searchState: searchState,
             reduceTransparency: reduceTransparency,
             selectionGestureIndex: selectionGestureState?.hoveredIndex,
+            selectionGestureX: selectionGestureState?.currentSelectionX,
             overrideSelectedIndex: overrideSelectedIndex
         )
         guard nextParams != previousParams else {
@@ -222,8 +224,19 @@ final class NagiTabBarView: UIView {
                 zip(self.itemViews, self.selectedItemViews),
                 localItemFrames
             ) {
+                // Nagram uses frame for the normal item, but deliberately
+                // decomposes selected-item geometry because that view is also
+                // scaled while the Liquid Lens is lifted. Writing UIView.frame
+                // through a non-identity transform makes its geometry unstable.
                 transition.setFrame(view: itemView, frame: itemFrame)
-                transition.setFrame(view: selectedItemView, frame: itemFrame)
+                transition.setPosition(
+                    view: selectedItemView,
+                    position: itemFrame.center
+                )
+                transition.setBounds(
+                    view: selectedItemView,
+                    bounds: CGRect(origin: .zero, size: itemFrame.size)
+                )
             }
             self.updateItemSelectionPresentation(
                 displayedIndex: displayedIndex,
@@ -334,6 +347,9 @@ final class NagiTabBarView: UIView {
         gestureState.hoveredIndex = hoveredIndex
         selectionGestureState = gestureState
 
+        // currentSelectionX participates in NagiTabBarParams equality, so an
+        // immediate local render now reaches LiquidLensView on every move,
+        // matching Nagram's continuous currentX updates inside one tab slot.
         renderCurrentLayout(transition: .immediate)
     }
 
