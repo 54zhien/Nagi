@@ -12,7 +12,7 @@ import UIKit
 
 final class NagiTabSelectionRecognizer: UIGestureRecognizer {
     private var initialTouchLocation: CGPoint?
-    private var currentTouchLocation: CGPoint?
+    private(set) var currentTouchLocation: CGPoint?
 
     var shouldBeginAtLocation: ((CGPoint) -> Bool)?
 
