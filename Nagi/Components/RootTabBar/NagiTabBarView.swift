@@ -357,8 +357,7 @@ final class NagiTabBarView: UIView {
     }
 
     private func updateTabSelection(using recognizer: NagiTabSelectionRecognizer) {
-        guard var gestureState = selectionGestureState,
-              let currentLayout else {
+        guard var gestureState = selectionGestureState else {
             return
         }
 
