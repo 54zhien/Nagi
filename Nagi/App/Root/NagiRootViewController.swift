@@ -14,6 +14,14 @@ final class NagiRootViewController: UIViewController {
     let contentContainerView = UIView(frame: .zero)
     let tabBarView = NagiTabBarView()
     private let searchOverlayView = UIView(frame: .zero)
+    private lazy var searchOverlayDismissTapGesture: UITapGestureRecognizer = {
+        let recognizer = UITapGestureRecognizer(
+            target: self,
+            action: #selector(handleSearchOverlayDismissTap(_:))
+        )
+        recognizer.cancelsTouchesInView = false
+        return recognizer
+    }()
 
     let state = NagiRootState()
     private var hostingControllers: [AppTab: UIHostingController<AnyView>] = [:]
@@ -86,13 +94,15 @@ final class NagiRootViewController: UIViewController {
             let controller = makeHostingController(for: tab)
             hostingControllers[tab] = controller
             addChild(controller)
-            controller.view.backgroundColor = pageBackgroundColor(for: tab)
-            controller.view.isOpaque = true
 
             if tab == .search {
+                controller.view.backgroundColor = .clear
+                controller.view.isOpaque = false
                 continue
             }
 
+            controller.view.backgroundColor = pageBackgroundColor(for: tab)
+            controller.view.isOpaque = true
             controller.view.frame = contentContainerView.bounds
             contentContainerView.addSubview(controller.view)
             controller.didMove(toParent: self)
@@ -104,14 +114,17 @@ final class NagiRootViewController: UIViewController {
         }
 
         searchOverlayView.frame = contentContainerView.bounds
-        searchOverlayView.backgroundColor = pageBackgroundColor(for: .search)
-        searchOverlayView.isOpaque = true
+        searchOverlayView.backgroundColor = .clear
+        searchOverlayView.isOpaque = false
         searchOverlayView.alpha = 1
         searchOverlayView.isHidden = true
         searchOverlayView.isUserInteractionEnabled = false
         contentContainerView.addSubview(searchOverlayView)
+        searchOverlayView.addGestureRecognizer(searchOverlayDismissTapGesture)
 
         if let searchController = hostingControllers[.search] {
+            searchController.view.backgroundColor = .clear
+            searchController.view.isOpaque = false
             searchController.view.frame = searchOverlayView.bounds
             searchController.view.alpha = 1
             searchController.view.isHidden = false
@@ -259,30 +272,17 @@ final class NagiRootViewController: UIViewController {
 
         searchOverlayView.isHidden = false
         searchOverlayView.isUserInteractionEnabled = true
-        searchOverlayView.alpha = 0
+        // The overlay itself stays transparent and fully active. Nagram's
+        // Bottom Contacts Search does not perform an opaque background fade.
+        searchOverlayView.alpha = 1
         searchController.view.alpha = 0
 
         if reduceMotion {
-            searchOverlayView.alpha = 1
             searchController.view.alpha = 1
             return
         }
 
-        // Match Nagram SearchDisplayController background: 0 -> 1, 0.2s.
-        UIView.animate(
-            withDuration: 0.2,
-            delay: 0,
-            options: [
-                .curveLinear,
-                .allowUserInteraction,
-                .beginFromCurrentState
-            ],
-            animations: {
-                self.searchOverlayView.alpha = 1
-            }
-        )
-
-        // Match Nagram SearchDisplayController content: 0 -> 1, 0.3s.
+        // Match SearchDisplayController content activation: 0 -> 1, 0.3s.
         UIView.animate(
             withDuration: 0.3,
             delay: 0,
@@ -295,6 +295,25 @@ final class NagiRootViewController: UIViewController {
                 searchController.view.alpha = 1
             }
         )
+    }
+
+    @objc
+    private func handleSearchOverlayDismissTap(_ recognizer: UITapGestureRecognizer) {
+        guard recognizer.state == .ended else {
+            return
+        }
+
+        guard state.mode.isSearchVisible else {
+            return
+        }
+
+        // A background tap cancels only while the search query is empty.
+        // Once results are visible, taps belong to the result content.
+        guard state.searchText.isEmpty else {
+            return
+        }
+
+        cancelSearch()
     }
 
     private func dismissSearchOverlay(completion: @escaping () -> Void) {

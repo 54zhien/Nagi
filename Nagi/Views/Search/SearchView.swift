@@ -16,9 +16,19 @@ struct SearchView: View {
     @State private var queryTask: Task<Void, Never>?
 
     var body: some View {
-        NavigationStack {
-            searchContent
-                .toolbar(.hidden, for: .navigationBar)
+        Group {
+            if searchTerms.isEmpty {
+                Color.clear
+                    .ignoresSafeArea()
+            } else {
+                NavigationStack {
+                    activeSearchContent
+                        .toolbar(.hidden, for: .navigationBar)
+                }
+            }
+        }
+        .transaction { transaction in
+            transaction.animation = nil
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -40,23 +50,17 @@ struct SearchView: View {
     }
 
     @ViewBuilder
-    private var searchContent: some View {
-        Group {
-            if searchTerms.isEmpty {
-                ContentUnavailableView {
-                    searchUnavailableLabel("搜索书库")
-                }
-                .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
-                }
-            } else if matchingBooks.isEmpty {
+    private var activeSearchContent: some View {
+        ZStack {
+            // Results only become opaque once a real effective query exists.
+            Color(uiColor: .systemBackground)
+                .ignoresSafeArea()
+
+            if matchingBooks.isEmpty {
                 ContentUnavailableView {
                     searchUnavailableLabel("未找到书籍")
                 } description: {
                     Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
-                }
-                .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
                 }
             } else {
                 List {
@@ -71,13 +75,11 @@ struct SearchView: View {
                 }
                 .listStyle(.plain)
                 .scrollEdgeEffectStyle(.soft, for: .top)
-                .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
-                }
             }
         }
-        // Do not add a second implicit animation when the system search or
-        // keyboard transition updates this page.
+        .safeAreaBar(edge: .top, spacing: 0) {
+            searchHeader
+        }
         .transaction { transaction in
             transaction.animation = nil
         }
@@ -128,7 +130,7 @@ struct SearchView: View {
 
         queryTask = Task { @MainActor in
             do {
-                try await Task.sleep(for: .milliseconds(120))
+                try await Task.sleep(for: .milliseconds(100))
             } catch {
                 return
             }
