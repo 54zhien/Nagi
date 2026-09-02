@@ -155,7 +155,7 @@ final class NagiRootViewController: UIViewController {
         tabBarView.setSearchQuery("")
         state.mode = .searchEntering(previous: selected)
 
-        let transition = effectiveTransition(.easeInOut(duration: 0.26))
+        let transition = effectiveTransition(.spring(duration: 0.5))
         showChild(for: .search, transition: transition)
         reconcileLayout(transition: transition)
         tabBarView.becomeSearchFirstResponder()
@@ -179,7 +179,7 @@ final class NagiRootViewController: UIViewController {
         searchExitLayoutCompleted = false
         state.mode = .searchExiting(previous: target)
 
-        let transition = effectiveTransition(.easeInOut(duration: 0.24))
+        let transition = effectiveTransition(.spring(duration: 0.5))
         showChild(for: target, transition: transition)
         reconcileLayout(transition: transition) { [weak self] completed in
             guard let self, completed else { return }

@@ -19,13 +19,9 @@ struct NagiSearchParams: Equatable {
 }
 
 final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureRecognizerDelegate {
-    private static let normalSearchSymbolConfiguration = UIImage.SymbolConfiguration(
+    private static let searchSymbolConfiguration = UIImage.SymbolConfiguration(
         pointSize: 22,
         weight: .medium
-    )
-    private static let activeSearchSymbolConfiguration = UIImage.SymbolConfiguration(
-        pointSize: 18,
-        weight: .regular
     )
 
     private struct ActiveInput {
@@ -50,7 +46,12 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
     override init(frame: CGRect) {
         self.backgroundView = NagiGlassBackgroundView(frame: .zero)
-        self.iconView = UIImageView(image: UIImage(systemName: "magnifyingglass"))
+        self.iconView = UIImageView(
+            image: UIImage(
+                systemName: "magnifyingglass",
+                withConfiguration: Self.searchSymbolConfiguration
+            )
+        )
         self.placeholderLabel = UILabel(frame: .zero)
         self.close = nil
         self.activeInput = nil
@@ -65,7 +66,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         iconView.tintColor = .secondaryLabel
         iconView.contentMode = .center
-        iconView.preferredSymbolConfiguration = Self.normalSearchSymbolConfiguration
         iconView.isUserInteractionEnabled = false
         backgroundView.contentView.addSubview(iconView)
 
@@ -178,8 +178,8 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 applyVisibility: false
             )
             transition.setCornerRadius(view: close.background, radius: closeRadius)
-            transition.setScale(view: close.background, scale: params.isActive ? 1 : 0.001)
-            transition.setAlpha(view: close.background, alpha: params.isActive ? 1 : 0)
+            transition.setScale(view: close.background, scale: 1.0)
+            transition.setAlpha(view: close.background, alpha: params.isActive ? 1.0 : 0.0)
             close.background.isUserInteractionEnabled = params.isActive
             close.button.isUserInteractionEnabled = params.isActive
         }
@@ -251,8 +251,8 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             y: params.closeFrame.midY
         )
         background.transform = CGAffineTransform(scaleX: 0.001, y: 0.001)
-        background.alpha = 0
-        addSubview(background)
+        background.alpha = 1
+        insertSubview(background, at: 0)
         close = (background: background, button: button)
     }
 
@@ -334,15 +334,50 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         let backgroundBounds = backgroundView.bounds
         let active = params.isActive
 
-        let iconSize: CGFloat = active ? 18 : 22
-        let iconX = active ? 12 : backgroundBounds.midX - iconSize * 0.5
-        let iconY = backgroundBounds.midY - iconSize * 0.5
-        iconView.preferredSymbolConfiguration = active
-            ? Self.activeSearchSymbolConfiguration
-            : Self.normalSearchSymbolConfiguration
-        transition.setFrame(
+        let baseIconSize = iconView.image?.size ?? CGSize(width: 22, height: 22)
+        let targetIconSize: CGSize
+
+        if active {
+            let iconFraction: CGFloat = 0.8
+            targetIconSize = CGSize(
+                width: baseIconSize.width * iconFraction,
+                height: baseIconSize.height * iconFraction
+            )
+        } else {
+            targetIconSize = baseIconSize
+        }
+
+        let targetIconFrame: CGRect
+
+        if active {
+            targetIconFrame = CGRect(
+                x: 12,
+                y: floor((backgroundBounds.height - targetIconSize.height) * 0.5),
+                width: targetIconSize.width,
+                height: targetIconSize.height
+            )
+        } else {
+            targetIconFrame = CGRect(
+                x: floor((backgroundBounds.width - targetIconSize.width) * 0.5),
+                y: floor((backgroundBounds.height - targetIconSize.height) * 0.5),
+                width: targetIconSize.width,
+                height: targetIconSize.height
+            )
+        }
+
+        transition.setPosition(
             view: iconView,
-            frame: CGRect(x: iconX, y: iconY, width: iconSize, height: iconSize)
+            position: CGPoint(
+                x: targetIconFrame.midX,
+                y: targetIconFrame.midY
+            )
+        )
+        transition.setBounds(
+            view: iconView,
+            bounds: CGRect(
+                origin: .zero,
+                size: targetIconFrame.size
+            )
         )
         iconView.tintColor = .secondaryLabel
         transition.setAlpha(view: iconView, alpha: 1)
