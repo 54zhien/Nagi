@@ -65,7 +65,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         addSubview(backgroundView)
 
         iconView.tintColor = .secondaryLabel
-        iconView.contentMode = .center
+        iconView.contentMode = .scaleToFill
         iconView.isUserInteractionEnabled = false
         backgroundView.contentView.addSubview(iconView)
 

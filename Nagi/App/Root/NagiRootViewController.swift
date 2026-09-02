@@ -13,6 +13,7 @@ import UIKit
 final class NagiRootViewController: UIViewController {
     let contentContainerView = UIView(frame: .zero)
     let tabBarView = NagiTabBarView()
+    private let searchOverlayView = UIView(frame: .zero)
 
     let state = NagiRootState()
     private var hostingControllers: [AppTab: UIHostingController<AnyView>] = [:]
@@ -21,6 +22,7 @@ final class NagiRootViewController: UIViewController {
     private var activeLayoutTransition: NagiTabTransition?
     private var keyboardTransitionGeneration = 0
     private var searchExitLayoutCompleted = false
+    private var searchOverlayExitCompleted = false
     private var reduceMotion: Bool
     private var reduceTransparency: Bool
 
@@ -86,12 +88,36 @@ final class NagiRootViewController: UIViewController {
             addChild(controller)
             controller.view.backgroundColor = pageBackgroundColor(for: tab)
             controller.view.isOpaque = true
+
+            if tab == .search {
+                continue
+            }
+
             controller.view.frame = contentContainerView.bounds
             contentContainerView.addSubview(controller.view)
             controller.didMove(toParent: self)
+
+            let isHome = tab == .home
             controller.view.alpha = 1
-            controller.view.isHidden = tab != .home
-            controller.view.isUserInteractionEnabled = tab == .home
+            controller.view.isHidden = !isHome
+            controller.view.isUserInteractionEnabled = isHome
+        }
+
+        searchOverlayView.frame = contentContainerView.bounds
+        searchOverlayView.backgroundColor = pageBackgroundColor(for: .search)
+        searchOverlayView.isOpaque = true
+        searchOverlayView.alpha = 1
+        searchOverlayView.isHidden = true
+        searchOverlayView.isUserInteractionEnabled = false
+        contentContainerView.addSubview(searchOverlayView)
+
+        if let searchController = hostingControllers[.search] {
+            searchController.view.frame = searchOverlayView.bounds
+            searchController.view.alpha = 1
+            searchController.view.isHidden = false
+            searchController.view.isUserInteractionEnabled = true
+            searchOverlayView.addSubview(searchController.view)
+            searchController.didMove(toParent: self)
         }
     }
 
@@ -156,7 +182,7 @@ final class NagiRootViewController: UIViewController {
         state.mode = .searchEntering(previous: selected)
 
         let transition = effectiveTransition(.spring(duration: 0.5))
-        showChild(for: .search, transition: transition)
+        presentSearchOverlay()
         reconcileLayout(transition: transition)
         tabBarView.becomeSearchFirstResponder()
 
@@ -177,10 +203,18 @@ final class NagiRootViewController: UIViewController {
         tabBarView.setSearchQuery("")
         tabBarView.resignSearchFirstResponder()
         searchExitLayoutCompleted = false
+        searchOverlayExitCompleted = false
         state.mode = .searchExiting(previous: target)
 
         let transition = effectiveTransition(.spring(duration: 0.5))
-        showChild(for: target, transition: transition)
+        // Reveal the destination under the Search overlay. The overlay still
+        // covers it, so this does not produce a visible page snap.
+        showChild(for: target, transition: .immediate)
+        dismissSearchOverlay { [weak self] in
+            guard let self else { return }
+            self.searchOverlayExitCompleted = true
+            self.finishSearchDeactivationIfReady(target: target)
+        }
         reconcileLayout(transition: transition) { [weak self] completed in
             guard let self, completed else { return }
             self.searchExitLayoutCompleted = true
@@ -192,6 +226,7 @@ final class NagiRootViewController: UIViewController {
         guard case let .searchExiting(previous) = state.mode,
               previous == target,
               searchExitLayoutCompleted,
+              searchOverlayExitCompleted,
               currentLayoutState.keyboardFrame == nil else {
             return
         }
@@ -200,15 +235,106 @@ final class NagiRootViewController: UIViewController {
     }
 
     private func showChild(for tab: AppTab, transition: NagiTabTransition) {
-        let visibleTab = tab
+        guard tab != .search else { return }
+
         _ = transition
-        view.backgroundColor = pageBackgroundColor(for: visibleTab)
+        view.backgroundColor = pageBackgroundColor(for: tab)
         for (childTab, controller) in hostingControllers {
-            let isVisible = childTab == visibleTab
+            guard childTab != .search else { continue }
+
+            let isVisible = childTab == tab
             controller.view.alpha = 1
             controller.view.isHidden = !isVisible
             controller.view.isUserInteractionEnabled = isVisible
         }
+    }
+
+    private func presentSearchOverlay() {
+        guard let searchController = hostingControllers[.search] else {
+            return
+        }
+
+        searchOverlayView.layer.removeAllAnimations()
+        searchController.view.layer.removeAllAnimations()
+
+        searchOverlayView.isHidden = false
+        searchOverlayView.isUserInteractionEnabled = true
+        searchOverlayView.alpha = 0
+        searchController.view.alpha = 0
+
+        if reduceMotion {
+            searchOverlayView.alpha = 1
+            searchController.view.alpha = 1
+            return
+        }
+
+        // Match Nagram SearchDisplayController background: 0 -> 1, 0.2s.
+        UIView.animate(
+            withDuration: 0.2,
+            delay: 0,
+            options: [
+                .curveLinear,
+                .allowUserInteraction,
+                .beginFromCurrentState
+            ],
+            animations: {
+                self.searchOverlayView.alpha = 1
+            }
+        )
+
+        // Match Nagram SearchDisplayController content: 0 -> 1, 0.3s.
+        UIView.animate(
+            withDuration: 0.3,
+            delay: 0,
+            options: [
+                .curveEaseOut,
+                .allowUserInteraction,
+                .beginFromCurrentState
+            ],
+            animations: {
+                searchController.view.alpha = 1
+            }
+        )
+    }
+
+    private func dismissSearchOverlay(completion: @escaping () -> Void) {
+        searchOverlayView.isUserInteractionEnabled = false
+
+        guard !reduceMotion else {
+            searchOverlayView.alpha = 1
+            searchOverlayView.isHidden = true
+            completion()
+            return
+        }
+
+        searchOverlayView.layer.removeAllAnimations()
+
+        // Fade the complete overlay so its background and content leave
+        // together, matching Nagram SearchDisplayController.
+        UIView.animate(
+            withDuration: 0.3,
+            delay: 0,
+            options: [
+                .curveEaseInOut,
+                .allowUserInteraction,
+                .beginFromCurrentState
+            ],
+            animations: {
+                self.searchOverlayView.alpha = 0
+            },
+            completion: { [weak self] finished in
+                guard let self, finished else { return }
+
+                self.searchOverlayView.isHidden = true
+                self.searchOverlayView.alpha = 1
+
+                if let searchController = self.hostingControllers[.search] {
+                    searchController.view.alpha = 1
+                }
+
+                completion()
+            }
+        )
     }
 
     private func applyKeyboardFrame(_ frame: CGRect?, transition: NagiTabTransition) {
@@ -270,10 +396,24 @@ final class NagiRootViewController: UIViewController {
                 frame: self.view.bounds
             )
             resolvedTransition.setFrame(
+                view: self.searchOverlayView,
+                frame: self.contentContainerView.bounds
+            )
+            resolvedTransition.setFrame(
                 view: self.tabBarView,
                 frame: layout.tabBarFrame
             )
-            for controller in self.hostingControllers.values {
+
+            if let searchController = self.hostingControllers[.search] {
+                resolvedTransition.setFrame(
+                    view: searchController.view,
+                    frame: self.searchOverlayView.bounds
+                )
+            }
+
+            for (tab, controller) in self.hostingControllers {
+                guard tab != .search else { continue }
+
                 resolvedTransition.setFrame(
                     view: controller.view,
                     frame: self.contentContainerView.bounds

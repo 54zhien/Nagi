@@ -733,6 +733,70 @@ enum NagiTabTransition {
     ) -> CAAnimation {
         switch self {
         case let .spring(duration):
+            // Nagram has a dedicated 0.5-second spring path.
+            //
+            // This must be checked before the ordinary cubic spring path.
+            if duration == 0.5 {
+                let animation = CASpringAnimation(keyPath: keyPath)
+                animation.fromValue = fromValue
+                animation.toValue = toValue
+
+                if #available(iOS 26.0, *) {
+                    // Exact values from Nagram/UIKitRuntimeUtils.
+                    animation.mass = 1.0
+                    animation.stiffness = 555.027
+                    animation.damping = 47.118
+                    animation.duration = duration
+                    animation.timingFunction = CAMediaTimingFunction(name: .linear)
+
+                    if #available(iOS 17.0, *) {
+                        animation.allowsOverdamping = false
+                    }
+
+                    // Nagram's make26SpringAnimationImpl applies this
+                    // private high-frame-rate reason.
+                    animation.setValue(
+                        NSNumber(value: 1048619),
+                        forKey: "highFrameRateReason"
+                    )
+
+                    if #available(iOS 15.0, *) {
+                        animation.preferredFrameRateRange = CAFrameRateRange(
+                            minimum: 80.0,
+                            maximum: 120.0,
+                            preferred: 120.0
+                        )
+                    }
+                } else {
+                    // Nagram pre-iOS-26 makeSpringAnimationImpl.
+                    animation.mass = 3.0
+                    animation.stiffness = 1000.0
+                    animation.damping = 500.0
+                    animation.duration = 0.5
+                    animation.timingFunction = CAMediaTimingFunction(name: .linear)
+                }
+
+                animation.isRemovedOnCompletion = true
+                animation.fillMode = .forwards
+
+                // Match Nagram CAAnimationUtils.adjustFrameRate(). Opacity
+                // is intentionally excluded so iOS 26 keeps its 80/120/120
+                // range and pre-iOS-26 receives no explicit range.
+                if #available(iOS 15.0, *) {
+                    let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
+                    if maximumFPS > 61.0, keyPath != "opacity" {
+                        animation.preferredFrameRateRange = CAFrameRateRange(
+                            minimum: 30.0,
+                            maximum: maximumFPS,
+                            preferred: maximumFPS
+                        )
+                    }
+                }
+
+                return animation
+            }
+
+            // Ordinary Nagram ComponentTransition spring.
             let animation = CABasicAnimation(keyPath: keyPath)
             animation.fromValue = fromValue
             animation.toValue = toValue
