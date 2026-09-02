@@ -75,29 +75,47 @@ enum NagiTabBarMetrics {
         }
 
         let sideInset: CGFloat = tabBarBottomInset <= 28 ? 20 : 12
-        let availableWidth = max(0, bounds.width - sideInset * 2)
+        let rawAvailableWidth = max(0, bounds.width - sideInset * 2)
+        let componentWidth = min(500, rawAvailableWidth)
+        let componentX = floorToScreenPixels(
+            (bounds.width - componentWidth) * 0.5
+        )
         let barFrame = CGRect(
-            x: sideInset,
-            y: bounds.maxY - tabBarBottomInset - barHeight,
-            width: availableWidth,
+            x: componentX,
+            y: floorToScreenPixels(
+                bounds.maxY - tabBarBottomInset - barHeight
+            ),
+            width: componentWidth,
             height: barHeight
         )
 
-        let mainTabsWidth = max(0, availableWidth - standaloneGap - searchDiameter)
-        let mainFrame = CGRect(x: barFrame.minX, y: barFrame.minY, width: mainTabsWidth, height: barHeight)
+        let mainTabsWidth = max(
+            0,
+            componentWidth - standaloneGap - searchDiameter
+        )
+        let mainFrame = CGRect(
+            x: floorToScreenPixels(barFrame.minX),
+            y: floorToScreenPixels(barFrame.minY),
+            width: mainTabsWidth,
+            height: barHeight
+        )
         let searchContainerFrame = CGRect(
-            x: barFrame.maxX - searchDiameter,
-            y: barFrame.minY,
+            x: floorToScreenPixels(barFrame.maxX - searchDiameter),
+            y: floorToScreenPixels(barFrame.minY),
             width: searchDiameter,
             height: searchDiameter
         )
         let itemWidth = mainTabsWidth > innerInset * 2
-            ? (mainTabsWidth - innerInset * 2) / CGFloat(mainItemCount)
+            ? floorToScreenPixels(
+                (mainTabsWidth - innerInset * 2) / CGFloat(mainItemCount)
+            )
             : 0
         let itemFrames = (0..<mainItemCount).map { index in
             CGRect(
-                x: mainFrame.minX + innerInset + CGFloat(index) * itemWidth,
-                y: mainFrame.minY + innerInset,
+                x: floorToScreenPixels(
+                    mainFrame.minX + innerInset + CGFloat(index) * itemWidth
+                ),
+                y: floorToScreenPixels(mainFrame.minY + innerInset),
                 width: itemWidth,
                 height: itemHeight
             )
@@ -126,26 +144,37 @@ enum NagiTabBarMetrics {
         }
 
         let collapsedFrame = CGRect(
-            x: barFrame.minX - sideInset - collapsedLensDiameter,
-            y: barFrame.maxY - collapsedLensDiameter,
+            x: floorToScreenPixels(
+                barFrame.minX - sideInset - collapsedLensDiameter
+            ),
+            y: floorToScreenPixels(
+                barFrame.maxY - collapsedLensDiameter
+            ),
             width: collapsedLensDiameter,
             height: collapsedLensDiameter
         )
         let activeSearchContainerFrame = CGRect(
-            x: barFrame.minX,
-            y: barFrame.maxY - activeSearchHeight,
+            x: floorToScreenPixels(barFrame.minX),
+            y: floorToScreenPixels(barFrame.maxY - activeSearchHeight),
             width: barFrame.width,
             height: activeSearchHeight
         )
         let activeSearchBackgroundFrame = CGRect(
-            x: activeSearchContainerFrame.minX,
-            y: activeSearchContainerFrame.minY,
-            width: max(0, activeSearchContainerFrame.width - searchCloseDiameter - standaloneGap),
+            x: floorToScreenPixels(activeSearchContainerFrame.minX),
+            y: floorToScreenPixels(activeSearchContainerFrame.minY),
+            width: max(
+                0,
+                activeSearchContainerFrame.width -
+                    searchCloseDiameter -
+                    standaloneGap
+            ),
             height: activeSearchHeight
         )
         let activeSearchCloseFrame = CGRect(
-            x: activeSearchBackgroundFrame.maxX + standaloneGap,
-            y: activeSearchContainerFrame.minY,
+            x: floorToScreenPixels(
+                activeSearchBackgroundFrame.maxX + standaloneGap
+            ),
+            y: floorToScreenPixels(activeSearchContainerFrame.minY),
             width: searchCloseDiameter,
             height: searchCloseDiameter
         )
@@ -159,8 +188,9 @@ enum NagiTabBarMetrics {
         }
         var activeLocalItemFrames = normalLocalItemFrames
         if activeLocalItemFrames.indices.contains(selectedIndex) {
-            activeLocalItemFrames[selectedIndex].origin.x = floor(
-                (collapsedLensDiameter - activeLocalItemFrames[selectedIndex].width) * 0.5
+            activeLocalItemFrames[selectedIndex].origin.x = floorToScreenPixels(
+                (collapsedLensDiameter -
+                    activeLocalItemFrames[selectedIndex].width) * 0.5
             )
         }
         let activeItemFrames = activeLocalItemFrames.map { localFrame in

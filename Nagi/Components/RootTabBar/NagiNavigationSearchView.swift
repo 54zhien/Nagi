@@ -32,10 +32,13 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     private let backgroundView: NagiGlassBackgroundView
     private let iconView: UIImageView
     private let placeholderLabel: UILabel
-    private var close: (background: NagiGlassBackgroundView, button: UIButton)?
+    private var close: (background: NagiGlassBackgroundView, iconView: UIImageView)?
+    private var closingClose: (background: NagiGlassBackgroundView, iconView: UIImageView)?
     private var activeInput: ActiveInput?
     private var previousParams: NagiSearchParams?
     private var pendingQuery = ""
+    private var inputGeneration = 0
+    private var closeGeneration = 0
 
     var onActivate: (() -> Void)?
     var onCancel: (() -> Void)?
@@ -53,6 +56,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         )
         self.placeholderLabel = UILabel(frame: .zero)
         self.close = nil
+        self.closingClose = nil
         self.activeInput = nil
         super.init(frame: frame)
 
@@ -91,12 +95,18 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             return false
         }
 
+        let previousIsActive = isActive
         previousParams = params
         isActive = params.isActive
 
+        if previousIsActive != params.isActive {
+            inputGeneration += 1
+            closeGeneration += 1
+        }
+
         if params.isActive {
             ensureCloseSurface(for: params)
-            ensureActiveInput()
+            ensureActiveInput(for: params)
         }
 
         let backgroundSize = params.backgroundFrame.size
@@ -155,6 +165,12 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         )
 
         if let close {
+            if !active {
+                // Detach the logical surface now so a rapid re-entry can
+                // create a fresh Close Glass while this one fades out.
+                self.close = nil
+                closingClose = close
+            }
             let closeSize = params.isActive
                 ? params.closeFrame.size
                 : close.background.bounds.size
@@ -180,11 +196,39 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 transition: transition,
                 applyVisibility: false
             )
-            transition.setCornerRadius(view: close.background, radius: closeRadius)
-            transition.setScale(view: close.background, scale: 1.0)
-            transition.setAlpha(view: close.background, alpha: params.isActive ? 1.0 : 0.0)
+            if params.isActive {
+                transition.setCornerRadius(
+                    view: close.background,
+                    radius: closeRadius
+                )
+                transition.setScale(view: close.background, scale: 1.0)
+            }
+            let closeAlphaTransition: NagiTabTransition = transition.isImmediate
+                ? .immediate
+                : .easeInOut(duration: 0.25)
+            let generation = closeGeneration
+            closeAlphaTransition.setAlpha(
+                view: close.background,
+                alpha: params.isActive ? 1.0 : 0.0,
+                completion: params.isActive
+                    ? nil
+                    : { [weak self, weak closeBackground = close.background] completed in
+                        guard completed, let closeBackground else {
+                            return
+                        }
+
+                        closeBackground.removeFromSuperview()
+                        guard let self,
+                              !self.isActive,
+                              self.closeGeneration == generation,
+                              self.closingClose?.background === closeBackground else {
+                            return
+                        }
+
+                        self.closingClose = nil
+                    }
+            )
             close.background.isUserInteractionEnabled = params.isActive
-            close.button.isUserInteractionEnabled = params.isActive
         }
 
         backgroundView.contentView.clipsToBounds = true
@@ -192,25 +236,11 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         layoutControls(for: params, transition: transition)
     }
 
-    func finishTransition(params: NagiSearchParams, completed: Bool) {
-        guard completed, !params.isActive else {
-            return
-        }
-
-        close?.background.removeFromSuperview()
-        close = nil
-
-        if let activeInput {
-            activeInput.container.removeFromSuperview()
-            self.activeInput = nil
-        }
-    }
-
     private func ensureCloseSurface(for params: NagiSearchParams) {
         guard close == nil else { return }
 
         let background = NagiGlassBackgroundView(frame: .zero)
-        let button = UIButton(type: .system)
+        let iconView = UIImageView(image: Self.makeCloseImage())
         let closeSize = params.closeFrame.size
         let closeRadius = min(closeSize.width, closeSize.height) * 0.5
         let closeGlassParams = NagiGlassParams(
@@ -236,17 +266,18 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         background.isUserInteractionEnabled = true
         background.contentView.clipsToBounds = true
-        button.setImage(UIImage(systemName: "xmark"), for: .normal)
-        button.tintColor = .secondaryLabel
-        button.accessibilityLabel = "关闭搜索"
-        button.addTarget(self, action: #selector(cancelSearch), for: .primaryActionTriggered)
-        button.frame = CGRect(
-            x: max(0, closeSize.width * 0.5 - 22),
-            y: max(0, closeSize.height * 0.5 - 22),
-            width: min(44, closeSize.width),
-            height: min(44, closeSize.height)
+        iconView.tintColor = .secondaryLabel
+        iconView.contentMode = .center
+        iconView.isUserInteractionEnabled = false
+        iconView.accessibilityLabel = "关闭搜索"
+
+        let recognizer = UITapGestureRecognizer(
+            target: self,
+            action: #selector(cancelSearch(_:))
         )
-        background.contentView.addSubview(button)
+        recognizer.cancelsTouchesInView = false
+        background.contentView.addGestureRecognizer(recognizer)
+        background.contentView.addSubview(iconView)
 
         background.bounds = CGRect(origin: .zero, size: closeSize)
         background.center = CGPoint(
@@ -256,19 +287,59 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         background.transform = CGAffineTransform(scaleX: 0.001, y: 0.001)
         background.alpha = 1
         insertSubview(background, at: 0)
-        close = (background: background, button: button)
+        if let image = iconView.image {
+            iconView.frame = CGRect(
+                x: (closeSize.width - image.size.width) * 0.5,
+                y: (closeSize.height - image.size.height) * 0.5,
+                width: image.size.width,
+                height: image.size.height
+            )
+        }
+        close = (background: background, iconView: iconView)
     }
 
-    private func ensureActiveInput() {
-        guard activeInput == nil else {
+    private static func makeCloseImage() -> UIImage? {
+        let size = CGSize(width: 40, height: 40)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        let image = renderer.image { rendererContext in
+            let context = rendererContext.cgContext
+            context.setLineWidth(2)
+            context.setLineCap(.round)
+            context.setStrokeColor(UIColor.white.cgColor)
+            context.move(to: CGPoint(x: 12, y: 12))
+            context.addLine(to: CGPoint(x: 28, y: 28))
+            context.move(to: CGPoint(x: 28, y: 12))
+            context.addLine(to: CGPoint(x: 12, y: 28))
+            context.strokePath()
+        }
+        return image.withRenderingMode(.alwaysTemplate)
+    }
+
+    private func ensureActiveInput(for params: NagiSearchParams) {
+        if let activeInput {
+            setInputGeometry(
+                activeInput,
+                backgroundSize: params.backgroundFrame.size
+            )
             return
         }
 
-        let container = UIView(frame: .zero)
+        let finalBackgroundBounds = CGRect(
+            origin: .zero,
+            size: params.backgroundFrame.size
+        )
+        let container = UIView(frame: finalBackgroundBounds)
         container.backgroundColor = .clear
         container.alpha = 0
 
-        let textField = UITextField(frame: .zero)
+        let textField = UITextField(
+            frame: CGRect(
+                x: 36,
+                y: 0,
+                width: max(0, finalBackgroundBounds.width - 40),
+                height: finalBackgroundBounds.height
+            )
+        )
         textField.delegate = self
         textField.backgroundColor = .clear
         textField.borderStyle = .none
@@ -294,6 +365,20 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         activeInput = ActiveInput(
             container: container,
             textField: textField
+        )
+    }
+
+    private func setInputGeometry(
+        _ input: ActiveInput,
+        backgroundSize: CGSize
+    ) {
+        let backgroundBounds = CGRect(origin: .zero, size: backgroundSize)
+        input.container.frame = backgroundBounds
+        input.textField.frame = CGRect(
+            x: 36,
+            y: 0,
+            width: max(0, backgroundBounds.width - 40),
+            height: backgroundBounds.height
         )
     }
 
@@ -369,9 +454,12 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 size: targetIconFrame.size
             )
         )
-        iconView.tintColor = active
-            ? (UIColor(named: "AccentColor") ?? .tintColor)
-            : .secondaryLabel
+        transition.setTintColor(
+            view: iconView,
+            color: active
+                ? (UIColor(named: "AccentColor") ?? .tintColor)
+                : .secondaryLabel
+        )
         transition.setAlpha(view: iconView, alpha: 1)
 
         let placeholderLeading: CGFloat = params.isExpandedStandaloneBar && !active ? 40 : 0
@@ -388,49 +476,55 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         )
 
         if let input = activeInput {
-            transition.setFrame(
-                view: input.container,
-                frame: backgroundBounds
-            )
-
-            let fieldLeading: CGFloat = 36
-            let fieldFrame = CGRect(
-                x: fieldLeading,
-                y: 0,
-                width: max(0, backgroundBounds.width - 40),
-                height: backgroundBounds.height
-            )
-            transition.setFrame(view: input.textField, frame: fieldFrame)
+            if active {
+                setInputGeometry(
+                    input,
+                    backgroundSize: backgroundBounds.size
+                )
+            }
 
             let inputAlphaTransition: NagiTabTransition = transition.isImmediate
                 ? .immediate
                 : .easeInOut(duration: 0.25)
+            let generation = inputGeneration
             inputAlphaTransition.setAlpha(
                 view: input.container,
-                alpha: params.isActive ? 1 : 0
+                alpha: active ? 1 : 0,
+                completion: active
+                    ? nil
+                    : { [weak self, weak container = input.container] completed in
+                        guard completed,
+                              let self,
+                              !self.isActive,
+                              self.inputGeneration == generation else {
+                            return
+                        }
+
+                        container?.removeFromSuperview()
+                        if self.activeInput?.container === container {
+                            self.activeInput = nil
+                        }
+                    }
             )
 
-            input.container.isUserInteractionEnabled = params.isActive
-            input.textField.isUserInteractionEnabled = params.isActive
+            input.container.isUserInteractionEnabled = active
+            input.textField.isUserInteractionEnabled = active
         }
 
         if let close {
             if active {
-                let closeBounds = CGRect(
-                    origin: .zero,
-                    size: params.closeFrame.size
-                )
+                let closeBounds = CGRect(origin: .zero, size: params.closeFrame.size)
                 transition.setFrame(
-                    view: close.button,
+                    view: close.iconView,
                     frame: CGRect(
-                        x: max(0, closeBounds.midX - 22),
-                        y: max(0, closeBounds.midY - 22),
-                        width: min(44, closeBounds.width),
-                        height: min(44, closeBounds.height)
+                        x: (closeBounds.width - close.iconView.bounds.width) * 0.5,
+                        y: (closeBounds.height - close.iconView.bounds.height) * 0.5,
+                        width: close.iconView.bounds.width,
+                        height: close.iconView.bounds.height
                     )
                 )
             }
-            close.button.isUserInteractionEnabled = active
+            close.iconView.isUserInteractionEnabled = false
         }
     }
 
@@ -453,7 +547,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         onQueryChanged?(pendingQuery)
     }
 
-    @objc private func cancelSearch() {
+    @objc private func cancelSearch(_ recognizer: UITapGestureRecognizer) {
         onCancel?()
     }
 

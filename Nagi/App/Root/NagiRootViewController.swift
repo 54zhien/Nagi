@@ -35,6 +35,9 @@ final class NagiRootViewController: UIViewController {
     private var observedKeyboardFrame: CGRect?
     private var reduceMotion: Bool
     private var reduceTransparency: Bool
+    private var displayedTab: AppTab?
+    private var pageTransitionGeneration = 0
+    private var searchOverlayGeneration = 0
 
     init(reduceMotion: Bool, reduceTransparency: Bool) {
         self.reduceMotion = reduceMotion
@@ -207,24 +210,109 @@ final class NagiRootViewController: UIViewController {
 
     private func deactivateSearch() {
         guard state.tabBarSearchState.isActive else { return }
+        tabBarView.resignSearchFirstResponder()
         state.searchText = ""
         tabBarView.setSearchQuery("")
         dismissSearchOverlay()
-        tabBarView.resignSearchFirstResponder()
         searchOverlayDismissTapGesture.isEnabled = false
         state.tabBarSearchState = .inactive
         reconcileLayout(transition: effectiveTransition(.spring(duration: 0.5)))
     }
 
     private func showChild(for tab: AppTab, transition: NagiTabTransition) {
-        _ = transition
         view.backgroundColor = pageBackgroundColor(for: tab)
-        for (childTab, controller) in hostingControllers {
-            let isVisible = childTab == tab
-            controller.view.alpha = 1
-            controller.view.isHidden = !isVisible
-            controller.view.isUserInteractionEnabled = isVisible
+
+        guard !transition.isImmediate,
+              let oldTab = displayedTab,
+              oldTab != tab,
+              let oldView = hostingControllers[oldTab]?.view,
+              let newView = hostingControllers[tab]?.view else {
+            pageTransitionGeneration += 1
+            for (childTab, controller) in hostingControllers {
+                let isVisible = childTab == tab
+                NagiTabTransition.immediate.setAlpha(
+                    view: controller.view,
+                    alpha: 1
+                )
+                NagiTabTransition.immediate.setScale(
+                    view: controller.view,
+                    scale: 1
+                )
+                controller.view.layer.allowsGroupOpacity = false
+                controller.view.isHidden = !isVisible
+                controller.view.isUserInteractionEnabled = isVisible
+            }
+            displayedTab = tab
+            return
         }
+
+        pageTransitionGeneration += 1
+        let generation = pageTransitionGeneration
+        let transitionScale: CGFloat
+        if oldView.frame.height > 0 {
+            transitionScale = (oldView.frame.height - 3.0) / oldView.frame.height
+        } else {
+            transitionScale = 0.998
+        }
+
+        oldView.isHidden = false
+        oldView.isUserInteractionEnabled = false
+        oldView.layer.allowsGroupOpacity = false
+
+        newView.isHidden = false
+        newView.isUserInteractionEnabled = false
+        newView.layer.allowsGroupOpacity = true
+        NagiTabTransition.immediate.setAlpha(view: newView, alpha: 0)
+        NagiTabTransition.immediate.setScale(
+            view: newView,
+            scale: transitionScale
+        )
+
+        NagiTabTransition.spring(duration: 0.12).setScale(
+            view: oldView,
+            scale: transitionScale,
+            completion: { [weak self, weak oldView] completed in
+                guard completed, let self else {
+                    return
+                }
+
+                // If a newer transition superseded this one, the old page
+                // may still be visible behind the current page. Hide it only
+                // when it is no longer the displayed target; never hide a
+                // page that a rapid reverse has already made current again.
+                guard generation == self.pageTransitionGeneration ||
+                    self.displayedTab != oldTab else {
+                    return
+                }
+
+                oldView?.transform = .identity
+                oldView?.alpha = 1
+                oldView?.isHidden = true
+                oldView?.isUserInteractionEnabled = false
+            }
+        )
+
+        NagiTabTransition.spring(duration: 0.15).setScale(
+            view: newView,
+            scale: 1,
+            delay: 0.1
+        )
+        NagiTabTransition.easeInOut(duration: 0.1).setAlpha(
+            view: newView,
+            alpha: 1,
+            completion: { [weak self, weak newView] completed in
+                guard completed,
+                      let self,
+                      generation == self.pageTransitionGeneration else {
+                    return
+                }
+
+                newView?.layer.allowsGroupOpacity = false
+                newView?.isUserInteractionEnabled = true
+            }
+        )
+
+        displayedTab = tab
     }
 
     private func presentSearchOverlay() {
@@ -232,6 +320,7 @@ final class NagiRootViewController: UIViewController {
             return
         }
 
+        searchOverlayGeneration += 1
         searchOverlayView.layer.removeAllAnimations()
         searchController.view.layer.removeAllAnimations()
 
@@ -283,6 +372,8 @@ final class NagiRootViewController: UIViewController {
     }
 
     private func dismissSearchOverlay() {
+        searchOverlayGeneration += 1
+        let generation = searchOverlayGeneration
         searchOverlayDismissTapGesture.isEnabled = false
         searchOverlayView.isUserInteractionEnabled = false
 
@@ -308,7 +399,11 @@ final class NagiRootViewController: UIViewController {
                 self.searchOverlayView.alpha = 0
             },
             completion: { [weak self] finished in
-                guard let self, finished else { return }
+                guard let self,
+                      finished,
+                      self.searchOverlayGeneration == generation else {
+                    return
+                }
 
                 self.searchOverlayView.isHidden = true
                 self.searchOverlayView.alpha = 1

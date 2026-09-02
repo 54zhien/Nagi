@@ -91,7 +91,9 @@ final class NagiTabBarItemView: UIView {
                 ? nagiAccentColor
                 : .secondaryLabel
         case .selected:
-            iconView.tintColor = nagiAccentColor
+            iconView.tintColor = isCompact
+                ? .secondaryLabel
+                : nagiAccentColor
         }
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]

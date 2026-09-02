@@ -63,12 +63,6 @@ final class NagiTabSelectionRecognizer: UIGestureRecognizer {
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard let touch = touches.first, let view else {
-            state = .cancelled
-            return
-        }
-
-        currentTouchLocation = touch.location(in: view)
         state = .ended
     }
 

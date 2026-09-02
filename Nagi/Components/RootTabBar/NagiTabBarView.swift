@@ -39,7 +39,6 @@ final class NagiTabBarView: UIView {
     private var selectionGestureState: NagiSelectionGestureState?
     private var overrideSelectedIndex: Int?
     private let isLiftedStateEnabled = true
-    private var searchTransitionGeneration = 0
     private var lastTraitStyle: UIUserInterfaceStyle
 
     var onTabSelected: ((AppTab) -> Void)?
@@ -202,12 +201,6 @@ final class NagiTabBarView: UIView {
         )
 
         let searchParamsChanged = searchView.prepare(params: searchParams)
-        searchTransitionGeneration += 1
-        let generation = searchTransitionGeneration
-        let searchGeometryDidChange = searchGeometryChanged(
-            from: oldParams?.layout,
-            to: layout
-        )
 
         let itemBlurTransition: NagiTabTransition = transition.isImmediate
             ? .immediate
@@ -217,7 +210,7 @@ final class NagiTabBarView: UIView {
             if searchContainerFrameChanged {
                 transition.setFrame(view: self.searchView, frame: localSearchContainerFrame)
             }
-            if searchParamsChanged || searchGeometryDidChange || oldParams == nil {
+            if searchParamsChanged || oldParams == nil {
                 self.searchView.applyInternalGeometry(
                     params: searchParams,
                     transition: transition
@@ -239,14 +232,7 @@ final class NagiTabBarView: UIView {
                 scaleTransition: transition,
                 isSearchActive: layout.isSearchActive
             )
-        } completion: { [weak self] completed in
-            guard let self else { return }
-            if generation == self.searchTransitionGeneration {
-                self.searchView.finishTransition(
-                    params: searchParams,
-                    completed: completed
-                )
-            }
+        } completion: { completed in
             completion?(completed)
         }
 
@@ -282,29 +268,6 @@ final class NagiTabBarView: UIView {
         searchView.becomeSearchFirstResponder()
     }
 
-    private func searchGeometryChanged(
-        from oldLayout: NagiTabBarLayout?,
-        to newLayout: NagiTabBarLayout
-    ) -> Bool {
-        guard let oldLayout else { return true }
-        let oldContainerFrame = localFrame(oldLayout.searchContainerFrame, in: oldLayout.tabBarFrame)
-        let newContainerFrame = localFrame(newLayout.searchContainerFrame, in: newLayout.tabBarFrame)
-        let oldBackgroundFrame = localFrame(
-            oldLayout.searchBackgroundFrame,
-            in: oldLayout.searchContainerFrame
-        )
-        let newBackgroundFrame = localFrame(
-            newLayout.searchBackgroundFrame,
-            in: newLayout.searchContainerFrame
-        )
-        let oldCloseFrame = localFrame(oldLayout.searchCloseFrame, in: oldLayout.searchContainerFrame)
-        let newCloseFrame = localFrame(newLayout.searchCloseFrame, in: newLayout.searchContainerFrame)
-        return oldLayout.isSearchActive != newLayout.isSearchActive ||
-            oldContainerFrame != newContainerFrame ||
-            oldBackgroundFrame != newBackgroundFrame ||
-            oldCloseFrame != newCloseFrame
-    }
-
     @objc private func handleTabSelectionGesture(_ recognizer: NagiTabSelectionRecognizer) {
         switch recognizer.state {
         case .began:
@@ -312,7 +275,6 @@ final class NagiTabBarView: UIView {
         case .changed:
             updateTabSelection(using: recognizer)
         case .ended:
-            updateTabSelection(using: recognizer)
             finishTabSelection()
         case .cancelled:
             cancelTabSelection()

@@ -13,17 +13,9 @@ struct SearchView: View {
     @Binding var searchText: String
     @State private var selectedBook: Book?
     @State private var effectiveQuery = ""
-    @State private var queryTask: Task<Void, Never>?
 
     var body: some View {
-        Group {
-            if searchTerms.isEmpty {
-                Color.clear
-                    .ignoresSafeArea()
-            } else {
-                activeSearchContent
-            }
-        }
+        searchContent
         .transaction { transaction in
             transaction.animation = nil
         }
@@ -38,40 +30,23 @@ struct SearchView: View {
             }
         }
         .onChange(of: searchText, initial: true) { _, newValue in
-            scheduleQueryUpdate(for: newValue)
-        }
-        .onDisappear {
-            queryTask?.cancel()
-            queryTask = nil
+            effectiveQuery = newValue
         }
     }
 
-    @ViewBuilder
-    private var activeSearchContent: some View {
+    private var searchContent: some View {
         ZStack {
-            if matchingBooks.isEmpty {
-                ContentUnavailableView {
-                    searchUnavailableLabel("未找到书籍")
-                } description: {
-                    Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
-                }
-            } else {
-                List {
-                    ForEach(matchingBooks) { book in
-                        Button {
-                            selectedBook = book
-                        } label: {
-                            BookRow(book: book)
-                        }
-                        .buttonStyle(.plain)
-                        .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
-                .background(Color.clear)
-                .scrollEdgeEffectStyle(.soft, for: .top)
-            }
+            searchResultsList
+                .opacity(searchTerms.isEmpty ? 0 : 1)
+                .allowsHitTesting(!searchTerms.isEmpty)
+
+            searchEmptyState
+                .opacity(
+                    !searchTerms.isEmpty && matchingBooks.isEmpty
+                        ? 1
+                        : 0
+                )
+                .allowsHitTesting(false)
         }
         .background(Color.clear)
         .safeAreaBar(edge: .top, spacing: 0) {
@@ -79,6 +54,32 @@ struct SearchView: View {
         }
         .transaction { transaction in
             transaction.animation = nil
+        }
+    }
+
+    private var searchResultsList: some View {
+        List {
+            ForEach(matchingBooks) { book in
+                Button {
+                    selectedBook = book
+                } label: {
+                    BookRow(book: book)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.clear)
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .background(Color.clear)
+        .scrollEdgeEffectStyle(.soft, for: .top)
+    }
+
+    private var searchEmptyState: some View {
+        ContentUnavailableView {
+            searchUnavailableLabel("未找到书籍")
+        } description: {
+            Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
         }
     }
 
@@ -116,26 +117,6 @@ struct SearchView: View {
         }
     }
 
-    private func scheduleQueryUpdate(for query: String) {
-        queryTask?.cancel()
-
-        guard !query.isEmpty else {
-            queryTask = nil
-            effectiveQuery = ""
-            return
-        }
-
-        queryTask = Task { @MainActor in
-            do {
-                try await Task.sleep(for: .milliseconds(100))
-            } catch {
-                return
-            }
-
-            guard !Task.isCancelled else { return }
-            effectiveQuery = query
-        }
-    }
 }
 
 #Preview {
