@@ -230,10 +230,11 @@ final class NagiRootViewController: UIViewController {
         tabBarView.resignSearchFirstResponder()
         state.searchText = ""
         tabBarView.setSearchQuery("")
-        dismissSearchOverlay()
         searchOverlayDismissTapGesture.isEnabled = false
         state.tabBarSearchState = .inactive
-        reconcileLayout(transition: effectiveTransition(.spring(duration: 0.5)))
+        let transition = effectiveTransition(.spring(duration: 0.5))
+        reconcileLayout(transition: transition)
+        dismissSearchOverlay()
     }
 
     private func showChild(for tab: AppTab, transition: NagiTabTransition) {
