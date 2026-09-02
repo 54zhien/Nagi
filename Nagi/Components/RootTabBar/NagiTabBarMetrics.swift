@@ -33,6 +33,13 @@ enum NagiTabBarMetrics {
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
 
+    // Preserve Nagi's original optical baseline on Home Indicator devices.
+    // UIKit's raw safe-area bottom (commonly 34pt) includes the full indicator
+    // region and places this floating bar visibly too high. The original Nagi
+    // layout used 23pt here, while keyboard motion still tracks the actual
+    // keyboard top with the Nagram-compatible 8pt gap.
+    static let homeIndicatorOpticalBottomInset: CGFloat = 23
+
     static func calculateLayout(
         bounds: CGRect,
         safeAreaInsets: UIEdgeInsets,
@@ -62,19 +69,36 @@ enum NagiTabBarMetrics {
             inputHeight = 0
         }
 
-        var panelsBottomInset = safeAreaInsets.bottom
-        if panelsBottomInset == 0 {
-            panelsBottomInset = 8
+        // Keep the raw/minimum system inset as the reference for Nagram's
+        // horizontal side-inset rule. Vertical placement intentionally uses
+        // Nagi's optical inset below, so restoring the old Y position cannot
+        // unexpectedly make the bar narrower or wider.
+        let systemPanelsBottomInset: CGFloat
+        if safeAreaInsets.bottom == 0 {
+            systemPanelsBottomInset = 8
         } else {
-            panelsBottomInset = max(panelsBottomInset, 8)
+            systemPanelsBottomInset = max(safeAreaInsets.bottom, 8)
         }
 
-        var tabBarBottomInset = panelsBottomInset
+        let normalVisualBottomInset: CGFloat
+        if safeAreaInsets.bottom >= 30 {
+            normalVisualBottomInset = homeIndicatorOpticalBottomInset
+        } else if safeAreaInsets.bottom > 0 {
+            normalVisualBottomInset = max(8, safeAreaInsets.bottom - 8)
+        } else {
+            normalVisualBottomInset = 8
+        }
+
+        var tabBarBottomInset = normalVisualBottomInset
         if searchState.isActive, inputHeight > 0 {
+            // Equivalent to placing the bar 8pt above the keyboard top.
             tabBarBottomInset = max(tabBarBottomInset, inputHeight + 8)
         }
 
-        let sideInset: CGFloat = tabBarBottomInset <= 28 ? 20 : 12
+        let sideInsetReference = searchState.isActive && inputHeight > 0
+            ? tabBarBottomInset
+            : systemPanelsBottomInset
+        let sideInset: CGFloat = sideInsetReference <= 28 ? 20 : 12
         let rawAvailableWidth = max(0, bounds.width - sideInset * 2)
         let componentWidth = min(500, rawAvailableWidth)
         let componentX = floorToScreenPixels(
