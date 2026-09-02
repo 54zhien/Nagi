@@ -3,95 +3,87 @@
 //  Nagi
 //
 //  Continuous one-finger selection tracking for the Main Root Tab surface.
-//  The recognizer deliberately leaves the current tab untouched until the
-//  touch ends; NagiTabBarView uses the live coordinates only for Lens visual
-//  presentation while the finger is moving.
+//  Touch delivery and translation semantics intentionally mirror Nagram's
+//  TabSelectionRecognizer; Nagi only adds a start-location gate so Search and
+//  the standalone slot stay outside the Main-tab gesture surface.
 //
 
 import UIKit
 
 final class NagiTabSelectionRecognizer: UIGestureRecognizer {
-    private(set) var initialTouchLocation = CGPoint.zero
-    private(set) var currentTouchLocation = CGPoint.zero
+    private var initialTouchLocation: CGPoint?
+    private var currentTouchLocation: CGPoint?
 
     var shouldBeginAtLocation: ((CGPoint) -> Bool)?
 
     var initialLocation: CGPoint {
-        initialTouchLocation
+        initialTouchLocation ?? .zero
+    }
+
+    var currentLocation: CGPoint {
+        currentTouchLocation ?? initialTouchLocation ?? .zero
     }
 
     override init(target: Any?, action: Selector?) {
         super.init(target: target, action: action)
-        configureTouchDelivery()
+
+        delaysTouchesBegan = false
+        delaysTouchesEnded = false
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
+    override func reset() {
+        super.reset()
+
+        initialTouchLocation = nil
+        currentTouchLocation = nil
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard state == .possible,
-              touches.count == 1,
-              let touch = touches.first,
-              let view else {
+        super.touchesBegan(touches, with: event)
+
+        if initialTouchLocation == nil {
+            initialTouchLocation = touches.first?.location(in: view)
+        }
+        guard let initialTouchLocation,
+              shouldBeginAtLocation?(initialTouchLocation) ?? true else {
             state = .failed
             return
         }
 
-        let location = touch.location(in: view)
-        guard shouldBeginAtLocation?(location) ?? true else {
-            state = .failed
-            return
-        }
-
-        initialTouchLocation = location
-        currentTouchLocation = location
+        currentTouchLocation = initialTouchLocation
         state = .began
     }
 
     override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent) {
-        guard touches.count == 1,
-              let touch = touches.first,
-              let view,
-              state == .began || state == .changed else {
-            state = .cancelled
-            return
-        }
+        super.touchesMoved(touches, with: event)
 
-        currentTouchLocation = touch.location(in: view)
+        currentTouchLocation = touches.first?.location(in: view)
         state = .changed
     }
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesEnded(touches, with: event)
+
         state = .ended
     }
 
     override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent) {
+        super.touchesCancelled(touches, with: event)
+
         state = .cancelled
     }
 
     func translation(in targetView: UIView?) -> CGPoint {
-        guard let recognizerView = view else {
+        if let initialTouchLocation, let currentTouchLocation {
             return CGPoint(
                 x: currentTouchLocation.x - initialTouchLocation.x,
                 y: currentTouchLocation.y - initialTouchLocation.y
             )
         }
-
-        let initial = recognizerView.convert(initialTouchLocation, to: targetView)
-        let current = recognizerView.convert(currentTouchLocation, to: targetView)
-        return CGPoint(x: current.x - initial.x, y: current.y - initial.y)
-    }
-
-    override func reset() {
-        super.reset()
-        initialTouchLocation = .zero
-        currentTouchLocation = .zero
-    }
-
-    private func configureTouchDelivery() {
-        delaysTouchesBegan = false
-        delaysTouchesEnded = false
-        cancelsTouchesInView = true
+        return .zero
     }
 }
