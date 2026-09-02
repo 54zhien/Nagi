@@ -231,7 +231,7 @@ final class NagiTabBarView: UIView {
                 transition.setFrame(view: itemView, frame: itemFrame)
                 transition.setPosition(
                     view: selectedItemView,
-                    position: itemFrame.center
+                    position: CGPoint(x: itemFrame.midX, y: itemFrame.midY)
                 )
                 transition.setBounds(
                     view: selectedItemView,
@@ -339,7 +339,7 @@ final class NagiTabBarView: UIView {
         let translation = recognizer.translation(in: liquidLensView)
         let currentSelectionX = gestureState.startSelectionX + translation.x
         let hoveredIndex = mainIndex(
-            at: recognizer.currentTouchLocation,
+            at: recognizer.currentLocation,
             requiresMainFrameHit: false
         ) ?? gestureState.hoveredIndex
 
