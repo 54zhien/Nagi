@@ -97,6 +97,142 @@ private func removeAnimationDelegate(from layer: CALayer?, forKey key: String) {
     delegates.removeObject(forKey: key as NSString)
 }
 
+private enum NagiLayerSpringOverride {
+    private static var isInstalled = false
+    private static var stackDepth = 0
+
+    static var isActive: Bool {
+        isInstalled && stackDepth > 0
+    }
+
+    static func push() {
+        installIfNeeded()
+
+        guard isInstalled else {
+            return
+        }
+
+        stackDepth += 1
+    }
+
+    static func pop() {
+        guard isInstalled, stackDepth > 0 else {
+            return
+        }
+
+        stackDepth -= 1
+    }
+
+    private static func installIfNeeded() {
+        guard !isInstalled else {
+            return
+        }
+
+        let originalSelector = #selector(CALayer.add(_:forKey:))
+        let replacementSelector =
+            #selector(CALayer.nagi_addAnimation(_:forKey:))
+
+        guard
+            let originalMethod = class_getInstanceMethod(
+                CALayer.self,
+                originalSelector
+            ),
+            let replacementMethod = class_getInstanceMethod(
+                CALayer.self,
+                replacementSelector
+            )
+        else {
+            assertionFailure(
+                "Unable to install CALayer spring animation override"
+            )
+            return
+        }
+
+        method_exchangeImplementations(
+            originalMethod,
+            replacementMethod
+        )
+
+        isInstalled = true
+    }
+}
+
+private extension CALayer {
+    @objc func nagi_addAnimation(
+        _ animation: CAAnimation,
+        forKey key: String?
+    ) {
+        var updatedAnimation = animation
+
+        if NagiLayerSpringOverride.isActive,
+           let sourceAnimation = animation as? CASpringAnimation {
+
+            var keepNativeSpring = false
+
+            // Match Nagram UIKitRuntimeUtils:
+            // iOS 26's special 0.3832-second native glass spring must
+            // remain untouched.
+            if #available(iOS 26.0, *) {
+                if abs(sourceAnimation.duration - 0.3832) <= 0.0001 {
+                    keepNativeSpring = true
+                }
+            }
+
+            // Nagram also deliberately preserves the 0.5-second spring.
+            if abs(sourceAnimation.duration - 0.5) <= 0.0001 {
+                keepNativeSpring = true
+            }
+
+            if !keepNativeSpring {
+                let replacement = CABasicAnimation(
+                    keyPath: sourceAnimation.keyPath
+                )
+
+                replacement.fromValue = sourceAnimation.fromValue
+                replacement.toValue = sourceAnimation.toValue
+                replacement.byValue = sourceAnimation.byValue
+
+                replacement.isAdditive = sourceAnimation.isAdditive
+
+                replacement.duration = sourceAnimation.duration
+                replacement.timingFunction =
+                    CAMediaTimingFunction(
+                        controlPoints:
+                            0.380,
+                            0.700,
+                            0.125,
+                            1.000
+                    )
+
+                replacement.isRemovedOnCompletion =
+                    sourceAnimation.isRemovedOnCompletion
+                replacement.fillMode =
+                    sourceAnimation.fillMode
+
+                replacement.speed =
+                    sourceAnimation.speed
+                replacement.beginTime =
+                    sourceAnimation.beginTime
+                replacement.timeOffset =
+                    sourceAnimation.timeOffset
+                replacement.repeatCount =
+                    sourceAnimation.repeatCount
+                replacement.autoreverses =
+                    sourceAnimation.autoreverses
+
+                updatedAnimation = replacement
+            }
+        }
+
+        // After method_exchangeImplementations(), this selector points
+        // to CALayer's original addAnimation:forKey: implementation.
+        nagi_addAnimation(
+            updatedAnimation,
+            forKey: key
+        )
+    }
+}
+
 enum NagiTabTransition {
     case immediate
     case easeInOut(duration: TimeInterval)
@@ -203,20 +339,23 @@ enum NagiTabTransition {
 
         switch self {
         case .spring:
-            // Nagram enters UIKit's spring animation transaction for native
-            // views. Its private layer override makes the damping argument
-            // effectively critically damped; 1.0 is the public UIKit
-            // equivalent while the existing Nagi property transition keeps
-            // its own timing curve.
+            // Match Nagram ComponentTransition exactly:
+            // enter the CALayer spring-override scope before UIKit creates
+            // its spring animations, then leave the scope immediately after
+            // UIView.animate has synchronously installed them.
+            NagiLayerSpringOverride.push()
+
             UIView.animate(
                 withDuration: duration,
                 delay: delay,
-                usingSpringWithDamping: 1.0,
+                usingSpringWithDamping: 500.0,
                 initialSpringVelocity: 0.0,
                 options: options,
                 animations: changes,
                 completion: animationCompletion
             )
+
+            NagiLayerSpringOverride.pop()
         default:
             UIView.animate(
                 withDuration: duration,

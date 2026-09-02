@@ -394,26 +394,33 @@ final class NagiLiquidLensView: UIView {
         let previousBounds = nativeLensView.bounds
 
         if !privateLiftChanged {
-            // Nagram lets UIKit animate the native Lens bounds, then uses an
-            // additive position correction to keep the selected content
-            // visually anchored while its width changes.
             transition.animateView {
                 nativeLensView.bounds = targetBounds
             }
 
-            transition.setPosition(view: nativeLensView, position: newCenter)
+            // Intentionally mirror Nagram LiquidLensView's workaround.
+            //
+            // Do not remove or "clean up" these two lines.
+            // Nagram starts the UIKit bounds animation, immediately removes
+            // the resulting layer animations, then forces the model bounds to
+            // the final value before applying position compensation.
+            nativeLensView.layer.removeAllAnimations()
+            nativeLensView.bounds = targetBounds
 
-            if !transition.isImmediate {
-                let widthDelta = targetBounds.width - previousBounds.width
-                if abs(widthDelta) > 0.001 {
-                    transition.animatePosition(
-                        layer: nativeLensView.layer,
-                        from: CGPoint(x: widthDelta * 0.5, y: 0),
-                        to: .zero,
-                        additive: true
-                    )
-                }
-            }
+            transition.setPosition(
+                view: nativeLensView,
+                position: newCenter
+            )
+
+            transition.animatePosition(
+                layer: nativeLensView.layer,
+                from: CGPoint(
+                    x: (targetBounds.width - previousBounds.width) * 0.5,
+                    y: 0
+                ),
+                to: .zero,
+                additive: true
+            )
         }
 
         // During a private lift, bounds and center are both completed by the
@@ -454,11 +461,17 @@ final class NagiLiquidLensView: UIView {
                 selector: #selector(updateLiftedLensPresentation(_:))
             )
             if #available(iOS 15.0, *) {
-                displayLink.preferredFrameRateRange = CAFrameRateRange(
-                    minimum: 60,
-                    maximum: 120,
-                    preferred: 120
-                )
+                let maximumFPS =
+                    Float(UIScreen.main.maximumFramesPerSecond)
+
+                if maximumFPS > 61.0 {
+                    displayLink.preferredFrameRateRange =
+                        CAFrameRateRange(
+                            minimum: 30.0,
+                            maximum: 120.0,
+                            preferred: 120.0
+                        )
+                }
             }
             displayLink.add(to: .main, forMode: .common)
             interactiveDisplayLink = displayLink
