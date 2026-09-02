@@ -30,6 +30,7 @@ final class NagiRootViewController: UIViewController {
     private var hostingControllers: [AppTab: UIHostingController<AnyView>] = [:]
     private var keyboardCoordinator: NagiKeyboardLayoutCoordinator?
     private var currentLayoutState = NagiRootLayoutState.initial
+    private var observedKeyboardFrame: CGRect?
     private var activeLayoutTransition: NagiTabTransition?
     private var keyboardTransitionGeneration = 0
     private var searchExitLayoutCompleted = false
@@ -221,7 +222,6 @@ final class NagiRootViewController: UIViewController {
 
         state.searchText = ""
         tabBarView.setSearchQuery("")
-        tabBarView.resignSearchFirstResponder()
         searchExitLayoutCompleted = false
         searchOverlayExitCompleted = false
         state.mode = .searchExiting(previous: target)
@@ -243,6 +243,7 @@ final class NagiRootViewController: UIViewController {
             self.searchExitLayoutCompleted = true
             self.finishSearchDeactivationIfReady(target: target)
         }
+        tabBarView.resignSearchFirstResponder()
     }
 
     private func finishSearchDeactivationIfReady(target: AppTab) {
@@ -250,7 +251,8 @@ final class NagiRootViewController: UIViewController {
               previous == target,
               searchExitLayoutCompleted,
               searchOverlayExitCompleted,
-              currentLayoutState.keyboardFrame == nil else {
+              observedKeyboardFrame == nil,
+              activeLayoutTransition == nil else {
             return
         }
         state.mode = .tabs(selected: target)
@@ -370,7 +372,7 @@ final class NagiRootViewController: UIViewController {
     }
 
     private func applyKeyboardFrame(_ frame: CGRect?, transition: NagiTabTransition) {
-        currentLayoutState.keyboardFrame = frame
+        observedKeyboardFrame = frame
         guard state.mode.isSearchInteractionActive else {
             reconcileLayout(transition: .immediate)
             return
@@ -380,11 +382,17 @@ final class NagiRootViewController: UIViewController {
         let resolvedTransition = effectiveTransition(transition)
         activeLayoutTransition = resolvedTransition
         reconcileLayout(transition: resolvedTransition) { [weak self] _ in
-            guard let self, generation == self.keyboardTransitionGeneration else { return }
+            guard let self,
+                  generation == self.keyboardTransitionGeneration else {
+                return
+            }
+
             self.activeLayoutTransition = nil
-        }
-        if frame == nil, case let .searchExiting(previous) = state.mode {
-            finishSearchDeactivationIfReady(target: previous)
+
+            if frame == nil,
+               case let .searchExiting(previous) = self.state.mode {
+                self.finishSearchDeactivationIfReady(target: previous)
+            }
         }
     }
 
@@ -393,10 +401,12 @@ final class NagiRootViewController: UIViewController {
         force: Bool = false,
         completion: ((Bool) -> Void)? = nil
     ) {
+        let oldState = currentLayoutState
+
         let nextState = NagiRootLayoutState(
             bounds: view.bounds,
             safeAreaInsets: view.safeAreaInsets,
-            keyboardFrame: currentLayoutState.keyboardFrame,
+            keyboardFrame: observedKeyboardFrame,
             mode: state.mode
         )
         guard force || nextState != currentLayoutState || tabBarView.frame == .zero else {
@@ -410,8 +420,30 @@ final class NagiRootViewController: UIViewController {
             keyboardFrame: nextState.keyboardFrame,
             state: nextState.mode
         )
-        currentLayoutState = nextState
         let resolvedTransition = effectiveTransition(transition)
+        let isKeyboardOnlyCarrierUpdate =
+            !force &&
+            tabBarView.frame != .zero &&
+            oldState.bounds == nextState.bounds &&
+            oldState.safeAreaInsets == nextState.safeAreaInsets &&
+            oldState.mode == nextState.mode &&
+            oldState.keyboardFrame != nextState.keyboardFrame
+
+        currentLayoutState = nextState
+
+        if isKeyboardOnlyCarrierUpdate {
+            resolvedTransition.perform { [weak self] in
+                guard let self else { return }
+                resolvedTransition.setFrame(
+                    view: self.tabBarView,
+                    frame: layout.tabBarFrame
+                )
+            } completion: { completed in
+                completion?(completed)
+            }
+            return
+        }
+
         var completedParts = 0
         var allPartsCompleted = true
         func completePart(_ completed: Bool) {

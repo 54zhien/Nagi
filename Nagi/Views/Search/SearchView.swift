@@ -21,10 +21,7 @@ struct SearchView: View {
                 Color.clear
                     .ignoresSafeArea()
             } else {
-                NavigationStack {
-                    activeSearchContent
-                        .toolbar(.hidden, for: .navigationBar)
-                }
+                activeSearchContent
             }
         }
         .transaction { transaction in
@@ -52,10 +49,6 @@ struct SearchView: View {
     @ViewBuilder
     private var activeSearchContent: some View {
         ZStack {
-            // Results only become opaque once a real effective query exists.
-            Color(uiColor: .systemBackground)
-                .ignoresSafeArea()
-
             if matchingBooks.isEmpty {
                 ContentUnavailableView {
                     searchUnavailableLabel("未找到书籍")
@@ -71,12 +64,16 @@ struct SearchView: View {
                             BookRow(book: book)
                         }
                         .buttonStyle(.plain)
+                        .listRowBackground(Color.clear)
                     }
                 }
                 .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .background(Color.clear)
                 .scrollEdgeEffectStyle(.soft, for: .top)
             }
         }
+        .background(Color.clear)
         .safeAreaBar(edge: .top, spacing: 0) {
             searchHeader
         }

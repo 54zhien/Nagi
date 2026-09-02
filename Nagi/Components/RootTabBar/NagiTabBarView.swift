@@ -165,6 +165,17 @@ final class NagiTabBarView: UIView {
             transition: transition
         )
         let localSearchContainerFrame = localFrame(layout.searchContainerFrame, in: layout.tabBarFrame)
+        let searchContainerFrameChanged: Bool
+        if let oldParams {
+            let previousLocalSearchContainerFrame = localFrame(
+                oldParams.layout.searchContainerFrame,
+                in: oldParams.layout.tabBarFrame
+            )
+            searchContainerFrameChanged =
+                previousLocalSearchContainerFrame != localSearchContainerFrame
+        } else {
+            searchContainerFrameChanged = true
+        }
         let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.lensContainerFrame) }
         let selectedIndex = mainIndex(for: mode.previousTab ?? mode.selectedTab)
         let displayedIndex = selectionGestureState?.hoveredIndex ?? overrideSelectedIndex ?? selectedIndex
@@ -197,7 +208,9 @@ final class NagiTabBarView: UIView {
             : .easeInOut(duration: 0.25)
         transition.perform { [weak self] in
             guard let self else { return }
-            transition.setFrame(view: self.searchView, frame: localSearchContainerFrame)
+            if searchContainerFrameChanged {
+                transition.setFrame(view: self.searchView, frame: localSearchContainerFrame)
+            }
             if searchParamsChanged || searchGeometryDidChange || oldParams == nil {
                 self.searchView.applyInternalGeometry(
                     params: searchParams,

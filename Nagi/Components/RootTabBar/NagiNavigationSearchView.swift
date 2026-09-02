@@ -331,7 +331,10 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     }
 
     private func layoutControls(for params: NagiSearchParams, transition: NagiTabTransition) {
-        let backgroundBounds = backgroundView.bounds
+        let backgroundBounds = CGRect(
+            origin: .zero,
+            size: params.backgroundFrame.size
+        )
         let active = params.isActive
 
         let baseIconSize = iconView.image?.size ?? CGSize(width: 22, height: 22)
@@ -401,7 +404,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 frame: backgroundBounds
             )
 
-            let fieldLeading: CGFloat = 40
+            let fieldLeading: CGFloat = 36
             let trailingControls: CGFloat = 48
             let fieldFrame = CGRect(
                 x: fieldLeading,
@@ -442,7 +445,10 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         }
 
         if let close {
-            let closeBounds = close.background.bounds
+            let closeBounds = CGRect(
+                origin: .zero,
+                size: params.closeFrame.size
+            )
             transition.setFrame(
                 view: close.button,
                 frame: CGRect(
