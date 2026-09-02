@@ -32,14 +32,13 @@ final class NagiRootViewController: UIViewController {
     let contentContainerView = UIView(frame: .zero)
     let tabBarView = NagiTabBarView()
     private let searchOverlayView = UIView(frame: .zero)
+
     private lazy var searchOverlayDismissTapGesture: UITapGestureRecognizer = {
         let recognizer = UITapGestureRecognizer(
             target: self,
             action: #selector(handleSearchOverlayDismissTap(_:))
         )
         recognizer.cancelsTouchesInView = false
-        // The transparent dim interaction only exists while an empty Search
-        // is actively presented.
         recognizer.isEnabled = false
         return recognizer
     }()
@@ -69,8 +68,6 @@ final class NagiRootViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // Keep the root fallback in sync with the visible page. Each
-        // persistent hosting view still owns its full-screen page surface.
         view.backgroundColor = pageBackgroundColor(for: .home)
         view.isOpaque = true
         contentContainerView.backgroundColor = .clear
@@ -80,7 +77,9 @@ final class NagiRootViewController: UIViewController {
 
         installPersistentChildren()
         wireTabBar()
-        keyboardCoordinator = NagiKeyboardLayoutCoordinator(view: view) { [weak self] frame, transition in
+
+        keyboardCoordinator = NagiKeyboardLayoutCoordinator(view: view) {
+            [weak self] frame, transition in
             self?.applyKeyboardFrame(frame, transition: transition)
         }
 
@@ -97,10 +96,17 @@ final class NagiRootViewController: UIViewController {
         reconcileLayout(transition: .immediate)
     }
 
-    func updateAccessibility(reduceMotion: Bool, reduceTransparency: Bool) {
-        let changed = self.reduceMotion != reduceMotion || self.reduceTransparency != reduceTransparency
+    func updateAccessibility(
+        reduceMotion: Bool,
+        reduceTransparency: Bool
+    ) {
+        let changed =
+            self.reduceMotion != reduceMotion ||
+            self.reduceTransparency != reduceTransparency
+
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
+
         guard changed else { return }
         reconcileLayout(transition: .immediate, force: true)
     }
@@ -112,6 +118,7 @@ final class NagiRootViewController: UIViewController {
 
     private func installPersistentChildren() {
         let tabs: [AppTab] = [.home, .library, .settings]
+
         for tab in tabs {
             let controller = makeHostingController(for: tab)
             hostingControllers[tab] = controller
@@ -160,16 +167,26 @@ final class NagiRootViewController: UIViewController {
         }
     }
 
-    private func makeHostingController(for tab: AppTab) -> UIHostingController<AnyView> {
+    private func makeHostingController(
+        for tab: AppTab
+    ) -> UIHostingController<AnyView> {
         let rootView: AnyView
+
         switch tab {
         case .home:
-            rootView = AnyView(HomeView().modelContainer(Persistence.container))
+            rootView = AnyView(
+                HomeView().modelContainer(Persistence.container)
+            )
         case .library:
-            rootView = AnyView(LibraryView().modelContainer(Persistence.container))
+            rootView = AnyView(
+                LibraryView().modelContainer(Persistence.container)
+            )
         case .settings:
-            rootView = AnyView(SettingsView().modelContainer(Persistence.container))
+            rootView = AnyView(
+                SettingsView().modelContainer(Persistence.container)
+            )
         }
+
         return UIHostingController(rootView: rootView)
     }
 
@@ -195,15 +212,18 @@ final class NagiRootViewController: UIViewController {
         tabBarView.onSearchQueryChanged = { [weak self] query in
             guard let self else { return }
 
-            self.state.searchText = query
-            self.searchOverlayDismissTapGesture.isEnabled =
-                query.isEmpty && self.state.tabBarSearchState.isActive
+            state.searchText = query
+            searchOverlayDismissTapGesture.isEnabled =
+                query.isEmpty && state.tabBarSearchState.isActive
         }
     }
 
     private func select(tab: AppTab) {
         guard !state.tabBarSearchState.isActive,
-              state.selectedTab != tab else { return }
+              state.selectedTab != tab else {
+            return
+        }
+
         state.selectedTab = tab
         let transition = effectiveTransition(.spring(duration: 0.4))
         showChild(for: tab, transition: transition)
@@ -212,32 +232,41 @@ final class NagiRootViewController: UIViewController {
 
     private func activateSearch() {
         guard !state.tabBarSearchState.isActive else { return }
+
         state.searchText = ""
         tabBarView.setSearchQuery("")
 
-        // Search content becomes active before the shared state changes. The
-        // overlay and the Bottom Bar then animate independently from that one
-        // state submission, as in Nagram's SearchDisplayController path.
         presentSearchOverlay()
         state.tabBarSearchState = NagiTabBarSearchState(isActive: true)
         searchOverlayDismissTapGesture.isEnabled = true
-        reconcileLayout(transition: effectiveTransition(.spring(duration: 0.5)))
+
+        // Build the active Search surface first. becomeFirstResponder then
+        // produces the system keyboard transition, whose frame update retargets
+        // this same in-flight property animation from its presentation values.
+        reconcileLayout(
+            transition: effectiveTransition(.spring(duration: 0.5))
+        )
         tabBarView.becomeSearchFirstResponder()
     }
 
     private func deactivateSearch() {
         guard state.tabBarSearchState.isActive else { return }
+
         tabBarView.resignSearchFirstResponder()
         state.searchText = ""
         tabBarView.setSearchQuery("")
         searchOverlayDismissTapGesture.isEnabled = false
         state.tabBarSearchState = .inactive
+
         let transition = effectiveTransition(.spring(duration: 0.5))
         reconcileLayout(transition: transition)
         dismissSearchOverlay()
     }
 
-    private func showChild(for tab: AppTab, transition: NagiTabTransition) {
+    private func showChild(
+        for tab: AppTab,
+        transition: NagiTabTransition
+    ) {
         view.backgroundColor = pageBackgroundColor(for: tab)
 
         guard !transition.isImmediate,
@@ -246,9 +275,12 @@ final class NagiRootViewController: UIViewController {
               let oldView = hostingControllers[oldTab]?.view,
               let newView = hostingControllers[tab]?.view else {
             pageTransitionGeneration += 1
+
             for (childTab, controller) in hostingControllers {
                 let isVisible = childTab == tab
-                controller.view.layer.removeAnimation(forKey: "transform.scale")
+                controller.view.layer.removeAnimation(
+                    forKey: "transform.scale"
+                )
                 NagiTabTransition.immediate.setAlpha(
                     view: controller.view,
                     alpha: 1
@@ -261,23 +293,22 @@ final class NagiRootViewController: UIViewController {
                 controller.view.isHidden = !isVisible
                 controller.view.isUserInteractionEnabled = isVisible
             }
+
             displayedTab = tab
             return
         }
 
         pageTransitionGeneration += 1
         let generation = pageTransitionGeneration
+
         let transitionScale: CGFloat
         if oldView.frame.height > 0 {
-            transitionScale = (oldView.frame.height - 3.0) / oldView.frame.height
+            transitionScale =
+                (oldView.frame.height - 3.0) / oldView.frame.height
         } else {
             transitionScale = 0.998
         }
 
-        // Nagram's controller transition is animation-only: the page model
-        // transform stays identity while explicit transform.scale animations
-        // provide the 0.12 / 0.15 visual micro-transition. This is important
-        // because reconcileLayout() continues to write full-screen frames.
         oldView.layer.removeAnimation(forKey: "transform.scale")
         newView.layer.removeAnimation(forKey: "transform.scale")
         NagiTabTransition.immediate.setScale(view: oldView, scale: 1)
@@ -299,15 +330,10 @@ final class NagiRootViewController: UIViewController {
             duration: 0.12,
             removeOnCompletion: false,
             completion: { [weak self, weak oldView] completed in
-                guard completed, let self else {
-                    return
-                }
+                guard completed, let self else { return }
 
-                // If a newer transition superseded this one, the old page
-                // may have become the visible target again. Do not remove a
-                // newer transform.scale animation in that case.
-                guard generation == self.pageTransitionGeneration ||
-                    self.displayedTab != oldTab else {
+                guard generation == pageTransitionGeneration ||
+                        displayedTab != oldTab else {
                     return
                 }
 
@@ -326,13 +352,14 @@ final class NagiRootViewController: UIViewController {
             delay: 0.1,
             removeOnCompletion: true
         )
+
         NagiTabTransition.easeInOut(duration: 0.1).setAlpha(
             view: newView,
             alpha: 1,
             completion: { [weak self, weak newView] completed in
                 guard completed,
                       let self,
-                      generation == self.pageTransitionGeneration else {
+                      generation == pageTransitionGeneration else {
                     return
                 }
 
@@ -406,8 +433,6 @@ final class NagiRootViewController: UIViewController {
         searchOverlayView.isHidden = false
         searchOverlayView.isUserInteractionEnabled = true
         searchOverlayDismissTapGesture.isEnabled = false
-        // The overlay itself stays transparent and fully active. Nagram's
-        // Bottom Contacts Search does not perform an opaque background fade.
         searchOverlayView.alpha = 1
         searchController.view.alpha = 0
 
@@ -416,7 +441,6 @@ final class NagiRootViewController: UIViewController {
             return
         }
 
-        // Match SearchDisplayController content activation: 0 -> 1, 0.3s.
         UIView.animate(
             withDuration: 0.3,
             delay: 0,
@@ -432,18 +456,12 @@ final class NagiRootViewController: UIViewController {
     }
 
     @objc
-    private func handleSearchOverlayDismissTap(_ recognizer: UITapGestureRecognizer) {
-        guard recognizer.state == .ended else {
-            return
-        }
-
-        guard state.tabBarSearchState.isActive else {
-            return
-        }
-
-        // A background tap cancels only while the search query is empty.
-        // Once results are visible, taps belong to the result content.
-        guard state.searchText.isEmpty else {
+    private func handleSearchOverlayDismissTap(
+        _ recognizer: UITapGestureRecognizer
+    ) {
+        guard recognizer.state == .ended,
+              state.tabBarSearchState.isActive,
+              state.searchText.isEmpty else {
             return
         }
 
@@ -453,6 +471,7 @@ final class NagiRootViewController: UIViewController {
     private func dismissSearchOverlay() {
         searchOverlayGeneration += 1
         let generation = searchOverlayGeneration
+
         searchOverlayDismissTapGesture.isEnabled = false
         searchOverlayView.isUserInteractionEnabled = false
 
@@ -464,8 +483,6 @@ final class NagiRootViewController: UIViewController {
 
         searchOverlayView.layer.removeAllAnimations()
 
-        // Fade the complete overlay so its background and content leave
-        // together, matching Nagram SearchDisplayController.
         UIView.animate(
             withDuration: 0.3,
             delay: 0,
@@ -480,21 +497,21 @@ final class NagiRootViewController: UIViewController {
             completion: { [weak self] finished in
                 guard let self,
                       finished,
-                      self.searchOverlayGeneration == generation else {
+                      searchOverlayGeneration == generation else {
                     return
                 }
 
-                self.searchOverlayView.isHidden = true
-                self.searchOverlayView.alpha = 1
-
-                if let searchController = self.searchHostingController {
-                    searchController.view.alpha = 1
-                }
+                searchOverlayView.isHidden = true
+                searchOverlayView.alpha = 1
+                searchHostingController?.view.alpha = 1
             }
         )
     }
 
-    private func applyKeyboardFrame(_ frame: CGRect?, transition: NagiTabTransition) {
+    private func applyKeyboardFrame(
+        _ frame: CGRect?,
+        transition: NagiTabTransition
+    ) {
         observedKeyboardFrame = frame
         reconcileLayout(transition: effectiveTransition(transition))
     }
@@ -510,7 +527,10 @@ final class NagiRootViewController: UIViewController {
             selectedTab: state.selectedTab,
             searchState: state.tabBarSearchState
         )
-        guard force || nextState != currentLayoutState || tabBarView.frame == .zero else {
+
+        guard force ||
+                nextState != currentLayoutState ||
+                tabBarView.frame == .zero else {
             return
         }
 
@@ -524,46 +544,54 @@ final class NagiRootViewController: UIViewController {
         let resolvedTransition = effectiveTransition(transition)
         currentLayoutState = nextState
 
+        // Parent RootTabBar geometry and all child Search/Main/Lens geometry
+        // are submitted before this transaction commits. This is the same
+        // topology as Nagram's containerLayoutUpdated -> TabBarComponent.update
+        // path and prevents a child from animating in an already-retargeted
+        // parent coordinate system.
         resolvedTransition.perform { [weak self] in
             guard let self else { return }
+
             resolvedTransition.setFrame(
-                view: self.contentContainerView,
-                frame: self.view.bounds
+                view: contentContainerView,
+                frame: view.bounds
             )
             resolvedTransition.setFrame(
-                view: self.searchOverlayView,
-                frame: self.contentContainerView.bounds
+                view: searchOverlayView,
+                frame: contentContainerView.bounds
             )
             resolvedTransition.setFrame(
-                view: self.tabBarView,
+                view: tabBarView,
                 frame: layout.tabBarFrame
             )
 
-            if let searchController = self.searchHostingController {
+            if let searchController = searchHostingController {
                 resolvedTransition.setFrame(
                     view: searchController.view,
-                    frame: self.searchOverlayView.bounds
+                    frame: searchOverlayView.bounds
                 )
             }
 
-            for controller in self.hostingControllers.values {
+            for controller in hostingControllers.values {
                 resolvedTransition.setFrame(
                     view: controller.view,
-                    frame: self.contentContainerView.bounds
+                    frame: contentContainerView.bounds
                 )
             }
-        }
 
-        tabBarView.update(
-            layout: layout,
-            selectedTab: nextState.selectedTab,
-            searchState: nextState.searchState,
-            reduceTransparency: reduceTransparency,
-            transition: resolvedTransition
-        )
+            tabBarView.update(
+                layout: layout,
+                selectedTab: nextState.selectedTab,
+                searchState: nextState.searchState,
+                reduceTransparency: reduceTransparency,
+                transition: resolvedTransition
+            )
+        }
     }
 
-    private func effectiveTransition(_ transition: NagiTabTransition) -> NagiTabTransition {
+    private func effectiveTransition(
+        _ transition: NagiTabTransition
+    ) -> NagiTabTransition {
         reduceMotion ? .immediate : transition
     }
 }
