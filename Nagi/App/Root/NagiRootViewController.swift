@@ -372,7 +372,7 @@ final class NagiRootViewController: UIViewController {
                 )
             }
 
-            for (tab, controller) in self.hostingControllers {
+            for controller in self.hostingControllers.values {
                 resolvedTransition.setFrame(
                     view: controller.view,
                     frame: self.contentContainerView.bounds

@@ -378,7 +378,6 @@ final class NagiTabBarView: UIView {
 
     private func finishTabSelection() {
         guard let gestureState = selectionGestureState,
-              let currentLayout,
               let actualIndex = mainIndex(for: currentSelectedTab) else {
             cancelTabSelection()
             return
