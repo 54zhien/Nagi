@@ -17,7 +17,6 @@ private let nagiBoundsAnimationKey = "bounds"
 private let nagiBoundsOriginAnimationKey = "bounds.origin"
 private let nagiBoundsSizeAnimationKey = "bounds.size"
 private let nagiOpacityAnimationKey = "opacity"
-private let nagiTransformAnimationKey = "transform"
 private let nagiTransformScaleAnimationKey = "transform.scale"
 private let nagiCornerRadiusAnimationKey = "cornerRadius"
 private let nagiTintAnimationKey = "contentsMultiplyColor"
@@ -58,10 +57,6 @@ private final class NagiTransitionCompletionContext: NSObject {
     }
 }
 
-// CAAnimation retains its delegate, exactly as Nagram's CAAnimationUtils does.
-// Keeping completion ownership on the animation itself avoids the previous
-// layer-key dictionary collision when a rapid reverse replaces an animation
-// under the same property key.
 private final class NagiTransitionAnimationDelegate: NSObject, CAAnimationDelegate {
     private var didNotify = false
     private let context: NagiTransitionCompletionContext?
@@ -77,17 +72,15 @@ private final class NagiTransitionAnimationDelegate: NSObject, CAAnimationDelega
     }
 
     func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
-        notify(finished: flag)
-    }
-
-    private func notify(finished: Bool) {
         guard !didNotify else { return }
         didNotify = true
-        completion?(finished)
-        context?.animationDidStop(finished: finished)
+        completion?(flag)
+        context?.animationDidStop(finished: flag)
     }
 }
 
+// ComponentTransition.animateView(.spring) in Nagram temporarily overrides
+// UIKit-created CASpringAnimation values. Keep the same scoped behaviour.
 private enum NagiLayerSpringOverride {
     private static var isInstalled = false
     private static var stackDepth = 0
@@ -176,8 +169,8 @@ private extension CALayer {
             }
         }
 
-        // After method_exchangeImplementations(), this selector points to
-        // CALayer's original add(_:forKey:) implementation.
+        // After method_exchangeImplementations(), this selector points to the
+        // original CALayer.add(_:forKey:) implementation.
         nagi_addAnimation(updatedAnimation, forKey: key)
     }
 }
@@ -189,9 +182,7 @@ enum NagiTabTransition {
     case keyboard(duration: TimeInterval, curve: UIView.AnimationOptions)
 
     var isImmediate: Bool {
-        if case .immediate = self {
-            return true
-        }
+        if case .immediate = self { return true }
         return false
     }
 
@@ -206,14 +197,16 @@ enum NagiTabTransition {
         }
     }
 
-    /// Apply a batch of property writes in one Core Animation transaction.
-    /// Interrupted property animations report false to the original batch.
+    /// Completion grouping only. Nagram's ComponentTransition does not wrap a
+    /// whole component update in an outer CATransaction with actions disabled;
+    /// each property setter owns its model write + explicit animation, while
+    /// UIGlass/UIVisualEffect geometry is animated by UIView.animate itself.
+    /// Keeping perform transaction-free avoids nesting those UIKit animations
+    /// inside a disabled-actions transaction while still letting callers wait
+    /// for every explicit animation started in the synchronous update.
     func perform(_ changes: () -> Void, completion: ((Bool) -> Void)? = nil) {
         if isImmediate {
-            CATransaction.begin()
-            CATransaction.setDisableActions(true)
             changes()
-            CATransaction.commit()
             completion?(true)
             return
         }
@@ -223,10 +216,7 @@ enum NagiTabTransition {
         let previousContext = threadDictionary[nagiTransitionContextThreadKey]
         threadDictionary[nagiTransitionContextThreadKey] = context
 
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
         changes()
-        CATransaction.commit()
 
         if let previousContext {
             threadDictionary[nagiTransitionContextThreadKey] = previousContext
@@ -306,8 +296,6 @@ enum NagiTabTransition {
     // MARK: - ComponentTransition-compatible property setters
 
     func setFrame(view: UIView, frame: CGRect) {
-        // Nagram does not restart an in-flight animation when its model value
-        // already points at the same final frame.
         guard view.frame != frame else { return }
 
         let layer = view.layer
@@ -477,8 +465,7 @@ enum NagiTabTransition {
         completion: ((Bool) -> Void)? = nil
     ) {
         let layer = view.layer
-        let currentTransform = layer.transform
-        let currentScale = scaleValue(of: currentTransform)
+        let currentScale = scaleValue(of: layer.transform)
 
         if currentScale == scale {
             if let animation = layer.animation(forKey: nagiTransformScaleAnimationKey) as? CABasicAnimation,
@@ -783,9 +770,6 @@ enum NagiTabTransition {
         if #available(iOS 15.0, *) {
             let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
             guard maximumFPS > 61.0 else { return }
-
-            // Nagram intentionally leaves opacity at its existing frame-rate
-            // preference (the iOS 26 0.5 spring already carries 80/120/120).
             guard keyPath != nagiOpacityAnimationKey else { return }
 
             animation.preferredFrameRateRange = CAFrameRateRange(
