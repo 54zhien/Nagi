@@ -64,9 +64,6 @@ final class NagiTabBarItemView: UIView {
         case .settings:
             button.accessibilityLabel = "设置"
             iconView.image = UIImage(systemName: "gearshape")
-        case .search:
-            button.accessibilityLabel = "搜索"
-            iconView.image = UIImage(systemName: "magnifyingglass")
         }
 
         iconView.preferredSymbolConfiguration = Self.tabSymbolConfiguration
@@ -90,11 +87,11 @@ final class NagiTabBarItemView: UIView {
     ) {
         switch visualRole {
         case .normal:
-            iconView.tintColor = (!usesPrivateLens && isSelected && !isCompact)
+            iconView.tintColor = !usesPrivateLens && isSelected
                 ? nagiAccentColor
                 : .secondaryLabel
         case .selected:
-            iconView.tintColor = isCompact ? .secondaryLabel : nagiAccentColor
+            iconView.tintColor = nagiAccentColor
         }
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]

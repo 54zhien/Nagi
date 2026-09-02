@@ -2,8 +2,9 @@
 //  NagiTabBarMetrics.swift
 //  Nagi
 //
-//  Root 底栏的唯一几何计算入口。参数沿用当前原生 TabBar 视觉基线，
-//  搜索展开和键盘移动也只改变这份 layout 结果。
+//  Root 底栏的唯一几何计算入口。布局参数按 Nagram
+//  TabBarControllerNode.updateImpl 的 inset、standalone slot 和 collapse
+//  规则计算，Search 只是当前 Tab 上方的状态。
 //
 
 import UIKit
@@ -28,23 +29,16 @@ enum NagiTabBarMetrics {
     static let searchDiameter: CGFloat = 64
     static let searchCloseDiameter: CGFloat = 48
     static let collapsedLensDiameter: CGFloat = 48
-    static let collapsedOffscreenClearance: CGFloat = 24
     static let standaloneGap: CGFloat = 8
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
-    static let horizontalMargin: CGFloat = 16
-    // The system safe-area value includes the full Home Indicator region. The
-    // floating TabBar's optical baseline sits above that region instead of
-    // using the raw safe-area inset as its visual bottom edge.
-    static let homeIndicatorOpticalBottomInset: CGFloat = 23
-    static let normalBottomSpacing: CGFloat = 0
-    static let keyboardSpacing: CGFloat = 8
 
     static func calculateLayout(
         bounds: CGRect,
         safeAreaInsets: UIEdgeInsets,
         keyboardFrame: CGRect?,
-        state: NagiRootTabMode
+        selectedTab: AppTab,
+        searchState: NagiTabBarSearchState
     ) -> NagiTabBarLayout {
         guard !bounds.isEmpty else {
             return NagiTabBarLayout(
@@ -56,52 +50,43 @@ enum NagiTabBarMetrics {
                 itemFrames: Array(repeating: .zero, count: mainItemCount),
                 lensSelectionFrame: .zero,
                 lensContainerFrame: .zero,
-                isSearchActive: state.isSearchActive,
-                isLensCollapsed: state.isSearchActive
+                isSearchActive: searchState.isActive,
+                isLensCollapsed: searchState.isActive
             )
         }
 
-        let keyboardOverlap: CGFloat
-        let keyboardTop: CGFloat?
-        if let keyboardFrame, !keyboardFrame.isNull, keyboardFrame.intersects(bounds) {
-            keyboardTop = max(bounds.minY, min(bounds.maxY, keyboardFrame.minY))
-            keyboardOverlap = max(0, bounds.maxY - (keyboardTop ?? bounds.maxY))
+        let inputHeight: CGFloat
+        if let keyboardFrame, !keyboardFrame.isNull, keyboardFrame.minY < bounds.maxY {
+            inputHeight = max(0, bounds.maxY - keyboardFrame.minY)
         } else {
-            keyboardTop = nil
-            keyboardOverlap = 0
+            inputHeight = 0
         }
 
-        let bottomY: CGFloat
-        if let keyboardTop, state.isSearchVisible, keyboardOverlap > 0 {
-            bottomY = keyboardTop - keyboardSpacing
+        var panelsBottomInset = safeAreaInsets.bottom
+        if panelsBottomInset == 0 {
+            panelsBottomInset = 8
         } else {
-            let normalBottomInset: CGFloat
-            if safeAreaInsets.bottom >= 30 {
-                normalBottomInset = homeIndicatorOpticalBottomInset + normalBottomSpacing
-            } else if safeAreaInsets.bottom > 0 {
-                normalBottomInset = max(8, safeAreaInsets.bottom - 8) + normalBottomSpacing
-            } else {
-                normalBottomInset = 8 + normalBottomSpacing
-            }
-            bottomY = bounds.maxY - normalBottomInset
+            panelsBottomInset = max(panelsBottomInset, 8)
         }
 
-        let normalBarWidth = max(0, bounds.width - horizontalMargin * 2)
-        let width = normalBarWidth
+        var tabBarBottomInset = panelsBottomInset
+        if searchState.isActive, inputHeight > 0 {
+            tabBarBottomInset = max(tabBarBottomInset, inputHeight + 8)
+        }
+
+        let sideInset: CGFloat = tabBarBottomInset <= 28 ? 20 : 12
+        let availableWidth = max(0, bounds.width - sideInset * 2)
         let barFrame = CGRect(
-            x: bounds.midX - width * 0.5,
-            y: bottomY - barHeight,
-            width: width,
+            x: sideInset,
+            y: bounds.maxY - tabBarBottomInset - barHeight,
+            width: availableWidth,
             height: barHeight
         )
 
-        // The original Nagi system TabView uses the available width for the
-        // complete floating bar. Keep the search surface independent, then
-        // distribute the remaining main capsule width across the three tabs.
-        let mainTabsWidth = max(0, normalBarWidth - standaloneGap - searchDiameter)
+        let mainTabsWidth = max(0, availableWidth - standaloneGap - searchDiameter)
         let mainFrame = CGRect(x: barFrame.minX, y: barFrame.minY, width: mainTabsWidth, height: barHeight)
         let searchContainerFrame = CGRect(
-            x: mainFrame.maxX + standaloneGap,
+            x: barFrame.maxX - searchDiameter,
             y: barFrame.minY,
             width: searchDiameter,
             height: searchDiameter
@@ -118,27 +103,20 @@ enum NagiTabBarMetrics {
             )
         }
         let selectedIndex: Int
-        switch state.previousTab ?? state.selectedTab {
+        switch selectedTab {
         case .home: selectedIndex = 0
         case .library: selectedIndex = 1
         case .settings: selectedIndex = 2
-        case .search: selectedIndex = 0
         }
         let selectedFrame = itemFrames.indices.contains(selectedIndex) ? itemFrames[selectedIndex] : .zero
-        let searchCloseFrame = CGRect(
-            x: searchContainerFrame.midX - searchCloseDiameter * 0.5,
-            y: searchContainerFrame.midY - searchCloseDiameter * 0.5,
-            width: searchCloseDiameter,
-            height: searchCloseDiameter
-        )
 
-        guard state.isSearchActive else {
+        guard searchState.isActive else {
             return NagiTabBarLayout(
                 tabBarFrame: barFrame,
                 mainTabsFrame: mainFrame,
                 searchContainerFrame: searchContainerFrame,
                 searchBackgroundFrame: searchContainerFrame,
-                searchCloseFrame: searchCloseFrame,
+                searchCloseFrame: .zero,
                 itemFrames: itemFrames,
                 lensSelectionFrame: selectedFrame,
                 lensContainerFrame: mainFrame,
@@ -148,7 +126,7 @@ enum NagiTabBarMetrics {
         }
 
         let collapsedFrame = CGRect(
-            x: bounds.minX - collapsedLensDiameter - collapsedOffscreenClearance,
+            x: barFrame.minX - sideInset - collapsedLensDiameter,
             y: barFrame.maxY - collapsedLensDiameter,
             width: collapsedLensDiameter,
             height: collapsedLensDiameter

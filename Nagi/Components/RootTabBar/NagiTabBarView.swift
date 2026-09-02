@@ -10,7 +10,8 @@ import UIKit
 
 struct NagiTabBarParams: Equatable {
     var layout: NagiTabBarLayout
-    var mode: NagiRootTabMode
+    var selectedTab: AppTab
+    var searchState: NagiTabBarSearchState
     var reduceTransparency: Bool
     var selectionGestureIndex: Int?
     var overrideSelectedIndex: Int?
@@ -33,7 +34,8 @@ final class NagiTabBarView: UIView {
     private let tabSelectionRecognizer: NagiTabSelectionRecognizer
     private var previousParams: NagiTabBarParams?
     private var currentLayout: NagiTabBarLayout?
-    private var currentMode: NagiRootTabMode?
+    private var currentSelectedTab: AppTab = .home
+    private var currentSearchState = NagiTabBarSearchState.inactive
     private var selectionGestureState: NagiSelectionGestureState?
     private var overrideSelectedIndex: Int?
     private let isLiftedStateEnabled = true
@@ -127,7 +129,8 @@ final class NagiTabBarView: UIView {
             self.previousParams = nil
             update(
                 layout: previousParams.layout,
-                mode: previousParams.mode,
+                selectedTab: previousParams.selectedTab,
+                searchState: previousParams.searchState,
                 reduceTransparency: previousParams.reduceTransparency,
                 transition: .immediate
             )
@@ -136,17 +139,20 @@ final class NagiTabBarView: UIView {
 
     func update(
         layout: NagiTabBarLayout,
-        mode: NagiRootTabMode,
+        selectedTab: AppTab,
+        searchState: NagiTabBarSearchState,
         reduceTransparency: Bool,
         transition: NagiTabTransition,
         completion: ((Bool) -> Void)? = nil
     ) {
         currentLayout = layout
-        currentMode = mode
+        currentSelectedTab = selectedTab
+        currentSearchState = searchState
 
         let nextParams = NagiTabBarParams(
             layout: layout,
-            mode: mode,
+            selectedTab: selectedTab,
+            searchState: searchState,
             reduceTransparency: reduceTransparency,
             selectionGestureIndex: selectionGestureState?.hoveredIndex,
             overrideSelectedIndex: overrideSelectedIndex
@@ -177,7 +183,7 @@ final class NagiTabBarView: UIView {
             searchContainerFrameChanged = true
         }
         let localItemFrames = layout.itemFrames.map { localFrame($0, in: layout.lensContainerFrame) }
-        let selectedIndex = mainIndex(for: mode.previousTab ?? mode.selectedTab)
+        let selectedIndex = mainIndex(for: selectedTab)
         let displayedIndex = selectionGestureState?.hoveredIndex ?? overrideSelectedIndex ?? selectedIndex
         let searchParams = NagiSearchParams(
             containerSize: localSearchContainerFrame.size,
@@ -189,8 +195,8 @@ final class NagiTabBarView: UIView {
                 layout.searchCloseFrame,
                 in: layout.searchContainerFrame
             ),
-            isActive: layout.isSearchActive,
-            isExpandedStandaloneBar: mode.searchPresentation.isExpandedStandaloneBar,
+            isActive: searchState.isActive,
+            isExpandedStandaloneBar: false,
             isDark: isDark,
             reduceTransparency: reduceTransparency
         )
@@ -322,10 +328,9 @@ final class NagiTabBarView: UIView {
     private func beginTabSelection(at location: CGPoint) {
         guard selectionGestureState == nil,
               let currentLayout,
-              let currentMode,
               !currentLayout.isSearchActive,
               let hoveredIndex = mainIndex(at: location, requiresMainFrameHit: true),
-              let originalIndex = mainIndex(for: currentMode.previousTab ?? currentMode.selectedTab) else {
+              let originalIndex = mainIndex(for: currentSelectedTab) else {
             return
         }
 
@@ -348,20 +353,7 @@ final class NagiTabBarView: UIView {
             currentSelectionX: startSelectionX,
             itemWidth: itemWidth
         )
-        let transition = NagiTabTransition.spring(
-            duration: 0.4
-        )
-        applyLensSelection(
-            layout: currentLayout,
-            displayedIndex: hoveredIndex,
-            isLifted: true,
-            transition: transition
-        )
-        updateItemSelectionPresentation(
-            displayedIndex: hoveredIndex,
-            transition: transition,
-            scaleTransition: transition
-        )
+        renderCurrentLayout(transition: .spring(duration: 0.4))
     }
 
     private func updateTabSelection(using recognizer: NagiTabSelectionRecognizer) {
@@ -381,24 +373,13 @@ final class NagiTabBarView: UIView {
         gestureState.hoveredIndex = hoveredIndex
         selectionGestureState = gestureState
 
-        applyLensSelection(
-            layout: currentLayout,
-            displayedIndex: hoveredIndex,
-            isLifted: true,
-            transition: .immediate
-        )
-        updateItemSelectionPresentation(
-            displayedIndex: hoveredIndex,
-            transition: .immediate,
-            scaleTransition: .immediate
-        )
+        renderCurrentLayout(transition: .immediate)
     }
 
     private func finishTabSelection() {
         guard let gestureState = selectionGestureState,
               let currentLayout,
-              let currentMode,
-              let actualIndex = mainIndex(for: currentMode.previousTab ?? currentMode.selectedTab) else {
+              let actualIndex = mainIndex(for: currentSelectedTab) else {
             cancelTabSelection()
             return
         }
@@ -419,26 +400,12 @@ final class NagiTabBarView: UIView {
         }
 
         overrideSelectedIndex = nil
-        let transition = NagiTabTransition.spring(
-            duration: 0.4
-        )
-        updateItemSelectionPresentation(
-            displayedIndex: finalIndex,
-            transition: transition,
-            scaleTransition: transition
-        )
-        applyLensSelection(
-            layout: currentLayout,
-            displayedIndex: finalIndex,
-            isLifted: false,
-            transition: transition
-        )
+        renderCurrentLayout(transition: .spring(duration: 0.4))
     }
 
     private func cancelTabSelection() {
-        guard let currentLayout,
-              let currentMode,
-              let actualIndex = mainIndex(for: currentMode.previousTab ?? currentMode.selectedTab) else {
+        guard currentLayout != nil,
+              mainIndex(for: currentSelectedTab) != nil else {
             selectionGestureState = nil
             overrideSelectedIndex = nil
             return
@@ -446,18 +413,16 @@ final class NagiTabBarView: UIView {
 
         selectionGestureState = nil
         overrideSelectedIndex = nil
-        let transition = NagiTabTransition.spring(
-            duration: 0.4
-        )
-        updateItemSelectionPresentation(
-            displayedIndex: actualIndex,
-            transition: transition,
-            scaleTransition: transition
-        )
-        applyLensSelection(
+        renderCurrentLayout(transition: .spring(duration: 0.4))
+    }
+
+    private func renderCurrentLayout(transition: NagiTabTransition) {
+        guard let currentLayout else { return }
+        update(
             layout: currentLayout,
-            displayedIndex: actualIndex,
-            isLifted: false,
+            selectedTab: currentSelectedTab,
+            searchState: currentSearchState,
+            reduceTransparency: previousParams?.reduceTransparency ?? false,
             transition: transition
         )
     }
@@ -498,27 +463,6 @@ final class NagiTabBarView: UIView {
                 scale: selectedContentScale
             )
         }
-    }
-
-    private func applyLensSelection(
-        layout: NagiTabBarLayout,
-        displayedIndex: Int?,
-        isLifted: Bool,
-        transition: NagiTabTransition,
-        completion: ((Bool) -> Void)? = nil
-    ) {
-        let isDark = traitCollection.userInterfaceStyle == .dark
-        liquidLensView.apply(
-            params: makeLensParams(
-                layout: layout,
-                displayedIndex: displayedIndex,
-                isLifted: isLifted,
-                isDark: isDark,
-                reduceTransparency: previousParams?.reduceTransparency ?? false
-            ),
-            transition: transition,
-            completion: completion
-        )
     }
 
     private func makeLensSelectionGeometry(
@@ -657,7 +601,6 @@ final class NagiTabBarView: UIView {
         case .home: return 0
         case .library: return 1
         case .settings: return 2
-        case .search: return nil
         }
     }
 }

@@ -125,10 +125,12 @@ final class NagiLiquidLensView: UIView {
     private let lensContentContainer: UIView
     private let restingBackgroundView: NagiLensRestingBackgroundView
     private let nativeLensView: UIView?
+    // currentParams is the latest requested state. The private Lens can lag
+    // behind it while setLifted waits for its alongside callback.
     private var currentParams: NagiLensParams?
+    private var appliedLensParams: NagiLensParams?
     private var isApplyingParams = false
     private var pendingParams: NagiLensParams?
-    private var pendingCompletion: ((Bool) -> Void)?
     private var interactiveDisplayLink: CADisplayLink?
 
     var usesPrivateLens: Bool {
@@ -228,21 +230,19 @@ final class NagiLiquidLensView: UIView {
 
     func apply(
         params: NagiLensParams,
-        transition: NagiTabTransition,
-        completion: ((Bool) -> Void)? = nil
+        transition: NagiTabTransition
     ) {
         if isApplyingParams {
             pendingParams = params
-            pendingCompletion = completion
             return
         }
         guard params != currentParams else {
-            completion?(true)
             return
         }
 
-        let previousParams = currentParams
+        let previousParams = appliedLensParams
         currentParams = params
+        appliedLensParams = params
         updateLiftedDisplayLink(isLifted: params.isLifted)
         let oldLifted = previousParams?.isLifted ?? false
         let privateLiftChanged =
@@ -287,14 +287,8 @@ final class NagiLiquidLensView: UIView {
 
         guard privateLiftChanged else {
             transition.perform(applyAnimations) { [weak self] completed in
-                guard let self else {
-                    completion?(completed)
-                    return
-                }
-                if self.currentParams == params {
-                    self.setResizeClipping(false)
-                }
-                completion?(completed)
+                guard let self, completed, self.currentParams == params else { return }
+                self.setResizeClipping(false)
             }
             return
         }
@@ -305,7 +299,6 @@ final class NagiLiquidLensView: UIView {
         // setLifted defers its alongside callback replaces this value with
         // the newest params instead of starting another nested lift.
         pendingParams = params
-        pendingCompletion = nil
         transition.perform(applyAnimations)
 
         let alongsideAnimations = { [weak self] in
@@ -319,8 +312,7 @@ final class NagiLiquidLensView: UIView {
         invokeLifted(
             params: params,
             transition: transition,
-            alongsideAnimations: alongsideAnimations,
-            completion: completion
+            alongsideAnimations: alongsideAnimations
         )
     }
 
@@ -498,21 +490,20 @@ final class NagiLiquidLensView: UIView {
     private func invokeLifted(
         params: NagiLensParams,
         transition: NagiTabTransition,
-        alongsideAnimations: @escaping () -> Void,
-        completion: ((Bool) -> Void)?
+        alongsideAnimations: @escaping () -> Void
     ) {
         guard let nativeLensView,
               let method = nativeLensView.method(for: PrivateSelector.setLifted) else {
             transition.perform(alongsideAnimations) { [weak self] completed in
-                guard let self else {
-                    completion?(completed)
-                    return
-                }
+                guard let self else { return }
                 self.isApplyingParams = false
-                if self.currentParams == params {
+                if completed, self.currentParams == params {
                     self.setResizeClipping(false)
                 }
-                completion?(completed)
+                self.applyPendingLensParams(
+                    using: transition,
+                    reapplyCurrentParams: false
+                )
             }
             return
         }
@@ -545,15 +536,6 @@ final class NagiLiquidLensView: UIView {
 
                 didProcessUpdate = true
 
-                // UIKit may invoke alongside after setLifted returns. In
-                // that case the native center must start from this callback,
-                // just as it does in the synchronous Nagram path.
-                if shouldScheduleUpdate {
-                    transition.animateView {
-                        nativeLensView.center = newCenter
-                    }
-                }
-
                 // If UIKit delays alongside, a newer touch update may already
                 // be waiting. Release the reentrancy guard on the next main
                 // turn and apply only the newest pending params.
@@ -562,31 +544,10 @@ final class NagiLiquidLensView: UIView {
                         guard let self else { return }
 
                         self.isApplyingParams = false
-
-                        guard let pendingParams = self.pendingParams else {
-                            self.pendingCompletion = nil
-                            return
-                        }
-
-                        let pendingCompletion = self.pendingCompletion
-
-                        self.pendingParams = nil
-                        self.pendingCompletion = nil
-
-                        if pendingParams == params {
-                            self.applyNativeLensGeometry(
-                                params: pendingParams,
-                                transition: transition,
-                                privateLiftChanged: false
-                            )
-                            pendingCompletion?(true)
-                        } else {
-                            self.apply(
-                                params: pendingParams,
-                                transition: transition,
-                                completion: pendingCompletion
-                            )
-                        }
+                        self.applyPendingLensParams(
+                            using: transition,
+                            reapplyCurrentParams: true
+                        )
                     }
                 }
             },
@@ -598,7 +559,6 @@ final class NagiLiquidLensView: UIView {
                 if self.currentParams == params {
                     self.setResizeClipping(false)
                 }
-                completion?(true)
             }
         )
 
@@ -609,27 +569,40 @@ final class NagiLiquidLensView: UIView {
                 nativeLensView.center = newCenter
             }
             isApplyingParams = false
-
-            if let pendingParams {
-                let pendingCompletion = self.pendingCompletion
-
-                self.pendingParams = nil
-                self.pendingCompletion = nil
-
-                if pendingParams == params {
-                    pendingCompletion?(true)
-                } else {
-                    apply(
-                        params: pendingParams,
-                        transition: transition,
-                        completion: pendingCompletion
-                    )
-                }
-            }
+            applyPendingLensParams(
+                using: transition,
+                reapplyCurrentParams: false
+            )
         } else {
             // UIKit has not called alongside yet. Keep the guard until that
             // callback has processed the geometry.
             shouldScheduleUpdate = true
+        }
+    }
+
+    private func applyPendingLensParams(
+        using transition: NagiTabTransition,
+        reapplyCurrentParams: Bool
+    ) {
+        guard let pendingParams else {
+            self.pendingParams = nil
+            return
+        }
+
+        self.pendingParams = nil
+        if pendingParams == appliedLensParams {
+            if reapplyCurrentParams {
+                applyNativeLensGeometry(
+                    params: pendingParams,
+                    transition: transition,
+                    privateLiftChanged: false
+                )
+            }
+            if currentParams == pendingParams {
+                setResizeClipping(false)
+            }
+        } else {
+            apply(params: pendingParams, transition: transition)
         }
     }
 

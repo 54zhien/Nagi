@@ -10,7 +10,14 @@
 import SwiftUI
 
 struct SystemRootTabReferenceView: View {
-    @State private var selection: AppTab = .home
+    private enum SystemRootTab: Hashable {
+        case home
+        case library
+        case settings
+        case search
+    }
+
+    @State private var selection: SystemRootTab = .home
     @State private var searchText = ""
     @State private var isSearchPresented = false
 

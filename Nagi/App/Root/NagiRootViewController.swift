@@ -2,8 +2,9 @@
 //  NagiRootViewController.swift
 //  Nagi
 //
-//  Nagi 的正式 App Root。四个 SwiftUI 页面在这里一次性创建并完成
-//  UIKit containment，之后只做 alpha/frame/state 更新。
+//  Nagi 的正式 App Root。三个 SwiftUI 页面在这里一次性创建并完成
+//  UIKit containment，Search 作为独立 overlay 持久存在，之后只做
+//  alpha/frame/state 更新。
 //
 
 import SwiftUI
@@ -28,13 +29,10 @@ final class NagiRootViewController: UIViewController {
 
     let state = NagiRootState()
     private var hostingControllers: [AppTab: UIHostingController<AnyView>] = [:]
+    private var searchHostingController: UIHostingController<AnyView>?
     private var keyboardCoordinator: NagiKeyboardLayoutCoordinator?
     private var currentLayoutState = NagiRootLayoutState.initial
     private var observedKeyboardFrame: CGRect?
-    private var activeLayoutTransition: NagiTabTransition?
-    private var keyboardTransitionGeneration = 0
-    private var searchExitLayoutCompleted = false
-    private var searchOverlayExitCompleted = false
     private var reduceMotion: Bool
     private var reduceTransparency: Bool
 
@@ -51,8 +49,8 @@ final class NagiRootViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
-        // This is only the transition fallback. Each persistent hosting view
-        // owns the same semantic page background while it is visible.
+        // Keep the root fallback in sync with the visible page. Each
+        // persistent hosting view still owns its full-screen page surface.
         view.backgroundColor = pageBackgroundColor(for: .home)
         view.isOpaque = true
         contentContainerView.backgroundColor = .clear
@@ -71,12 +69,12 @@ final class NagiRootViewController: UIViewController {
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        reconcileLayout(transition: activeLayoutTransition ?? .immediate)
+        reconcileLayout(transition: .immediate)
     }
 
     override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
-        reconcileLayout(transition: activeLayoutTransition ?? .immediate)
+        reconcileLayout(transition: .immediate)
     }
 
     func updateAccessibility(reduceMotion: Bool, reduceTransparency: Bool) {
@@ -93,17 +91,11 @@ final class NagiRootViewController: UIViewController {
     }
 
     private func installPersistentChildren() {
-        let tabs: [AppTab] = [.home, .library, .settings, .search]
+        let tabs: [AppTab] = [.home, .library, .settings]
         for tab in tabs {
             let controller = makeHostingController(for: tab)
             hostingControllers[tab] = controller
             addChild(controller)
-
-            if tab == .search {
-                controller.view.backgroundColor = .clear
-                controller.view.isOpaque = false
-                continue
-            }
 
             controller.view.backgroundColor = pageBackgroundColor(for: tab)
             controller.view.isOpaque = true
@@ -126,23 +118,24 @@ final class NagiRootViewController: UIViewController {
         contentContainerView.addSubview(searchOverlayView)
         searchOverlayView.addGestureRecognizer(searchOverlayDismissTapGesture)
 
-        if let searchController = hostingControllers[.search] {
-            searchController.view.backgroundColor = .clear
-            searchController.view.isOpaque = false
-            searchController.view.frame = searchOverlayView.bounds
-            searchController.view.alpha = 1
-            searchController.view.isHidden = false
-            searchController.view.isUserInteractionEnabled = true
-            searchOverlayView.addSubview(searchController.view)
-            searchController.didMove(toParent: self)
-        }
+        let searchController = makeSearchHostingController()
+        searchHostingController = searchController
+        addChild(searchController)
+        searchController.view.backgroundColor = .clear
+        searchController.view.isOpaque = false
+        searchController.view.frame = searchOverlayView.bounds
+        searchController.view.alpha = 1
+        searchController.view.isHidden = false
+        searchController.view.isUserInteractionEnabled = true
+        searchOverlayView.addSubview(searchController.view)
+        searchController.didMove(toParent: self)
     }
 
     private func pageBackgroundColor(for tab: AppTab) -> UIColor {
         switch tab {
         case .settings:
             return .systemGroupedBackground
-        case .home, .library, .search:
+        case .home, .library:
             return .systemBackground
         }
     }
@@ -156,10 +149,17 @@ final class NagiRootViewController: UIViewController {
             rootView = AnyView(LibraryView().modelContainer(Persistence.container))
         case .settings:
             rootView = AnyView(SettingsView().modelContainer(Persistence.container))
-        case .search:
-            rootView = AnyView(NagiSearchHostView(state: state).modelContainer(Persistence.container))
         }
         return UIHostingController(rootView: rootView)
+    }
+
+    private func makeSearchHostingController() -> UIHostingController<AnyView> {
+        UIHostingController(
+            rootView: AnyView(
+                NagiSearchHostView(state: state)
+                    .modelContainer(Persistence.container)
+            )
+        )
     }
 
     private func wireTabBar() {
@@ -170,103 +170,56 @@ final class NagiRootViewController: UIViewController {
             self?.activateSearch()
         }
         tabBarView.onSearchCancelled = { [weak self] in
-            self?.cancelSearch()
+            self?.deactivateSearch()
         }
         tabBarView.onSearchQueryChanged = { [weak self] query in
             guard let self else { return }
 
             self.state.searchText = query
             self.searchOverlayDismissTapGesture.isEnabled =
-                query.isEmpty && self.state.mode.isSearchActive
+                query.isEmpty && self.state.tabBarSearchState.isActive
         }
     }
 
     private func select(tab: AppTab) {
-        switch state.mode {
-        case .tabs:
-            guard state.mode.selectedTab != tab else { return }
-            state.mode = .tabs(selected: tab)
-            let transition = effectiveTransition(.spring(duration: 0.4))
-            showChild(for: tab, transition: transition)
-            reconcileLayout(transition: transition)
-        case .searchEntering, .searchActive, .searchExiting:
-            cancelSearch(to: tab)
-        }
+        guard !state.tabBarSearchState.isActive,
+              state.selectedTab != tab else { return }
+        state.selectedTab = tab
+        let transition = effectiveTransition(.spring(duration: 0.4))
+        showChild(for: tab, transition: transition)
+        reconcileLayout(transition: transition)
     }
 
     private func activateSearch() {
-        guard case let .tabs(selected) = state.mode else { return }
-
-        state.tabBeforeSearch = selected
+        guard !state.tabBarSearchState.isActive else { return }
         state.searchText = ""
         tabBarView.setSearchQuery("")
-        state.mode = .searchEntering(previous: selected)
 
-        let transition = effectiveTransition(.spring(duration: 0.5))
+        // Search content becomes active before the shared state changes. The
+        // overlay and the Bottom Bar then animate independently from that one
+        // state submission, as in Nagram's SearchDisplayController path.
         presentSearchOverlay()
-        reconcileLayout(transition: transition)
+        state.tabBarSearchState = NagiTabBarSearchState(isActive: true)
+        searchOverlayDismissTapGesture.isEnabled = true
+        reconcileLayout(transition: effectiveTransition(.spring(duration: 0.5)))
         tabBarView.becomeSearchFirstResponder()
-
-        state.mode = .searchActive(previous: selected)
     }
 
-    private func cancelSearch(to targetTab: AppTab? = nil) {
-        let target = targetTab ?? state.mode.previousTab ?? state.tabBeforeSearch
-        guard target != .search else { return }
-        guard state.mode.isSearchVisible else {
-            state.mode = .tabs(selected: target)
-            showChild(for: target, transition: .immediate)
-            reconcileLayout(transition: .immediate, force: true)
-            return
-        }
-
+    private func deactivateSearch() {
+        guard state.tabBarSearchState.isActive else { return }
         state.searchText = ""
         tabBarView.setSearchQuery("")
-        searchExitLayoutCompleted = false
-        searchOverlayExitCompleted = false
-        state.mode = .searchExiting(previous: target)
-        // Nagram hides the dim interaction once Search is no longer in the
-        // active-search phase.
-        searchOverlayDismissTapGesture.isEnabled = false
-
-        let transition = effectiveTransition(.spring(duration: 0.5))
-        // Reveal the destination under the Search overlay. The overlay still
-        // covers it, so this does not produce a visible page snap.
-        showChild(for: target, transition: .immediate)
-        dismissSearchOverlay { [weak self] in
-            guard let self else { return }
-            self.searchOverlayExitCompleted = true
-            self.finishSearchDeactivationIfReady(target: target)
-        }
-        reconcileLayout(transition: transition) { [weak self] completed in
-            guard let self, completed else { return }
-            self.searchExitLayoutCompleted = true
-            self.finishSearchDeactivationIfReady(target: target)
-        }
+        dismissSearchOverlay()
         tabBarView.resignSearchFirstResponder()
-    }
-
-    private func finishSearchDeactivationIfReady(target: AppTab) {
-        guard case let .searchExiting(previous) = state.mode,
-              previous == target,
-              searchExitLayoutCompleted,
-              searchOverlayExitCompleted,
-              observedKeyboardFrame == nil,
-              activeLayoutTransition == nil else {
-            return
-        }
-        state.mode = .tabs(selected: target)
-        reconcileLayout(transition: .immediate, force: true)
+        searchOverlayDismissTapGesture.isEnabled = false
+        state.tabBarSearchState = .inactive
+        reconcileLayout(transition: effectiveTransition(.spring(duration: 0.5)))
     }
 
     private func showChild(for tab: AppTab, transition: NagiTabTransition) {
-        guard tab != .search else { return }
-
         _ = transition
         view.backgroundColor = pageBackgroundColor(for: tab)
         for (childTab, controller) in hostingControllers {
-            guard childTab != .search else { continue }
-
             let isVisible = childTab == tab
             controller.view.alpha = 1
             controller.view.isHidden = !isVisible
@@ -275,7 +228,7 @@ final class NagiRootViewController: UIViewController {
     }
 
     private func presentSearchOverlay() {
-        guard let searchController = hostingControllers[.search] else {
+        guard let searchController = searchHostingController else {
             return
         }
 
@@ -284,8 +237,7 @@ final class NagiRootViewController: UIViewController {
 
         searchOverlayView.isHidden = false
         searchOverlayView.isUserInteractionEnabled = true
-        searchOverlayDismissTapGesture.isEnabled =
-            state.searchText.isEmpty && state.mode.isSearchActive
+        searchOverlayDismissTapGesture.isEnabled = false
         // The overlay itself stays transparent and fully active. Nagram's
         // Bottom Contacts Search does not perform an opaque background fade.
         searchOverlayView.alpha = 1
@@ -317,7 +269,7 @@ final class NagiRootViewController: UIViewController {
             return
         }
 
-        guard state.mode.isSearchActive else {
+        guard state.tabBarSearchState.isActive else {
             return
         }
 
@@ -327,17 +279,16 @@ final class NagiRootViewController: UIViewController {
             return
         }
 
-        cancelSearch()
+        deactivateSearch()
     }
 
-    private func dismissSearchOverlay(completion: @escaping () -> Void) {
+    private func dismissSearchOverlay() {
         searchOverlayDismissTapGesture.isEnabled = false
         searchOverlayView.isUserInteractionEnabled = false
 
         guard !reduceMotion else {
             searchOverlayView.alpha = 1
             searchOverlayView.isHidden = true
-            completion()
             return
         }
 
@@ -362,55 +313,30 @@ final class NagiRootViewController: UIViewController {
                 self.searchOverlayView.isHidden = true
                 self.searchOverlayView.alpha = 1
 
-                if let searchController = self.hostingControllers[.search] {
+                if let searchController = self.searchHostingController {
                     searchController.view.alpha = 1
                 }
-
-                completion()
             }
         )
     }
 
     private func applyKeyboardFrame(_ frame: CGRect?, transition: NagiTabTransition) {
         observedKeyboardFrame = frame
-        guard state.mode.isSearchInteractionActive else {
-            reconcileLayout(transition: .immediate)
-            return
-        }
-        keyboardTransitionGeneration += 1
-        let generation = keyboardTransitionGeneration
-        let resolvedTransition = effectiveTransition(transition)
-        activeLayoutTransition = resolvedTransition
-        reconcileLayout(transition: resolvedTransition) { [weak self] _ in
-            guard let self,
-                  generation == self.keyboardTransitionGeneration else {
-                return
-            }
-
-            self.activeLayoutTransition = nil
-
-            if frame == nil,
-               case let .searchExiting(previous) = self.state.mode {
-                self.finishSearchDeactivationIfReady(target: previous)
-            }
-        }
+        reconcileLayout(transition: effectiveTransition(transition))
     }
 
     private func reconcileLayout(
         transition: NagiTabTransition,
-        force: Bool = false,
-        completion: ((Bool) -> Void)? = nil
+        force: Bool = false
     ) {
-        let oldState = currentLayoutState
-
         let nextState = NagiRootLayoutState(
             bounds: view.bounds,
             safeAreaInsets: view.safeAreaInsets,
             keyboardFrame: observedKeyboardFrame,
-            mode: state.mode
+            selectedTab: state.selectedTab,
+            searchState: state.tabBarSearchState
         )
         guard force || nextState != currentLayoutState || tabBarView.frame == .zero else {
-            completion?(true)
             return
         }
 
@@ -418,40 +344,11 @@ final class NagiRootViewController: UIViewController {
             bounds: nextState.bounds,
             safeAreaInsets: nextState.safeAreaInsets,
             keyboardFrame: nextState.keyboardFrame,
-            state: nextState.mode
+            selectedTab: nextState.selectedTab,
+            searchState: nextState.searchState
         )
         let resolvedTransition = effectiveTransition(transition)
-        let isKeyboardOnlyCarrierUpdate =
-            !force &&
-            tabBarView.frame != .zero &&
-            oldState.bounds == nextState.bounds &&
-            oldState.safeAreaInsets == nextState.safeAreaInsets &&
-            oldState.mode == nextState.mode &&
-            oldState.keyboardFrame != nextState.keyboardFrame
-
         currentLayoutState = nextState
-
-        if isKeyboardOnlyCarrierUpdate {
-            resolvedTransition.perform { [weak self] in
-                guard let self else { return }
-                resolvedTransition.setFrame(
-                    view: self.tabBarView,
-                    frame: layout.tabBarFrame
-                )
-            } completion: { completed in
-                completion?(completed)
-            }
-            return
-        }
-
-        var completedParts = 0
-        var allPartsCompleted = true
-        func completePart(_ completed: Bool) {
-            completedParts += 1
-            allPartsCompleted = allPartsCompleted && completed
-            guard completedParts == 2 else { return }
-            completion?(allPartsCompleted)
-        }
 
         resolvedTransition.perform { [weak self] in
             guard let self else { return }
@@ -468,7 +365,7 @@ final class NagiRootViewController: UIViewController {
                 frame: layout.tabBarFrame
             )
 
-            if let searchController = self.hostingControllers[.search] {
+            if let searchController = self.searchHostingController {
                 resolvedTransition.setFrame(
                     view: searchController.view,
                     frame: self.searchOverlayView.bounds
@@ -476,25 +373,19 @@ final class NagiRootViewController: UIViewController {
             }
 
             for (tab, controller) in self.hostingControllers {
-                guard tab != .search else { continue }
-
                 resolvedTransition.setFrame(
                     view: controller.view,
                     frame: self.contentContainerView.bounds
                 )
             }
-        } completion: { completed in
-            completePart(completed)
         }
 
         tabBarView.update(
             layout: layout,
-            mode: nextState.mode,
+            selectedTab: nextState.selectedTab,
+            searchState: nextState.searchState,
             reduceTransparency: reduceTransparency,
-            transition: resolvedTransition,
-            completion: { completed in
-                completePart(completed)
-            }
+            transition: resolvedTransition
         )
     }
 
