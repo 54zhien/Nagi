@@ -7,8 +7,25 @@
 //  alpha/frame/state 更新。
 //
 
+import QuartzCore
 import SwiftUI
 import UIKit
+
+private final class NagiPageScaleAnimationDelegate: NSObject, CAAnimationDelegate {
+    private var didComplete = false
+    private let completion: (Bool) -> Void
+
+    init(completion: @escaping (Bool) -> Void) {
+        self.completion = completion
+        super.init()
+    }
+
+    func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
+        guard !didComplete else { return }
+        didComplete = true
+        completion(flag)
+    }
+}
 
 @MainActor
 final class NagiRootViewController: UIViewController {
@@ -230,6 +247,7 @@ final class NagiRootViewController: UIViewController {
             pageTransitionGeneration += 1
             for (childTab, controller) in hostingControllers {
                 let isVisible = childTab == tab
+                controller.view.layer.removeAnimation(forKey: "transform.scale")
                 NagiTabTransition.immediate.setAlpha(
                     view: controller.view,
                     alpha: 1
@@ -255,6 +273,15 @@ final class NagiRootViewController: UIViewController {
             transitionScale = 0.998
         }
 
+        // Nagram's controller transition is animation-only: the page model
+        // transform stays identity while explicit transform.scale animations
+        // provide the 0.12 / 0.15 visual micro-transition. This is important
+        // because reconcileLayout() continues to write full-screen frames.
+        oldView.layer.removeAnimation(forKey: "transform.scale")
+        newView.layer.removeAnimation(forKey: "transform.scale")
+        NagiTabTransition.immediate.setScale(view: oldView, scale: 1)
+        NagiTabTransition.immediate.setScale(view: newView, scale: 1)
+
         oldView.isHidden = false
         oldView.isUserInteractionEnabled = false
         oldView.layer.allowsGroupOpacity = false
@@ -263,39 +290,40 @@ final class NagiRootViewController: UIViewController {
         newView.isUserInteractionEnabled = false
         newView.layer.allowsGroupOpacity = true
         NagiTabTransition.immediate.setAlpha(view: newView, alpha: 0)
-        NagiTabTransition.immediate.setScale(
-            view: newView,
-            scale: transitionScale
-        )
 
-        NagiTabTransition.spring(duration: 0.12).setScale(
-            view: oldView,
-            scale: transitionScale,
+        animatePageScale(
+            layer: oldView.layer,
+            from: 1.0,
+            to: transitionScale,
+            duration: 0.12,
+            removeOnCompletion: false,
             completion: { [weak self, weak oldView] completed in
                 guard completed, let self else {
                     return
                 }
 
                 // If a newer transition superseded this one, the old page
-                // may still be visible behind the current page. Hide it only
-                // when it is no longer the displayed target; never hide a
-                // page that a rapid reverse has already made current again.
+                // may have become the visible target again. Do not remove a
+                // newer transform.scale animation in that case.
                 guard generation == self.pageTransitionGeneration ||
                     self.displayedTab != oldTab else {
                     return
                 }
 
-                oldView?.transform = .identity
+                oldView?.layer.removeAnimation(forKey: "transform.scale")
                 oldView?.alpha = 1
                 oldView?.isHidden = true
                 oldView?.isUserInteractionEnabled = false
             }
         )
 
-        NagiTabTransition.spring(duration: 0.15).setScale(
-            view: newView,
-            scale: 1,
-            delay: 0.1
+        animatePageScale(
+            layer: newView.layer,
+            from: transitionScale,
+            to: 1.0,
+            duration: 0.15,
+            delay: 0.1,
+            removeOnCompletion: true
         )
         NagiTabTransition.easeInOut(duration: 0.1).setAlpha(
             view: newView,
@@ -313,6 +341,56 @@ final class NagiRootViewController: UIViewController {
         )
 
         displayedTab = tab
+    }
+
+    private func animatePageScale(
+        layer: CALayer,
+        from: CGFloat,
+        to: CGFloat,
+        duration: TimeInterval,
+        delay: TimeInterval = 0,
+        removeOnCompletion: Bool,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        let animation = CABasicAnimation(keyPath: "transform.scale")
+        animation.fromValue = from as NSNumber
+        animation.toValue = to as NSNumber
+        animation.duration = duration
+        animation.timingFunction = CAMediaTimingFunction(
+            controlPoints: 0.380,
+            0.700,
+            0.125,
+            1.000
+        )
+        animation.isRemovedOnCompletion = removeOnCompletion
+        animation.fillMode = .forwards
+
+        if delay > 0 {
+            animation.beginTime = layer.convertTime(
+                CACurrentMediaTime(),
+                from: nil
+            ) + delay
+            animation.fillMode = .both
+        }
+
+        if #available(iOS 15.0, *) {
+            let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
+            if maximumFPS > 61.0 {
+                animation.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 30.0,
+                    maximum: maximumFPS,
+                    preferred: maximumFPS
+                )
+            }
+        }
+
+        if let completion {
+            animation.delegate = NagiPageScaleAnimationDelegate(
+                completion: completion
+            )
+        }
+
+        layer.add(animation, forKey: "transform.scale")
     }
 
     private func presentSearchOverlay() {
