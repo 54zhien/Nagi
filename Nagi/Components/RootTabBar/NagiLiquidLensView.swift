@@ -574,6 +574,11 @@ final class NagiLiquidLensView: UIView {
                         self.pendingCompletion = nil
 
                         if pendingParams == params {
+                            self.applyNativeLensGeometry(
+                                params: pendingParams,
+                                transition: transition,
+                                privateLiftChanged: false
+                            )
                             pendingCompletion?(true)
                         } else {
                             self.apply(
