@@ -661,7 +661,13 @@ enum NagiTabTransition {
     ) -> CAAnimation {
         switch self {
         case let .spring(duration):
-            if (#available(iOS 26.0, *) && abs(duration - 0.3832) <= 0.0001) || duration == 0.5 {
+            let usesModernSpring: Bool
+            if #available(iOS 26.0, *) {
+                usesModernSpring = abs(duration - 0.3832) <= 0.0001
+            } else {
+                usesModernSpring = false
+            }
+            if usesModernSpring || duration == 0.5 {
                 let animation = CASpringAnimation(keyPath: keyPath)
                 animation.fromValue = fromValue
                 animation.toValue = toValue

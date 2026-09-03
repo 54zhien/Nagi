@@ -370,7 +370,7 @@ final class NagiTabBarView: UIView {
             ? .immediate
             : .easeInOut(duration: 0.25)
 
-        transition.perform { [weak self] in
+        transition.perform({ [weak self] in
             guard let self else { return }
 
             transition.setFrame(
@@ -441,7 +441,7 @@ final class NagiTabBarView: UIView {
                 isDark: isDark,
                 transition: transition
             )
-        } completion: completion
+        }, completion: completion)
 
         if selectionGestureState == nil,
            overrideSelectedIndex == selectedIndex {
