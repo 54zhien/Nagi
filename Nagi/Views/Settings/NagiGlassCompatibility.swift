@@ -201,20 +201,6 @@ private struct NagiScrollEdgeEffectModifier: ViewModifier {
     }
 }
 
-private struct NagiSharedBackgroundVisibilityModifier: ViewModifier {
-    @AppStorage(NagiAppearanceSettings.liquidGlassEnabledKey)
-    private var liquidGlassEnabled = true
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), liquidGlassEnabled {
-            content.sharedBackgroundVisibility(.hidden)
-        } else {
-            content
-        }
-    }
-}
-
 extension View {
     func nagiGlass<GlassShape: Shape>(
         in shape: GlassShape,
@@ -252,7 +238,15 @@ extension View {
         modifier(NagiScrollEdgeEffectModifier())
     }
 
-    func nagiSharedBackgroundVisibilityHidden() -> some View {
-        modifier(NagiSharedBackgroundVisibilityModifier())
+}
+
+extension ToolbarContent {
+    @ToolbarContentBuilder
+    func nagiSharedBackgroundVisibilityHidden() -> some ToolbarContent {
+        if #available(iOS 26.0, *), NagiGlassStyleStore.usesNativeLiquidGlass {
+            self.sharedBackgroundVisibility(.hidden)
+        } else {
+            self
+        }
     }
 }
