@@ -1,9 +1,3 @@
-//
-//  EPUBReaderModel.swift
-//  Nagi
-//
-//  Readium EPUB 阅读状态、用户偏好、目录与稳定阅读位置。
-//
 
 import Foundation
 import Observation
@@ -26,7 +20,6 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
         }
     }
 
-    /// 与 Readium CSS 内置主题使用的正文色保持一致，供嵌入式页眉复用。
     var contentUIColor: UIColor {
         switch self {
         case .light:
@@ -98,8 +91,6 @@ enum EPUBReaderTheme: String, CaseIterable, Identifiable, Equatable {
         }
     }
 
-    /// Compatibility entry points for older renderer code. Brightness is now
-    /// controlled by the device and never changes these reader colors.
     func adjustedBackgroundUIColor(brightness _: Double) -> UIColor {
         readerBackgroundUIColor(isDarkAppearance: false)
     }
@@ -202,15 +193,12 @@ enum EPUBPageTransitionMode: String, CaseIterable, Identifiable, Equatable {
         case "pageCurl": self = .pageCurl
         case "fade": self = .fade
         case "scroll": self = .scroll
-        // Preserve values written by the earlier settings screen.
         case "cover": self = .pageCurl
         default: return nil
         }
     }
 }
 
-/// Legacy name kept so the older EPUB view continues to share the exact same
-/// five-option catalogue as the active reader settings screen.
 typealias EPUBFontFamily = ReaderFontFamily
 
 private extension ReaderFontFamily {
@@ -218,9 +206,6 @@ private extension ReaderFontFamily {
         FontFamily(rawValue: readiumFamilyName)
     }
 
-    /// Readium converts 1.0 to CSS 400 and 1.75 to CSS 700.  Use CSS 300 for
-    /// the lighter system-font choice while preserving the existing bold
-    /// switch below.
     var readiumFontWeight: Double {
         self == .pingFang ? 0.75 : 1.0
     }
@@ -277,15 +262,12 @@ final class EPUBReaderModel {
     var wordSpacing: Double { didSet { preferencesDidChange() } }
     var theme: EPUBReaderTheme { didSet { preferencesDidChange() } }
     var appearanceMode: EPUBAppearanceMode { didSet { preferencesDidChange() } }
-    /// Retained only for migration compatibility. Device brightness is
-    /// managed by ReaderView and is never applied to the EPUB palette.
     var brightness: Double
     var flowMode: EPUBFlowMode { didSet { preferencesDidChange() } }
     var pageTransition: EPUBPageTransitionMode { didSet { persistPreferencesIfNeeded() } }
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferencesIfNeeded() } }
 
-    /// Nil means the current settings are a custom combination rather than a preset.
     var selectedPreset: EPUBReaderPreset? { didSet { persistPreferencesIfNeeded() } }
 
     private(set) var previewText = ""
@@ -310,7 +292,6 @@ final class EPUBReaderModel {
     var onStateChange: (() -> Void)?
 
     private var publication: Publication?
-    /// 当前 Readium 打开的文件。TXT 会指向派生 EPUB，预览不能再读取原始 TXT。
     private var activePublicationURL: URL?
     @ObservationIgnored
     private lazy var mutationScheduler = ReaderMutationScheduler<EPUBPreferences>(
@@ -363,8 +344,6 @@ final class EPUBReaderModel {
            let locator = try? Locator(jsonString: locatorJSON) {
             currentLocatorJSON = try? locator.jsonString()
         } else {
-            // Older TXT versions stored a different location payload in this
-            // field.  Keep it out of the Readium position channel.
             currentLocatorJSON = nil
         }
         progress = min(max(book.progressPercent, 0), 1)
@@ -445,7 +424,6 @@ final class EPUBReaderModel {
                let locator = try? Locator(jsonString: locatorJSON) {
                 initialLocation = locator
             } else if book.format == .txt, progress > 0 {
-                // 兼容切换架构前已经读过的 TXT：旧版本只有总进度，没有 Readium Locator。
                 currentLocatorJSON = nil
                 initialLocation = await publication.locate(progression: progress)
             } else {
@@ -495,11 +473,6 @@ final class EPUBReaderModel {
         }
     }
 
-    /// Waits only for the part of the visible document that the mutation can
-    /// affect. Readium's public submitPreferences API does not expose a
-    /// completion callback, so the current WebView gets a two-frame readiness
-    /// check after the visible override has been submitted. Geometry changes
-    /// are native navigator work and intentionally do not enter JavaScript.
     func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async {
         guard let navigator, isReflowable else { return }
 
@@ -525,16 +498,10 @@ final class EPUBReaderModel {
         await navigator.waitForNagiReaderReadiness(readinessScript)
     }
 
-    /// Re-applies the complete Readium preference set after WebKit returns
-    /// from the background. This path is intentionally unconditional: the
-    /// navigator may need its CSS state restored even when no preference value
-    /// changed while the app was inactive.
     func restoreFromForeground(isDark: Bool) async {
         guard !Task.isCancelled, hasLoaded, navigator != nil else { return }
 
         systemIsDark = isDark
-        // Foreground restoration is one of the explicit lifecycle points at
-        // which Readium may have rebuilt its internal hierarchy.
         applyVisibleReaderBaseAppearance()
         enqueuePreferencesMutation(kind: .full)
         mutationScheduler.flush()
@@ -547,9 +514,6 @@ final class EPUBReaderModel {
         await waitForVisualUpdate(for: .full)
     }
 
-    /// Commits the latest in-memory EPUB location before the reader is
-    /// dismissed.  The view owns the SwiftData save because this model also
-    /// handles Readium state and should not own a ModelContext.
     func flushReadingProgress() {
         guard hasLoaded else { return }
         synchronizeStoredChapterMetadata()
@@ -626,8 +590,6 @@ final class EPUBReaderModel {
     func apply(preset: EPUBReaderPreset) {
         withPreferenceUpdatesSuspended {
             selectedPreset = preset
-            // Theme cards only select the reading palette. Typography and
-            // layout remain the user's current choices.
             theme = Self.readerTheme(for: ReaderThemePreset(rawValue: preset.rawValue) ?? .original)
             brightness = 1
         }
@@ -829,9 +791,6 @@ final class EPUBReaderModel {
         }
     }
 
-    /// Captures the complete Readium preference value before the scheduler
-    /// yields.  The delayed task therefore coalesces immutable snapshots
-    /// instead of consulting this mutable model later.
     private func enqueuePreferencesMutation(kind: ReaderVisualMutationKind? = nil) {
         guard navigator != nil else { return }
         if let kind {
@@ -896,12 +855,7 @@ final class EPUBReaderModel {
                 uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
             )
         let preferences = EPUBPreferences(
-            // ReaderChrome owns the reflowable surface. Leaving this unset
-            // avoids Readium's background preference rule, which clears
-            // publisher backgrounds on descendant elements.
             backgroundColor: navigatorBackgroundColor,
-            // Font selection is a first-class Readium preference. Publisher
-            // styles only disable the app-owned spacing rules below.
             fontFamily: fontFamily.readiumFontFamily,
             fontSize: fontScale,
             fontWeight: boldText ? 1.75 : fontFamily.readiumFontWeight,
@@ -930,9 +884,6 @@ final class EPUBReaderModel {
         )
     }
 
-    /// Applies app-owned rules to the current spread first. Preloaded spreads
-    /// are updated by a separate task after the visible task has completed so
-    /// a large preload set never delays a preference transition.
     private func refreshVisibleReaderOverrides(
         generation: UInt64? = nil
     ) {
@@ -961,8 +912,6 @@ final class EPUBReaderModel {
             }
 
             self.preloadedReaderOverrideTask = Task { @MainActor [weak self, weak navigator] in
-                // Give the visible document its next run-loop turn before
-                // touching any off-screen WebView.
                 await Task.yield()
                 guard let self, let navigator,
                       !Task.isCancelled,
@@ -1447,10 +1396,6 @@ final class EPUBReaderModel {
 }
 
 extension EPUBReaderModel {
-    /// Receives the host controller's geometry without rebuilding the SwiftUI
-    /// reader surface. Readium still owns the actual content layout; this
-    /// cached viewport only supplies stable safe-area information and causes
-    /// the navigator to relayout when the host geometry really changes.
     @discardableResult
     func updateViewport(
         size: CGSize,
@@ -1470,11 +1415,6 @@ extension EPUBReaderModel {
         return true
     }
 
-    /// The UIKit Reader surface passes the complete readable inset here:
-    /// system safe area plus the occupied page-header height. Keep that
-    /// content inset separate from ReaderChrome's own system safe area so the
-    /// header is reserved exactly once. The fallback preserves the legacy
-    /// delegate path until the controller has delivered its first viewport.
     func navigatorContentInset(_ navigator: VisualNavigator) -> UIEdgeInsets? {
         let contentInsets: UIEdgeInsets
         if let viewportSafeAreaInsets {

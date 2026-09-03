@@ -1,9 +1,3 @@
-//
-//  PageViewController.swift
-//  Nagi
-//
-//  UIPageViewController 包装：支持仿真翻页(.pageCurl) 与覆盖翻页(.scroll)。
-//
 
 import SwiftUI
 import UIKit
@@ -52,8 +46,6 @@ struct PageViewController: UIViewControllerRepresentable {
         let pageVC = UIPageViewController(
             transitionStyle: transitionStyle,
             navigationOrientation: .horizontal,
-            // `.none` is not valid for `.pageCurl`; a single-page reader uses
-            // the minimum spine and the scroll transition has no spine.
             options: options
         )
         pageVC.dataSource = context.coordinator
@@ -74,10 +66,6 @@ struct PageViewController: UIViewControllerRepresentable {
         context.coordinator.parent = self
         guard !pages.isEmpty else { return }
 
-        // Lazy TXT pagination can prepend a window.  Page indexes then shift,
-        // so cached hosting controllers must be discarded before UIKit asks
-        // the data source for a neighboring page; otherwise an old controller
-        // can be returned for the new index.
         if context.coordinator.updatePageWindowIfNeeded() {
             let target = max(0, min(currentPage, pages.count - 1))
             pageVC.setViewControllers(
@@ -88,7 +76,6 @@ struct PageViewController: UIViewControllerRepresentable {
             return
         }
 
-        // 外部 currentPage 变化（目录跳转等）时同步
         if let current = pageVC.viewControllers?.first as? UIHostingController<PageTextView>,
            let index = context.coordinator.index(of: current),
            index != currentPage {

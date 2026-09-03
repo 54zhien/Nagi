@@ -1,33 +1,30 @@
-//
-//  NagiRootRepresentable.swift
-//  Nagi
-//
-//  SwiftUI 只负责把持久化 UIKit Root 挂进 WindowGroup；不会在外层
-//  再包 TabView、searchable、ignoresSafeArea 或额外的 safe-area padding。
-//
 
 import SwiftUI
 
 struct NagiRootRepresentable: UIViewControllerRepresentable {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @AppStorage(NagiAppearanceSettings.showTabBarLabelsKey)
+    private var showTabBarLabels = true
+    @AppStorage(NagiAppearanceSettings.liquidGlassEnabledKey)
+    private var liquidGlassEnabled = true
 
     func makeUIViewController(context: Context) -> NagiRootViewController {
-        // Install the iOS 26 backdrop hook before the first persistent Glass
-        // hierarchy is created. The settings container also retries from
-        // didMoveToWindow if UIKit has not exposed its private backdrop class
-        // at this point yet.
         NagiGlassEffectRuntime.installIfNeeded()
         return NagiRootViewController(
             reduceMotion: reduceMotion,
-            reduceTransparency: reduceTransparency
+            reduceTransparency: reduceTransparency,
+            showTabBarLabels: showTabBarLabels,
+            liquidGlassEnabled: liquidGlassEnabled
         )
     }
 
     func updateUIViewController(_ viewController: NagiRootViewController, context: Context) {
-        viewController.updateAccessibility(
+        viewController.updatePreferences(
             reduceMotion: reduceMotion,
-            reduceTransparency: reduceTransparency
+            reduceTransparency: reduceTransparency,
+            showTabBarLabels: showTabBarLabels,
+            liquidGlassEnabled: liquidGlassEnabled
         )
     }
 

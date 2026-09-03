@@ -1,9 +1,3 @@
-//
-//  PageTextView.swift
-//  Nagi
-//
-//  单页文本渲染（用 UITextView 展示一页 AttributedString）。
-//
 
 import SwiftUI
 import UIKit
@@ -52,9 +46,6 @@ struct ScrollableTextView: UIViewRepresentable {
     }
 
     func makeUIView(context: Context) -> UITextView {
-        // TextKit 2 keeps layout work viewport-driven for long TXT books.
-        // PageTextView above remains a small TextKit 1-compatible surface;
-        // the continuous reader is the path that needs the modern engine.
         let textView = UITextView(usingTextLayoutManager: true)
         textView.isScrollEnabled = true
         textView.isEditable = false
@@ -96,9 +87,6 @@ struct ScrollableTextView: UIViewRepresentable {
         let positionChanged = context.coordinator.positionID != positionID
         guard revisionChanged || positionChanged else { return }
 
-        // A chapter selection changes the anchor without changing the text
-        // layout generation.  Preserve the current viewport only while the
-        // same anchor is being re-rendered (for example after a style change).
         let preservePosition = !positionChanged
         let previousCharacterOffset = preservePosition
             ? context.coordinator.characterOffset(in: textView)

@@ -1,9 +1,3 @@
-//
-//  EPUBParser.swift
-//  Nagi
-//
-//  EPUB 解析：用 ZIPFoundation 解压 → 定位 OPF → 提取元数据 + 章节列表 + 章节正文。
-//
 
 import Foundation
 import CoreGraphics
@@ -23,8 +17,6 @@ struct EPUBParser: Sendable {
         do {
             coverData = try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
         } catch {
-            // Cover extraction is optional; a malformed cover must not make
-            // an otherwise readable EPUB fail to import.
             coverData = nil
         }
 
@@ -37,22 +29,18 @@ struct EPUBParser: Sendable {
         )
     }
 
-    /// Loads and downsamples an EPUB cover for books imported before the
-    /// cover was stored in SwiftData.
     func loadCoverData(url: URL) throws -> Data? {
         let archive = try openArchive(url)
         let (opfXml, opfDir) = try opfDocument(archive)
         return try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
     }
 
-    /// 章节列表（spine 阅读顺序）。
     func loadChapters(url: URL) throws -> [BookChapter] {
         let archive = try openArchive(url)
         let (opfXml, opfDir) = try opfDocument(archive)
         return try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
     }
 
-    /// 加载某章正文（XHTML → 纯文本）。
     func loadChapterContent(url: URL, href: String) throws -> String {
         let archive = try openArchive(url)
         guard let entry = entry(in: archive, path: href) else {
@@ -66,7 +54,6 @@ struct EPUBParser: Sendable {
         return Self.htmlToText(html)
     }
 
-    // MARK: - 内部
 
     private func openArchive(_ url: URL) throws -> Archive {
         do {
@@ -76,7 +63,6 @@ struct EPUBParser: Sendable {
         }
     }
 
-    /// 返回 (OPF XML 文本, OPF 所在目录)。
     private func opfDocument(_ archive: Archive) throws -> (String, String) {
         guard
             let containerXml = try extractString(archive, path: "META-INF/container.xml"),
@@ -89,10 +75,9 @@ struct EPUBParser: Sendable {
         return (opfXml, opfDir)
     }
 
-    /// 从 OPF 提取章节列表（manifest + spine）。
     private func chapters(from archive: Archive, opfXml: String, opfDir: String) throws -> [BookChapter] {
-        let manifest = parseManifest(opfXml)      // id -> href
-        let spine = parseSpine(opfXml)            // [idref]
+        let manifest = parseManifest(opfXml)
+        let spine = parseSpine(opfXml)
         guard !spine.isEmpty else {
             throw ParseError.invalidArchive
         }
@@ -145,10 +130,6 @@ struct EPUBParser: Sendable {
         return result
     }
 
-    /// Resolves the EPUB cover according to the OPF cover metadata, then
-    /// falls back to a cover-like image and finally the first raster image.
-    /// The result is a small, center-cropped 3:4 JPEG thumbnail so SwiftData
-    /// and scrolling do not repeatedly carry full-resolution archive assets.
     private func extractCoverData(
         from archive: Archive,
         opfXml: String,
@@ -248,8 +229,6 @@ struct EPUBParser: Sendable {
         return CGImageDestinationFinalize(destination) ? output as Data : nil
     }
 
-    /// Crops from the center while preserving the requested width-to-height
-    /// ratio. The thumbnail has already applied the source image orientation.
     private static func centerCrop(_ image: CGImage, toAspectRatio aspectRatio: CGFloat) -> CGImage? {
         guard image.width > 0, image.height > 0, aspectRatio > 0 else { return nil }
 
@@ -385,14 +364,12 @@ struct EPUBParser: Sendable {
         return String(data: data, encoding: String.Encoding(rawValue: encoding))
     }
 
-    /// XHTML → 纯文本（SwiftSoup 解析，保留段落，忽略 style/script）。
     static func htmlToText(_ html: String) -> String {
         guard let doc = try? SwiftSoup.parse(html),
               let body = try? doc.body() else {
             return Self.legacyHtmlToText(html)
         }
 
-        // 提取块级文本元素，保留段落结构
         let selector = "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, th"
         guard let elements = try? body.select(selector) else {
             return Self.legacyHtmlToText(html)
@@ -412,7 +389,6 @@ struct EPUBParser: Sendable {
         return paragraphs.joined(separator: "\n\n")
     }
 
-    /// 正则 fallback（SwiftSoup 不可用时）。
     static func legacyHtmlToText(_ html: String) -> String {
         var text = html
         text = text.replacingOccurrences(of: #"<style[^>]*>.*?</style>"#, with: "", options: [.regularExpression, .caseInsensitive])

@@ -1,10 +1,3 @@
-//
-//  ReaderPerformanceSignposts.swift
-//  Nagi
-//
-//  Lightweight points for the Phase 6 Instruments comparison.  These are
-//  events, not timing logic: they do not allocate or alter the reader path.
-//
 
 import os
 

@@ -1,11 +1,3 @@
-//
-//  ReaderSettingsViewController.swift
-//  Nagi
-//
-//  UIKit implementation of the reader's medium settings surface.  SwiftUI
-//  continues to own sheet presentation and the custom editor; this controller
-//  owns the persistent controls and the fixed medium-sheet layout.
-//
 
 import SwiftUI
 import UIKit
@@ -43,6 +35,12 @@ final class ReaderSettingsViewController: UIViewController {
     private var latestSystemBrightness: Double
     private var latestIsDarkAppearance: Bool
     private var latestReduceMotion: Bool
+
+    private var readerSettingsGlassEnabled: Bool {
+        UserDefaults.standard.object(
+            forKey: NagiAppearanceSettings.readerSettingsUseLiquidGlassKey
+        ) as? Bool ?? true
+    }
 
     var onCustomSettings: (() -> Void)?
     var onBeforeMutation: ((ReaderVisualMutationKind) -> Void)?
@@ -326,6 +324,7 @@ final class ReaderSettingsViewController: UIViewController {
                 tintColor: nil,
                 title: preset.label,
                 cornerRadius: 18,
+                usesGlass: readerSettingsGlassEnabled,
                 action: { [weak self] in self?.select(preset: preset) }
             )
         })
@@ -354,7 +353,8 @@ final class ReaderSettingsViewController: UIViewController {
             smallerPointSize: IconMetrics.fontSmaller,
             largerPointSize: IconMetrics.fontLarger,
             tintColor: accentColor,
-            accessibilityValue: accessibilityValue
+            accessibilityValue: accessibilityValue,
+            usesGlass: readerSettingsGlassEnabled
         )
 
         for (index, dot) in indicatorDots.enumerated() {
@@ -376,7 +376,8 @@ final class ReaderSettingsViewController: UIViewController {
             accessibilityLabel: "翻页方式",
             tintColor: .label,
             isEnabled: true,
-            reduceMotion: latestReduceMotion
+            reduceMotion: latestReduceMotion,
+            usesGlass: readerSettingsGlassEnabled
         )
         transitionControl.accessibilityValue = transition.label
         transitionControl.setPrimaryMenu(UIMenu(
@@ -410,7 +411,8 @@ final class ReaderSettingsViewController: UIViewController {
             accessibilityLabel: "外观模式",
             tintColor: .label,
             isEnabled: true,
-            reduceMotion: latestReduceMotion
+            reduceMotion: latestReduceMotion,
+            usesGlass: readerSettingsGlassEnabled
         )
         appearanceControl.accessibilityValue = appearance.label
         appearanceControl.setPrimaryMenu(UIMenu(
@@ -452,7 +454,8 @@ final class ReaderSettingsViewController: UIViewController {
                 isSelected: isSelected,
                 cornerRadius: 18,
                 contentColor: content,
-                fillColor: background
+                fillColor: background,
+                usesGlass: readerSettingsGlassEnabled
             )
         }
     }
@@ -466,7 +469,8 @@ final class ReaderSettingsViewController: UIViewController {
             reduceMotion: latestReduceMotion,
             title: "自定义",
             cornerRadius: 24,
-            contentColor: accentColor
+            contentColor: accentColor,
+            usesGlass: readerSettingsGlassEnabled
         )
     }
 
@@ -569,8 +573,6 @@ final class ReaderSettingsViewController: UIViewController {
         guard deferredMutationTask == nil else { return }
 
         deferredMutationTask = Task { @MainActor [weak self] in
-            // Let GlassControlView finish the touch-release transaction and
-            // commit the first spring frame before snapshot/layout work starts.
             await Task.yield()
             guard let self, !Task.isCancelled else { return }
 

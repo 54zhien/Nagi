@@ -1,9 +1,3 @@
-//
-//  TXTReaderModel.swift
-//  Nagi
-//
-//  TXT 阅读状态、章节切分、TextKit 分页和排版偏好。
-//
 
 import Foundation
 import Observation
@@ -66,7 +60,6 @@ final class TXTReaderModel {
 
     let book: Book
 
-    // 章节与当前位置
     var title: String
     var chapters: [BookChapter] = []
     var currentChapterIndex: Int
@@ -80,7 +73,6 @@ final class TXTReaderModel {
     }
     var fullText = NSAttributedString(string: "")
 
-    // 与 EPUB 主题控件共用的排版值域
     var fontScale: Double { didSet { styleDidChange() } }
     var fontFamily: ReaderFontFamily { didSet { styleDidChange() } }
     var boldText: Bool { didSet { styleDidChange() } }
@@ -91,14 +83,11 @@ final class TXTReaderModel {
     var wordSpacing: Double { didSet { styleDidChange() } }
     var theme: ReaderTheme { didSet { styleDidChange() } }
     var appearanceMode: ReaderAppearanceMode { didSet { styleDidChange() } }
-    /// Retained only for migration compatibility. Device brightness is
-    /// managed by ReaderView and is never applied to the text palette.
     var brightness: Double
     var flowMode: ReaderFlowMode { didSet { flowModeDidChange() } }
     var pageTransition: ReaderPageTransitionMode { didSet { persistPreferences() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferences() } }
 
-    // 由阅读视图注入的全屏 viewport；分页和正文边距都以此为唯一基准。
     var pageSize = CGSize.zero
     var safeAreaInsets = UIEdgeInsets.zero
 
@@ -109,9 +98,6 @@ final class TXTReaderModel {
     private(set) var layoutGeneration = 0
 
     private var chapterLengths: [Int] = []
-    /// UTF-16 offsets of each chapter inside `currentContent`.  Keeping the
-    /// source as one continuous string makes TXT pagination behave like the
-    /// EPUB spine instead of stopping at every chapter boundary.
     private var chapterStartOffsets: [Int] = []
     private var currentContent = ""
     private var hasLoaded = false
@@ -199,7 +185,6 @@ final class TXTReaderModel {
             as? Bool ?? false
     }
 
-    // MARK: - 加载
 
     func load() async {
         guard !hasLoaded, !isLoading else { return }
@@ -284,9 +269,6 @@ final class TXTReaderModel {
         pendingCharacterOffset = targetOffset
         currentCharacterOffset = targetOffset
 
-        // Scrolling uses one continuous text view and does not need a page
-        // rebuild for a chapter jump.  Changing the position ID in
-        // `selectChapter` moves that view to the new anchor.
         if flowMode == .scroll,
            fullText.length > 0,
            fullText.length == currentContent.utf16.count {
@@ -297,8 +279,6 @@ final class TXTReaderModel {
             return
         }
 
-        // A generated page can be reused for a TOC jump.  Only rebuild when
-        // the requested anchor is outside the currently materialized window.
         if flowMode == .paged,
            fullText.length > 0,
            let targetPage = pageIndexIfContaining(targetOffset, in: pageRanges) {
@@ -314,10 +294,6 @@ final class TXTReaderModel {
             return
         }
 
-        // The first load and a jump outside the current page window need a
-        // fresh batch.  Keep the attributed text during a jump when possible;
-        // the page view will show the normal progress state until the batch is
-        // ready, without duplicating the full book in memory.
         if flowMode == .paged {
             pages = []
             pageRanges = []
@@ -337,14 +313,9 @@ final class TXTReaderModel {
         tryStartLayoutIfReady(startOffset: startOffset)
     }
 
-    // MARK: - 分页与排版
 
     @discardableResult
     func updateViewport(size: CGSize, safeAreaInsets: UIEdgeInsets) -> Bool {
-        // SwiftUI can report a transient zero-sized geometry while the
-        // reader surface is being inserted.  Starting a layout for that
-        // value only creates an empty result and makes the real layout race
-        // with it.
         guard size.width > 1, size.height > 1 else {
             if hasLoaded, !currentContent.isEmpty, flowMode == .paged {
                 cancelLayoutTasks()
@@ -445,10 +416,6 @@ final class TXTReaderModel {
         guard !currentContent.isEmpty else { return }
 
         let shouldPaginate = flowMode == .paged
-        // The initial load can finish before GeometryReader reports a usable
-        // viewport.  Never fall back to a full-book attributed layout for a
-        // paged reader in that transient state; wait for updateViewport and
-        // generate the first bounded batch there.
         guard !shouldPaginate || (pageSize.width > 1 && pageSize.height > 1) else {
             cancelLayoutTasks()
             layoutRequestID &+= 1
@@ -465,10 +432,6 @@ final class TXTReaderModel {
                 ?? pendingCharacterOffset
                 ?? currentCharacterOffset
         )
-        // A pagination window needs at least one character.  A saved
-        // progression of exactly 1.0 should open on the final page instead of
-        // producing an empty batch forever; scrolling can still use the exact
-        // end offset below.
         let anchor = shouldPaginate && !currentContent.isEmpty
             ? min(requestedAnchor, currentContent.utf16.count - 1)
             : requestedAnchor
@@ -507,7 +470,6 @@ final class TXTReaderModel {
         cancelLayoutTasks()
         layoutTask = Task { [weak self] in
             do {
-                // Coalesce a slider's rapid updates into one layout request.
                 try await Task.sleep(nanoseconds: 50_000_000)
             } catch is CancellationError {
                 guard let self, self.layoutRequestID == requestID else { return }
@@ -660,15 +622,9 @@ final class TXTReaderModel {
         layoutPhase = .ready
         onStateChange?()
 
-        // A restored location may start in the middle of the book.  Materialize
-        // one preceding batch in the background so the first reverse swipe is
-        // available immediately instead of hitting the window boundary.
         if hasMorePreviousPages {
             requestPreviousPageBatch()
         }
-        // Extremely large type or a very short source range can produce only
-        // one page in the first batch.  Fill one more batch before the user
-        // gets a chance to swipe into an empty data-source boundary.
         if pages.count < 2, nextPageOffset != nil {
             requestNextPageBatch()
         }
@@ -735,8 +691,6 @@ final class TXTReaderModel {
         )
         paragraphStyle.lineSpacing = 0
         paragraphStyle.paragraphSpacing = font.lineHeight * 0.65
-        // Use the final Dynamic Type-scaled font so the indent follows the
-        // glyph metrics instead of drifting when a font family is changed.
         paragraphStyle.firstLineHeadIndent = font.pointSize * CGFloat(snapshot.paragraphIndent)
         paragraphStyle.lineBreakMode = .byWordWrapping
 
@@ -793,15 +747,10 @@ final class TXTReaderModel {
                     && string.substring(with: NSRange(location: paragraphStart - 2, length: 2)) == "\n\n"
             )
             if !hasBlankLineBefore {
-                // A single newline is usually a hard-wrapped source line, not
-                // a new prose paragraph.  Do not indent or add paragraph gap.
                 style.firstLineHeadIndent = 0
                 style.paragraphSpacing = 0
             }
 
-            // Some TXT files already contain a full-width space, tab, or a
-            // conventional two-space indent.  Keep that source indentation,
-            // but do not add the theme indent on top of it.
             let contentLength = max(contentsEnd - paragraphStart, 0)
             if contentLength > 0 {
                 let firstCharacter = string.character(at: paragraphStart)
@@ -826,10 +775,6 @@ final class TXTReaderModel {
         return attributed
     }
 
-    /// Build attributes and pages for one bounded UTF-16 window.  Paged TXT
-    /// reading must never create an attributed string for the whole book just
-    /// to display the first screen; the source string remains cheap to share,
-    /// while TextKit only receives the requested window.
     private nonisolated static func makePagedLayout(
         from snapshot: TXTLayoutSnapshot,
         shouldCancel: @Sendable () -> Bool
@@ -906,7 +851,6 @@ final class TXTReaderModel {
         return attributedText(from: text, snapshot: snapshot)
     }
 
-    // MARK: - 翻页与目录
 
     var currentChapter: BookChapter? {
         guard chapters.indices.contains(currentChapterIndex) else { return nil }
@@ -917,16 +861,10 @@ final class TXTReaderModel {
         currentChapter?.id
     }
 
-    /// Changes only for an explicit TOC jump.  The current chapter itself is
-    /// updated continuously while scrolling, but that must not make the
-    /// `UITextView` reset its content offset at every chapter boundary.
     var scrollPositionID: String {
         "txt-position-\(scrollPositionGeneration)"
     }
 
-    /// Initial position supplied to the UIKit scroll view.  A character
-    /// anchor wins when one was persisted; otherwise the continuous book
-    /// progress provides a stable fallback.
     var initialScrollCharacterOffset: Int? {
         if let pendingCharacterOffset {
             return pendingCharacterOffset
@@ -1040,8 +978,6 @@ final class TXTReaderModel {
     func apply(preset: ReaderThemePreset) {
         var preferences = readerPreferences
         preferences.themePreset = preset
-        // Theme cards only select the reading palette. Typography and layout
-        // remain the user's current choices and are edited in Custom settings.
         apply(preferences: preferences)
     }
 
@@ -1091,9 +1027,6 @@ final class TXTReaderModel {
         return .scroll
     }
 
-    /// Called by the page controller when the reader is close to the end of
-    /// the materialized window.  More pages are generated off the main actor
-    /// and appended without rebuilding the already visible controller.
     func requestNextPageBatch() {
         guard flowMode == .paged,
               nextPageTask == nil,
@@ -1152,8 +1085,6 @@ final class TXTReaderModel {
         }
     }
 
-    /// Called when the user reaches the beginning of a lazily materialized
-    /// window after a TOC jump or a restored location.
     func requestPreviousPageBatch() {
         guard flowMode == .paged,
               previousPageTask == nil,
@@ -1168,9 +1099,6 @@ final class TXTReaderModel {
         let start = max(firstPageStart - Self.pageBatchCharacterLimit, 0)
         let snapshot = makePageLayoutSnapshot(
             range: NSRange(location: start, length: firstPageStart - start),
-            // Generate the whole bounded prefix so that taking its suffix
-            // really produces pages adjacent to the current window.  The
-            // source is still capped at 128k UTF-16 units, never the book.
             maximumPages: Int.max
         )
 
@@ -1275,8 +1203,6 @@ final class TXTReaderModel {
         let offset = clampCharacterOffset(characterOffset)
         currentCharacterOffset = offset
         currentChapterIndex = chapterIndex(forGlobalOffset: offset)
-        // The UIKit bridge calls this after applying a requested anchor.  Do
-        // not keep replaying that same anchor on later SwiftUI updates.
         pendingCharacterOffset = nil
     }
 
@@ -1286,9 +1212,6 @@ final class TXTReaderModel {
         scheduleProgressPersistence()
     }
 
-    /// Stop detached parsing/layout work when the reader leaves the screen.
-    /// Without this explicit cancellation a large TXT could continue laying
-    /// out in the background after dismissal and keep the device busy.
     func cancelPendingLayout() {
         cancelLayoutTasks()
         layoutRequestID &+= 1
@@ -1321,7 +1244,6 @@ final class TXTReaderModel {
         }
     }
 
-    // MARK: - 偏好
 
     func resetTypography() {
         fontScale = 1.0
@@ -1400,8 +1322,6 @@ final class TXTReaderModel {
         } else if currentCharacterOffset > 0 || progressHint == nil {
             offset = clampCharacterOffset(currentCharacterOffset)
         } else {
-            // The progress callback is a safe fallback if UIKit has not yet
-            // produced a character anchor (for example during first layout).
             offset = globalOffset(forBookProgress: progressHint ?? 0)
         }
 
@@ -1428,27 +1348,18 @@ final class TXTReaderModel {
             version: 1,
             format: "txt",
             chapterIndex: currentChapterIndex,
-            // The persisted offset is local to the chapter for compatibility
-            // with locations written by the previous chapter-at-a-time reader.
             characterOffset: chapterOffset,
             chapterFraction: chapterFraction
         )
         if let data = try? JSONEncoder().encode(location),
            let json = String(data: data, encoding: .utf8) {
-            // Keep the legacy field readable for existing installations while
-            // storing TXT anchors separately from EPUB locators going forward.
             book.txtReadingLocationJSON = json
             book.readerLocatorJSON = json
         }
         pendingScrollProgress = nil
     }
 
-    // MARK: - Continuous TXT coordinate space
 
-    /// Build the UTF-16 coordinate of each chapter after joining the parsed
-    /// chapters with one blank line.  TextKit and the scroll view both use
-    /// this same coordinate space, so page turns and vertical scrolling never
-    /// lose the chapter boundary.
     private func makeChapterStartOffsets(for contents: [String]) -> [Int] {
         var offsets: [Int] = []
         offsets.reserveCapacity(contents.count)
@@ -1456,7 +1367,7 @@ final class TXTReaderModel {
         var offset = 0
         for (index, content) in contents.enumerated() {
             if index > 0 {
-                offset += 2 // "\n\n".utf16.count
+                offset += 2
             }
             offsets.append(offset)
             offset += content.utf16.count
@@ -1478,17 +1389,12 @@ final class TXTReaderModel {
         min(max(offset, 0), currentContent.utf16.count)
     }
 
-    /// Convert a persisted (chapter-local) TXT location to the continuous
-    /// offset used by TextKit.  Invalid or legacy locations fall back to the
-    /// book-level progress value instead of opening at an arbitrary chapter.
     private func globalOffset(for location: TXTReadingLocation) -> Int {
         guard chapterLengths.indices.contains(location.chapterIndex) else {
             return globalOffset(forBookProgress: book.progressPercent)
         }
 
         let length = chapterLengths[location.chapterIndex]
-        // Early builds persisted only the chapter/page fraction for paged TXT
-        // books.  Honour it when no usable character anchor was written.
         let localOffset: Int
         if location.characterOffset > 0 || location.chapterFraction <= 0 {
             localOffset = min(max(location.characterOffset, 0), length)
@@ -1500,10 +1406,6 @@ final class TXTReaderModel {
         return clampCharacterOffset(chapterStartOffset(for: location.chapterIndex) + localOffset)
     }
 
-    /// Before TXT locations were stored as character anchors, `Book` used a
-    /// chapter-weighted progress value.  Keep that value readable for books
-    /// that have no locator yet, while all new writes use the continuous
-    /// character coordinate below.
     private func globalOffsetForLegacyBookPosition() -> Int {
         guard !chapterLengths.isEmpty else { return 0 }
         let chapterIndex = min(

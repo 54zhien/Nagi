@@ -1,10 +1,3 @@
-//
-//  NagiNavigationSearchView.swift
-//  Nagi
-//
-//  持久化的搜索 surface。外部 frame 由 NagiTabBarView 统一拥有，
-//  本 view 只管理两个 Glass surface 内部的内容和控件 geometry。
-//
 
 import UIKit
 
@@ -177,8 +170,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         if let close {
             if !showsClose {
-                // Match NavigationSearchView: detach the logical Close surface
-                // immediately, but keep its native Glass alive while alpha fades.
                 self.close = nil
                 closingClose = close
             }
@@ -273,10 +264,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             reduceTransparency: params.reduceTransparency
         )
 
-        // Fully initialize the native Glass before the surface is inserted
-        // into the active search hierarchy. This gives the first animated
-        // frame a real 48pt effect view, content view, corner radius and luma
-        // range instead of starting from the zero-sized initializer state.
         _ = background.prepare(params: closeGlassParams)
         background.applyGeometry(
             params: closeGlassParams,

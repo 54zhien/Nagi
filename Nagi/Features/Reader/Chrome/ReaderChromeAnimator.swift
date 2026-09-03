@@ -1,9 +1,3 @@
-//
-//  ReaderChromeAnimator.swift
-//  Nagi
-//
-//  Interruptible visibility animation for the persistent Reader Chrome.
-//
 
 import UIKit
 

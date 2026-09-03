@@ -1,11 +1,3 @@
-//
-//  NagiRootViewController.swift
-//  Nagi
-//
-//  Nagi 的正式 App Root。三个 SwiftUI 页面在这里一次性创建并完成
-//  UIKit containment，Search 作为独立 overlay 持久存在，之后只做
-//  alpha/frame/state 更新。
-//
 
 import QuartzCore
 import SwiftUI
@@ -51,13 +43,22 @@ final class NagiRootViewController: UIViewController {
     private var observedKeyboardFrame: CGRect?
     private var reduceMotion: Bool
     private var reduceTransparency: Bool
+    private var showTabBarLabels: Bool
+    private var liquidGlassEnabled: Bool
     private var displayedTab: AppTab?
     private var pageTransitionGeneration = 0
     private var searchOverlayGeneration = 0
 
-    init(reduceMotion: Bool, reduceTransparency: Bool) {
+    init(
+        reduceMotion: Bool,
+        reduceTransparency: Bool,
+        showTabBarLabels: Bool = true,
+        liquidGlassEnabled: Bool = true
+    ) {
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
+        self.showTabBarLabels = showTabBarLabels
+        self.liquidGlassEnabled = liquidGlassEnabled
         super.init(nibName: nil, bundle: nil)
     }
 
@@ -96,16 +97,22 @@ final class NagiRootViewController: UIViewController {
         reconcileLayout(transition: .immediate)
     }
 
-    func updateAccessibility(
+    func updatePreferences(
         reduceMotion: Bool,
-        reduceTransparency: Bool
+        reduceTransparency: Bool,
+        showTabBarLabels: Bool,
+        liquidGlassEnabled: Bool
     ) {
         let changed =
             self.reduceMotion != reduceMotion ||
-            self.reduceTransparency != reduceTransparency
+            self.reduceTransparency != reduceTransparency ||
+            self.showTabBarLabels != showTabBarLabels ||
+            self.liquidGlassEnabled != liquidGlassEnabled
 
         self.reduceMotion = reduceMotion
         self.reduceTransparency = reduceTransparency
+        self.showTabBarLabels = showTabBarLabels
+        self.liquidGlassEnabled = liquidGlassEnabled
 
         guard changed else { return }
         reconcileLayout(transition: .immediate, force: true)
@@ -240,9 +247,6 @@ final class NagiRootViewController: UIViewController {
         state.tabBarSearchState = NagiTabBarSearchState(isActive: true)
         searchOverlayDismissTapGesture.isEnabled = true
 
-        // Build the active Search surface first. becomeFirstResponder then
-        // produces the system keyboard transition, whose frame update retargets
-        // this same in-flight property animation from its presentation values.
         reconcileLayout(
             transition: effectiveTransition(.spring(duration: 0.5))
         )
@@ -544,11 +548,6 @@ final class NagiRootViewController: UIViewController {
         let resolvedTransition = effectiveTransition(transition)
         currentLayoutState = nextState
 
-        // Parent RootTabBar geometry and all child Search/Main/Lens geometry
-        // are submitted before this transaction commits. This is the same
-        // topology as Nagram's containerLayoutUpdated -> TabBarComponent.update
-        // path and prevents a child from animating in an already-retargeted
-        // parent coordinate system.
         resolvedTransition.perform { [weak self] in
             guard let self else { return }
 
@@ -584,6 +583,8 @@ final class NagiRootViewController: UIViewController {
                 selectedTab: nextState.selectedTab,
                 searchState: nextState.searchState,
                 reduceTransparency: reduceTransparency,
+                showItemTitles: showTabBarLabels,
+                liquidGlassEnabled: liquidGlassEnabled,
                 transition: resolvedTransition
             )
         }

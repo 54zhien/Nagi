@@ -1,9 +1,3 @@
-//
-//  ReaderSettingsView.swift
-//  Nagi
-//
-//  TXT / EPUB 共用的主题与排版设置。即时设置直接应用，详细排版设置使用草稿。
-//
 
 import SwiftUI
 import UIKit
@@ -15,6 +9,8 @@ struct MediumReaderSettingsView: View {
 
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
+    private var readerSettingsUseLiquidGlass = true
     @Binding private var systemBrightness: Double
     @State private var showFontSizeIndicator = false
     @State private var fontSizeIndicatorToken = 0
@@ -120,7 +116,7 @@ struct MediumReaderSettingsView: View {
     }
 
     private var fontSizeControl: some View {
-        GlassEffectContainer(spacing: 0) {
+        NagiGlassEffectContainer(spacing: 0) {
             HStack(spacing: 0) {
                 fontSizeButton(
                     title: "小",
@@ -142,7 +138,11 @@ struct MediumReaderSettingsView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(4)
-            .glassEffect(.regular.interactive(), in: Capsule())
+            .nagiGlass(
+                in: Capsule(),
+                interactive: true,
+                enabled: readerSettingsUseLiquidGlass
+            )
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("字号")
@@ -223,7 +223,11 @@ struct MediumReaderSettingsView: View {
         .buttonStyle(.plain)
         .frame(width: 48, height: 44)
         .contentShape(Rectangle())
-        .glassEffect(.regular.interactive(), in: Capsule())
+        .nagiGlass(
+            in: Capsule(),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
+        )
         .accessibilityLabel("翻页方式")
         .accessibilityValue(model.preferences.pageTransition.label)
     }
@@ -260,7 +264,11 @@ struct MediumReaderSettingsView: View {
         .buttonStyle(.plain)
         .frame(width: 48, height: 44)
         .contentShape(Rectangle())
-        .glassEffect(.regular.interactive(), in: Capsule())
+        .nagiGlass(
+            in: Capsule(),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
+        )
         .accessibilityLabel("外观模式")
         .accessibilityValue(model.preferences.appearanceMode.label)
     }
@@ -301,7 +309,7 @@ struct MediumReaderSettingsView: View {
     }
 
     private var presetCards: some View {
-        GlassEffectContainer(spacing: 10) {
+        NagiGlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
                 ForEach(ReaderThemePreset.allCases) { preset in
                     presetCard(preset)
@@ -344,7 +352,6 @@ struct MediumReaderSettingsView: View {
                     : preset.contentColor(isDarkAppearance: isDarkAppearance)
             )
             .padding(.vertical, 7)
-            // 三列卡片继续沿用原三列两行预设网格的比例，并向下延伸一些。
             .frame(maxWidth: .infinity, minHeight: ReaderControlValues.presetGridHeight)
             .background(cardColor, in: cardShape)
             .overlay {
@@ -356,7 +363,11 @@ struct MediumReaderSettingsView: View {
             .contentShape(cardShape)
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: cardShape)
+        .nagiGlass(
+            in: cardShape,
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
+        )
         .contentShape(cardShape)
         .accessibilityLabel("主题预设：\(preset.label)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -371,9 +382,10 @@ struct MediumReaderSettingsView: View {
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)
-        .glassEffect(
-            .regular.interactive(),
-            in: Capsule()
+        .nagiGlass(
+            in: Capsule(),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
         )
         .contentShape(Capsule())
         .accessibilityHint("打开更多文字与布局选项")
@@ -402,6 +414,8 @@ struct MediumReaderSettingsView: View {
 
 struct CustomReaderSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
+    private var readerSettingsUseLiquidGlass = true
 
     let initialDraft: ReaderCustomizationDraft
     let previewText: String
@@ -445,7 +459,6 @@ struct CustomReaderSettingsSheet: View {
         )
     }
 
-    // 朱自清《春》（1933）中的短段落，用于展示字体、行距和页边空白。
     private static let previewSampleText = """
     一切都像刚睡醒的样子，欣欣然张开了眼。山朗润起来了，水涨起来了，太阳的脸红起来了。
 
@@ -489,8 +502,6 @@ struct CustomReaderSettingsSheet: View {
                 ScrollView {
                     settingsContent
                         .padding(.horizontal, 16)
-                        // Reserve the initial preview space, then let the cards
-                        // scroll beneath the fixed preview overlay.
                         .padding(.top, Layout.previewHeight + 18)
                         .padding(.bottom, 28)
                 }
@@ -516,8 +527,6 @@ struct CustomReaderSettingsSheet: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("自定义主题")
             .navigationBarTitleDisplayMode(.inline)
-            // Keep the system navigation-bar surface continuous with the
-            // fixed preview surface below it.
             .toolbarBackground(Color(uiColor: previewBackgroundColor), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(previewColorScheme, for: .navigationBar)
@@ -530,10 +539,14 @@ struct CustomReaderSettingsSheet: View {
                             .contentShape(Circle())
                     }
                     .buttonStyle(.plain)
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .nagiGlass(
+                        in: Circle(),
+                        interactive: true,
+                        enabled: readerSettingsUseLiquidGlass
+                    )
                     .accessibilityLabel("取消")
                 }
-                .sharedBackgroundVisibility(.hidden)
+                .nagiSharedBackgroundVisibilityHidden()
                 ToolbarItem(placement: .confirmationAction) {
                     Button(action: commit) {
                         Image(systemName: "checkmark")
@@ -543,15 +556,15 @@ struct CustomReaderSettingsSheet: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(.white)
-                    .glassEffect(
-                        .regular
-                            .tint(nagiAccentColor)
-                            .interactive(),
-                        in: Circle()
+                    .nagiGlass(
+                        in: Circle(),
+                        interactive: true,
+                        tint: nagiAccentColor,
+                        enabled: readerSettingsUseLiquidGlass
                     )
                     .accessibilityLabel("完成")
                 }
-                .sharedBackgroundVisibility(.hidden)
+                .nagiSharedBackgroundVisibilityHidden()
             }
         }
         .presentationDetents([.large])

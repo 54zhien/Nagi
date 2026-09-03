@@ -1,12 +1,3 @@
-//
-//  NagiTabTransition.swift
-//  Nagi
-//
-//  Nagram ComponentFlow / Display / UIKitRuntimeUtils 的最小兼容运行时。
-//  只保留 RootTabBar / Search / LiquidLens 实际使用的能力，动画语义按
-//  Nagram 原实现对齐：presentation 续接、iOS 26 spring、UIView spring
-//  CALayer override、frame-rate / delay / additive position。
-//
 
 import ObjectiveC
 import QuartzCore
@@ -92,8 +83,6 @@ private final class NagiTransitionAnimationDelegate: NSObject, CAAnimationDelega
     }
 }
 
-// Equivalent to Nagram/UIKitRuntimeUtils CALayerSpringParametersOverride for
-// the nil-parameters path used by ComponentTransition.animateView(.spring).
 private enum NagiLayerSpringOverride {
     private static var isInstalled = false
     private static var stackDepth = 0
@@ -183,7 +172,6 @@ private extension CALayer {
             }
         }
 
-        // Swizzled selector points to CALayer's original add(_:forKey:).
         nagi_addAnimation(updatedAnimation, forKey: key)
     }
 }
@@ -210,8 +198,6 @@ enum NagiTabTransition {
         }
     }
 
-    // Nagram ComponentTransition itself has no outer animation transaction.
-    // This helper only aggregates completions for Nagi callers.
     func perform(_ changes: () -> Void, completion: ((Bool) -> Void)? = nil) {
         guard !isImmediate else {
             changes()
@@ -559,21 +545,32 @@ enum NagiTabTransition {
         )
     }
 
-    func setTintColor(view: UIView, color: UIColor) {
-        if let current = view.tintColor, current.isEqual(color) { return }
+    func setTintColor(
+        view: UIView,
+        color: UIColor,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        if let current = view.tintColor, current.isEqual(color) {
+            completion?(true)
+            return
+        }
 
         let previous = view.tintColor ?? .clear
         view.tintColor = color
-        guard !isImmediate else { return }
+        guard !isImmediate else {
+            completion?(true)
+            return
+        }
 
         addAnimation(
             makeAnimation(
                 keyPath: nagiTintAnimationKey,
-                fromValue: previous.cgColor,
+                fromValue: previous,
                 toValue: color.cgColor
             ),
             to: view.layer,
-            forKey: nagiTintAnimationKey
+            forKey: nagiTintAnimationKey,
+            completion: completion
         )
     }
 
@@ -777,7 +774,6 @@ enum NagiTabTransition {
         let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
         guard maximumFPS > 61.0 else { return }
 
-        // Nagram leaves opacity's existing preference untouched.
         if keyPath == nagiOpacityAnimationKey { return }
 
         animation.preferredFrameRateRange = CAFrameRateRange(

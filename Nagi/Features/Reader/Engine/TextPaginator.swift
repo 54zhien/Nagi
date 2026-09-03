@@ -1,9 +1,3 @@
-//
-//  TextPaginator.swift
-//  Nagi
-//
-//  TextKit 分页引擎：把章节正文按页面尺寸精确分成一页页。
-//
 
 import UIKit
 
@@ -19,10 +13,6 @@ enum TextPaginator {
         let isComplete: Bool
     }
 
-    /// 只排一段有限的字符，并返回下一段的起点。
-    ///
-    /// TXT 不应该在打开时把整本书复制成页面数组。调用方可以用这个批次
-    /// 接口先生成当前页附近的内容，用户继续翻页时再追加后续批次。
     static func paginateBatch(
         _ text: NSAttributedString,
         pageSize: CGSize,
@@ -51,9 +41,6 @@ enum TextPaginator {
         }
 
         let sourceRange = NSRange(location: start, length: requestedEnd - start)
-        // Keep the temporary TextKit storage bounded.  This is the important
-        // difference from the old implementation, which copied every page of
-        // the whole novel before showing the first one.
         let textStorage = NSTextStorage(
             attributedString: text.attributedSubstring(from: sourceRange)
         )
@@ -83,9 +70,6 @@ enum TextPaginator {
                 actualGlyphRange: nil
             )
 
-            // A zero or backwards range means TextKit could not make forward
-            // progress (usually because the available container is too small).
-            // Preserve the remaining text instead of silently dropping it.
             guard charRange.length > 0,
                   charRange.location >= localLocation,
                   NSMaxRange(charRange) <= textStorage.length else {
@@ -133,11 +117,6 @@ enum TextPaginator {
         )
     }
 
-    /// A page is rendered in its own text view, so a page that starts in the
-    /// middle of a paragraph would otherwise be treated as that paragraph's
-    /// first line again.  Remove only the first-line indent for that leading
-    /// continuation; all other typography stays identical to the full layout
-    /// used for pagination.
     private static func pageText(
         from textStorage: NSTextStorage,
         range: NSRange,

@@ -1,10 +1,3 @@
-//
-//  ReaderView.swift
-//  Nagi
-//
-//  阅读器入口。阅读编排层负责生命周期、统一设置和 chrome，
-//  TXT / EPUB 的正文渲染交给各自的 renderer。
-//
 
 import SwiftData
 import SwiftUI
@@ -33,18 +26,12 @@ struct ReaderView: View {
             }
             guard model == nil else { return }
 
-            // Let the full-screen presentation render its first frame before
-            // constructing the main-actor reader graph.  This keeps the
-            // presenting library responsive during the modal transition.
             await Task.yield()
             guard !Task.isCancelled else { return }
 
             let nextModel = ReaderViewModel(book: book)
             model = nextModel
 
-            // The session initially renders its loading state. Yield again so
-            // that state can reach the screen before Readium starts opening
-            // the publication and creating its UIKit navigator.
             await Task.yield()
             guard !Task.isCancelled else { return }
 
@@ -108,6 +95,7 @@ private struct ReaderSessionView: View {
 
     var body: some View {
         GeometryReader { geometry in
+            let cornerInsets = nagiWindowCornerInsets(for: geometry)
             ReaderControllerRepresentable(
                 model: model,
                 stateRevision: model.stateRevision,
@@ -118,8 +106,8 @@ private struct ReaderSessionView: View {
                 showsTitle: model.preferences.showBookTitleInPageHeader,
                 reduceMotion: reduceMotion,
                 cornerInsets: ReaderChromeCornerInsets(
-                    bottomLeading: geometry.containerCornerInsets.bottomLeading,
-                    bottomTrailing: geometry.containerCornerInsets.bottomTrailing
+                    bottomLeading: cornerInsets.bottomLeading,
+                    bottomTrailing: cornerInsets.bottomTrailing
                 ),
                 onDismiss: dismissReader,
                 onTableOfContents: { showTableOfContents = true },
@@ -205,10 +193,10 @@ private struct ReaderSessionView: View {
                     }
                     .frame(width: 44, height: 44)
                     .contentShape(Circle())
-                    .glassEffect(.regular.interactive(), in: Circle())
+                    .nagiGlass(in: Circle(), interactive: true)
                     .accessibilityLabel("关闭主题与排版")
                 }
-                .sharedBackgroundVisibility(.hidden)
+                .nagiSharedBackgroundVisibilityHidden()
             }
         }
         .presentationDetents([.medium])

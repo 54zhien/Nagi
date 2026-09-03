@@ -1,10 +1,3 @@
-//
-//  BookImportParser.swift
-//  Nagi
-//
-//  导入阶段的格式路由。导入结果仍由现有 ParsedBook 统一承载，
-//  阅读器不会直接依赖导入器的实现细节。
-//
 
 import Foundation
 

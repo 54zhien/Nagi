@@ -1,9 +1,3 @@
-//
-//  ReaderChrome.swift
-//  Nagi
-//
-//  EPUB 与 TXT 共用的沉浸式阅读页 chrome：页眉、退出、目录和主题控件。
-//
 
 import SwiftUI
 import UIKit
@@ -56,7 +50,6 @@ struct ReaderChrome<Content: View>: View {
     }
 
     var body: some View {
-        // 正文表面独立铺满容器；页眉和控件仍由下方的 safe-area/overlay 层定位。
         GeometryReader { geometry in
             ZStack {
                 content
@@ -70,7 +63,6 @@ struct ReaderChrome<Content: View>: View {
                         .accessibilityHidden(true)
                 }
             }
-            // 页眉保持现有位置；正文的实际安全区由 Readium 与页面内容 inset 统一处理。
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showsTitle {
                     ReaderPageHeader(
@@ -94,9 +86,6 @@ struct ReaderChrome<Content: View>: View {
                         .transition(.opacity)
                 }
             }
-            // Keep the transition cover above the complete reader surface,
-            // including the chrome, so a WebKit repaint cannot reveal a
-            // second background layer around the content.
             .overlay {
                 if let transitionCoordinator {
                     ReaderSnapshotLayer(
@@ -108,7 +97,6 @@ struct ReaderChrome<Content: View>: View {
                     .allowsHitTesting(false)
                 }
             }
-            // UIKit 阅读器会自行处理分页手势；这个 simultaneous 手势只负责统一收起控件。
             .simultaneousGesture(
                 DragGesture(minimumDistance: ReaderControlMetrics.swipeMinimumDistance)
                     .onChanged { _ in
@@ -117,14 +105,8 @@ struct ReaderChrome<Content: View>: View {
                     }
             )
         }
-        // 保留顶部安全区，同时让 GeometryReader 继续覆盖底部和横向区域；
-        // 因此底栏仍使用同一套全屏圆角几何，不改变其位置计算。
         .ignoresSafeArea(.container, edges: [.horizontal, .bottom])
-        // 阅读容器统一绘制主题背景，覆盖顶部安全区、页眉宿主和 UIKit 阅读器外层空白。
-        // 正文视图不再单独绘制一层背景，避免出现颜色不同的矩形色块。
         .background(readerBackground, ignoresSafeAreaEdges: .all)
-        // The status-bar toolbar placement is not present in the Xcode 26.3 SDK
-        // used by CI. Keep the reader edge-to-edge with the compatible API.
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -166,7 +148,7 @@ struct ReaderChrome<Content: View>: View {
     }
 
     private func bottomBar(in geometry: GeometryProxy) -> some View {
-        let cornerInsets = geometry.containerCornerInsets
+        let cornerInsets = nagiWindowCornerInsets(for: geometry)
         let leadingCenter = bottomCornerCenter(
             cornerInsets.bottomLeading,
             in: geometry.size,
@@ -178,7 +160,7 @@ struct ReaderChrome<Content: View>: View {
             isLeading: false
         )
 
-        return GlassEffectContainer(spacing: 12) {
+        return NagiGlassEffectContainer(spacing: 12) {
             ZStack {
                 controlButton(
                     "目录",
@@ -233,9 +215,6 @@ struct ReaderChrome<Content: View>: View {
         maximum: CGFloat,
         radius: CGFloat
     ) -> CGFloat {
-        // containerCornerInsets 的宽高分别代表对应圆角在两个轴上的动态偏移。
-        // 分轴计算可保留不对称窗口、系统 UI 和横竖屏布局的真实几何关系；
-        // 没有圆角数据时至少保留半个控件直径，确保整个圆形控件仍在屏幕内。
         min(max(radius, measuredInset), maximum)
     }
 
@@ -254,7 +233,7 @@ struct ReaderChrome<Content: View>: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
+        .nagiGlass(in: .circle, interactive: true)
         .accessibilityLabel(label)
     }
 
@@ -275,7 +254,6 @@ private struct ReaderPageHeader: View {
             .lineLimit(1)
             .padding(.horizontal, 72)
             .frame(maxWidth: .infinity, alignment: .center)
-            // 与右上角退出按钮共用同一高度，使书名基线区域的中心线一致。
             .frame(height: CGFloat(ReaderLayoutMetrics.pageHeaderHeight), alignment: .center)
             .allowsHitTesting(false)
             .accessibilityAddTraits(.isHeader)
@@ -284,7 +262,6 @@ private struct ReaderPageHeader: View {
 }
 
 private enum ReaderControlMetrics {
-    // 底栏控件比最小触控尺寸略大，提升沉浸式阅读中的可发现性和点击舒适度。
     static let diameter: CGFloat = 48
     static let iconPointSize: CGFloat = 20
     static let exitDiameter: CGFloat = 48
@@ -292,13 +269,9 @@ private enum ReaderControlMetrics {
     static let exitTopInset: CGFloat = 0
     static let exitTrailingInset: CGFloat = 24
     static let swipeMinimumDistance: CGFloat = 10
-    // 计时任务以 showControls 变为 true 的状态更新为起点，显示 7 秒后自动收起。
     static let autoHideNanoseconds: UInt64 = 7_000_000_000
 }
 
-/// Owns the short-lived reader snapshot used while Readium applies a visual
-/// preference. The object deliberately lives outside the reader model: the
-/// snapshot is presentation state, not a reading preference or persisted data.
 @MainActor
 final class ReaderTransitionCoordinator {
     private static let settleNanoseconds: UInt64 = 40_000_000
@@ -324,9 +297,6 @@ final class ReaderTransitionCoordinator {
         self.snapshotHost = snapshotHost
     }
 
-    /// Captures the visible reader only for mutations whose repaint can expose
-    /// an intermediate surface. Typography and geometry are allowed to
-    /// reflow directly so their controls remain responsive.
     func begin(kind: ReaderVisualMutationKind, reduceMotion: Bool) {
         transitionToken &+= 1
         cancelTasks()
@@ -342,8 +312,6 @@ final class ReaderTransitionCoordinator {
         host.layoutIfNeeded()
         guard host.bounds.width > 0, host.bounds.height > 0 else { return }
 
-        // A solid cover is created first and is therefore guaranteed even on
-        // surfaces such as WKWebView where snapshotView can return nil.
         let cover = UIView(frame: host.bounds)
         cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         cover.backgroundColor = host.fallbackBackgroundColor
@@ -386,9 +354,6 @@ final class ReaderTransitionCoordinator {
         }
     }
 
-    /// Called after the model has synchronized its new native state. The
-    /// supplied check receives the mutation kind so typography can settle on
-    /// its own narrow path without waiting for theme/font readiness.
     func readerStateDidUpdate(
         waitForContent: @escaping @MainActor (ReaderVisualMutationKind) async -> Void
     ) {

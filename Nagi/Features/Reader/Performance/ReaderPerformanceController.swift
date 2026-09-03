@@ -1,11 +1,3 @@
-//
-//  ReaderPerformanceController.swift
-//  Nagi
-//
-//  Internal quality policy for the reader's real-time glass layer.  The
-//  policy only removes nonessential visual work under system pressure; it
-//  never disables or delays touch tracking.
-//
 
 import Foundation
 import UIKit
@@ -38,8 +30,6 @@ final class ReaderPerformanceController {
     }
 
     private init() {
-        // Apple requires reading thermalState before registering for its
-        // change notification.
         thermalState = processInfo.thermalState
         isLowPowerModeEnabled = processInfo.isLowPowerModeEnabled
         supportsHighRefreshRate = UIScreen.main.maximumFramesPerSecond >= 120

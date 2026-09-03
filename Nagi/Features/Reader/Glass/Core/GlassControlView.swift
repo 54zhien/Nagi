@@ -1,9 +1,3 @@
-//
-//  GlassControlView.swift
-//  Nagi
-//
-//  Persistent UIKit control used by the Reader Chrome.
-//
 
 import QuartzCore
 import UIKit
@@ -28,8 +22,6 @@ final class GlassControlView: UIControl {
         surfaceView = GlassSurfaceView()
         super.init(frame: frame)
 
-        // Warm the process/thermal observer while the persistent control is
-        // being created, rather than paying that setup cost on touch-down.
         _ = ReaderPerformanceController.shared
 
         touchDriver.control = self
@@ -96,7 +88,8 @@ final class GlassControlView: UIControl {
         isSelected: Bool = false,
         cornerRadius: CGFloat? = nil,
         contentColor: UIColor? = nil,
-        fillColor: UIColor? = nil
+        fillColor: UIColor? = nil,
+        usesGlass: Bool = true
     ) {
         let imageChanged: Bool
         if let currentImage = iconView.image {
@@ -116,6 +109,7 @@ final class GlassControlView: UIControl {
         titleLabel.font = .preferredFont(forTextStyle: title == nil ? .body : .subheadline)
         fillView.backgroundColor = fillColor
         fillView.isHidden = fillColor == nil
+        surfaceView.isHidden = !usesGlass
         preferredCornerRadius = cornerRadius
         if self.accessibilityLabel != accessibilityLabel {
             self.accessibilityLabel = accessibilityLabel
@@ -156,8 +150,6 @@ final class GlassControlView: UIControl {
         setNeedsLayout()
     }
 
-    /// Uses UIButton's public UIMenu support while keeping this view's
-    /// existing persistent GlassControlView surface and accessibility label.
     func setPrimaryMenu(_ menu: UIMenu?) {
         menuButton.menu = menu
         menuButton.showsMenuAsPrimaryAction = menu != nil

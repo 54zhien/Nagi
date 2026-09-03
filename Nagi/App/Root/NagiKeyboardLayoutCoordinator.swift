@@ -1,10 +1,3 @@
-//
-//  NagiKeyboardLayoutCoordinator.swift
-//  Nagi
-//
-//  键盘通知只负责传递 screen 坐标、系统动画时长和曲线；Root 再把
-//  坐标转换为自己的 layout state，并用同一个 NagiTabTransition 更新。
-//
 
 import UIKit
 

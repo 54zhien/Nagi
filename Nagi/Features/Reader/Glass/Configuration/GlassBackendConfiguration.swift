@@ -1,11 +1,3 @@
-//
-//  GlassBackendConfiguration.swift
-//  Nagi
-//
-//  Selects a fixed Glass backend when a reader session creates its view tree.
-//  The debug override is intentionally a configuration seam, not a live
-//  mutation of an existing compositor graph.
-//
 
 import Foundation
 
@@ -33,9 +25,6 @@ enum GlassBackendConfiguration {
     }
 
 #if DEBUG
-    /// A launch argument makes Native/Backdrop/Hybrid comparison reproducible
-    /// without adding a user-facing settings row.  Both `-reader-glass-backend
-    /// backdrop` and `-reader-glass-backend=backdrop` are accepted.
     private static var launchBackend: GlassBackend? {
         let arguments = ProcessInfo.processInfo.arguments
         if let argument = arguments.first(where: {
@@ -54,15 +43,16 @@ enum GlassBackendConfiguration {
     }
 #endif
 
-    /// Hybrid keeps the shared container on Apple's compositor path while
-    /// giving individual controls the public blur fallback.  This is an A/B
-    /// candidate, not a claim that it wins before device profiling.
+    static var effectiveBackend: GlassBackend {
+        NagiGlassStyleStore.usesNativeLiquidGlass ? selectedBackend : .backdrop
+    }
+
     static var surfaceBackend: GlassBackend {
-        selectedBackend == .hybrid ? .backdrop : selectedBackend
+        effectiveBackend == .hybrid ? .backdrop : effectiveBackend
     }
 
     static var containerBackend: GlassBackend {
-        selectedBackend == .hybrid ? .native : selectedBackend
+        effectiveBackend == .hybrid ? .native : effectiveBackend
     }
 
 #if DEBUG

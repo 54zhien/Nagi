@@ -1,24 +1,15 @@
-//
-//  ReaderArchitecture.swift
-//  Nagi
-//
-//  阅读层的共同契约：导入结果与阅读会话分离，阅读编排层不依赖具体文件格式。
-//
 
 import Foundation
 import Observation
 import SwiftUI
 import UIKit
 
-/// Keeps newer SF Symbols requests usable on devices whose installed symbol
-/// catalog is older than the app's design reference.
 enum ReaderSystemSymbol {
     static func name(_ preferred: String, fallback: String) -> String {
         UIImage(systemName: preferred) == nil ? fallback : preferred
     }
 }
 
-// MARK: - Reading document
 
 struct ReaderChapter: Identifiable, Hashable, Sendable {
     let id: String
@@ -59,7 +50,6 @@ struct ReaderBookDescriptor: Sendable, Equatable {
     }
 }
 
-// MARK: - Unified preferences
 
 enum ReaderAppearanceMode: String, CaseIterable, Identifiable, Codable, Sendable, Hashable {
     case light
@@ -166,15 +156,7 @@ enum ReaderFontSize {
     static let maximumScale = maximum / defaultValue
 }
 
-/// The typography values that are shared by the TXT and EPUB renderers.
-///
-/// Keep the physical page clearance here instead of letting each renderer
-/// invent its own interpretation. `pageMargins` is the horizontal inset, in
-/// points, applied to both sides of the reading content.
 enum ReaderLayoutMetrics {
-    // The page header's actual occupied height. Vertical reading clearance is
-    // resolved from the system safe area and the active reader chrome rather
-    // than from a fixed app-wide margin.
     static let pageHeaderHeight = 48.0
     static let fixedParagraphIndent = 2.0
 
@@ -189,13 +171,8 @@ enum ReaderLayoutMetrics {
     static let defaultCharacterSpacing = 0.0
     static let defaultWordSpacing = 0.0
 
-    /// Character and word spacing remain percentage controls based on a fixed
-    /// reference point size, independent of the reader font size.
     static let spacingReferencePointSize = 24.0
 
-    /// Readium CSS expresses these two values in `rem`.  Its public
-    /// `letterSpacing` value is divided by two before it becomes CSS, so the
-    /// conversion is kept here to make the EPUB and TextKit paths agree.
     static let readiumRootPointSize = 16.0
 
     static func clampPageMargins(_ value: Double) -> Double {
@@ -218,9 +195,6 @@ enum ReaderLayoutMetrics {
         CGFloat(clampPageMargins(pageMargin))
     }
 
-    /// Readium expresses page margins as a factor relative to its default
-    /// page margin. Keep the user-facing value in points and convert only at
-    /// the renderer boundary.
     static func pageMarginFactor(for pageMargin: Double) -> Double {
         clampPageMargins(pageMargin) / pageMarginBase
     }
@@ -238,15 +212,11 @@ enum ReaderLayoutMetrics {
         Double(spacingPoints(for: clampWordSpacing(percentage))) / readiumRootPointSize
     }
 
-    /// Values written by the original settings screen were factors in the
-    /// 0.5...2.0 range. Convert them to the new absolute-point value.
     static func migrateLegacyPageMargins(_ value: Double?) -> Double {
         guard let value else { return defaultPageMargins }
         return clampPageMargins(pageMarginBase * value)
     }
 
-    /// Values written by the intermediate settings screen were signed
-    /// percentages around the 24 pt base. Convert them to points.
     static func migrateLegacyPageMarginAdjustment(_ value: Double?) -> Double {
         guard let value else { return defaultPageMargins }
         return clampPageMargins(pageMarginBase * (1 + value / 100))
@@ -259,17 +229,13 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var boldText: Bool
     var lineHeight: Double
     var paragraphSpacing: Double
-    /// Absolute horizontal page blank in points, applied to both sides.
     var pageMargins: Double
-    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
     var paragraphIndent: Double
     var characterSpacing: Double
     var wordSpacing: Double
     var publisherStyles: Bool
     var themePreset: ReaderThemePreset
     var appearanceMode: ReaderAppearanceMode
-    /// Kept for decoding older saved preferences. Reader brightness is now
-    /// controlled by the device, so renderers normalize this value to 1.
     var brightness: Double
     var pageTransition: ReaderPageTransition
     var showBookTitleInPageHeader: Bool
@@ -385,10 +351,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     }
 }
 
-/// Resolves the distance from the physical screen edge to the readable text.
-///
-/// The user-facing inset is a total distance, so it must not be added to the
-/// system safe area. Whichever is larger is the effective clearance.
 enum ReaderContentInsetResolver {
     static func resolve(
         safeAreaInsets: UIEdgeInsets,
@@ -439,7 +401,6 @@ enum ReaderChromeLayout: Sendable {
     case cornerAligned
 }
 
-// MARK: - Stable reading position
 
 struct TextReadingPosition: Codable, Hashable, Sendable {
     let chapterID: String
@@ -480,18 +441,12 @@ struct ReadingPosition: Codable, Hashable, Sendable {
     }
 }
 
-// MARK: - Renderer contract
 
 enum ReaderPreferenceCommitBehavior: Sendable, Equatable {
     case coalesced
     case immediate
 }
 
-/// Describes which part of the reader surface is expected to settle after a
-/// preference mutation.  Keeping this separate from the preference payload
-/// prevents a line-spacing change from waiting on unrelated theme or font
-/// signals (and lets the transition layer choose a cover only when a repaint
-/// actually needs one).
 enum ReaderVisualMutationKind: Sendable, Equatable {
     case theme
     case typography
@@ -552,7 +507,6 @@ protocol ReaderRenderer: AnyObject {
     func readingPosition() -> ReadingPosition?
 }
 
-// MARK: - Repository
 
 @MainActor
 final class ReaderRepository {
@@ -585,7 +539,6 @@ final class ReaderRepository {
     }
 }
 
-// MARK: - Shared reading orchestration
 
 @MainActor
 @Observable
@@ -603,8 +556,6 @@ final class ReaderEngine {
         self.repository = repository
         self.renderer = renderer
         var initialPreferences = ReaderPreferencesStore.load() ?? renderer.preferences
-        // Migrate the retired reader-only brightness value. The medium sheet
-        // now owns a live UIScreen brightness session instead.
         initialPreferences.brightness = 1
         preferences = initialPreferences
         renderer.apply(

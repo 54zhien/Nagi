@@ -1,9 +1,3 @@
-//
-//  EPUBReaderView.swift
-//  Nagi
-//
-//  Readium EPUB 阅读界面：正文优先、Liquid Glass 控件和集中式排版设置。
-//
 
 import Foundation
 import SwiftUI
@@ -30,7 +24,6 @@ struct EPUBReaderView: View {
             content
                 .ignoresSafeArea()
         }
-        // 页眉是正文布局的一部分，不属于阅读控件；滑动收起 chrome 时保持显示。
         .safeAreaInset(edge: .top, spacing: 0) {
             if model.showBookTitleInPageHeader {
                 pageHeader
@@ -48,7 +41,6 @@ struct EPUBReaderView: View {
                     .transition(.opacity)
             }
         }
-        // 阅读页始终沉浸显示，状态栏不随阅读控件显隐而重新出现。
         .statusBarHidden(true)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
@@ -110,9 +102,7 @@ struct EPUBReaderView: View {
         }
     }
 
-    // MARK: - 阅读页页眉
 
-    // 书名嵌入正文上方，独立于 showControls 的显隐状态。
     private var pageHeader: some View {
         Text(model.title)
             .font(.system(size: 15, weight: .medium))
@@ -144,11 +134,10 @@ struct EPUBReaderView: View {
             .padding(.trailing, ReaderControlMetrics.exitTrailingInset)
     }
 
-    // MARK: - Liquid Glass 阅读器 chrome
 
     private var bottomBar: some View {
         GeometryReader { geometry in
-            let cornerInsets = geometry.containerCornerInsets
+            let cornerInsets = nagiWindowCornerInsets(for: geometry)
             let leadingCenter = bottomCornerCenter(
                 cornerInsets.bottomLeading,
                 in: geometry.size,
@@ -160,7 +149,7 @@ struct EPUBReaderView: View {
                 isLeading: false
             )
 
-            GlassEffectContainer(spacing: 12) {
+            NagiGlassEffectContainer(spacing: 12) {
                 ZStack {
                     controlButton("目录", systemImage: "list.bullet") {
                         showTableOfContents = true
@@ -194,10 +183,6 @@ struct EPUBReaderView: View {
     }
 
     private func cornerCenterDistance(_ measuredInset: CGFloat) -> CGFloat {
-        // containerCornerInsets 是 iOS 26 根据当前窗口形状和系统 UI
-        // 计算出的动态值。优先使用系统测量值，让按钮圆心随真实屏幕
-        // 圆角向下对齐；只有平直窗口（例如部分 iPad 场景）返回 0 时，
-        // 才使用回退值，并确保圆形控件不会越过容器边界。
         guard measuredInset > 0 else {
             return ReaderControlMetrics.fallbackCornerCenterInset
         }
@@ -220,11 +205,10 @@ struct EPUBReaderView: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: .circle)
+        .nagiGlass(in: .circle, interactive: true)
         .accessibilityLabel(label)
     }
 
-    // MARK: - 主题与设置
 
     private var settingsSheet: some View {
         NavigationStack {
@@ -245,8 +229,6 @@ struct EPUBReaderView: View {
                 }
             }
         }
-        // The custom editor is intentionally presented from this sheet so it
-        // covers the medium sheet instead of dismissing it first.
         .sheet(isPresented: $showCustomSettings, onDismiss: { customDraft = nil }) {
             customSettingsSheet
         }
@@ -373,6 +355,8 @@ struct EPUBReaderView: View {
 
 private struct MediumReaderSettingsView: View {
     @Bindable private var model: EPUBReaderModel
+    @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
+    private var readerSettingsUseLiquidGlass = true
 
     let onCustomSettings: () -> Void
 
@@ -409,7 +393,7 @@ private struct MediumReaderSettingsView: View {
     }
 
     private var fontSizeControl: some View {
-        GlassEffectContainer(spacing: 0) {
+        NagiGlassEffectContainer(spacing: 0) {
             HStack(spacing: 0) {
                 fontSizeButton(
                     title: "小",
@@ -430,7 +414,11 @@ private struct MediumReaderSettingsView: View {
                 )
             }
             .padding(4)
-            .glassEffect(.regular.interactive(), in: Capsule())
+            .nagiGlass(
+                in: Capsule(),
+                interactive: true,
+                enabled: readerSettingsUseLiquidGlass
+            )
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("字号")
@@ -490,7 +478,11 @@ private struct MediumReaderSettingsView: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .nagiGlass(
+            in: Circle(),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
+        )
         .accessibilityLabel("翻页方式")
         .accessibilityValue(model.pageTransition.label)
     }
@@ -517,7 +509,11 @@ private struct MediumReaderSettingsView: View {
         }
         .menuStyle(.borderlessButton)
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .nagiGlass(
+            in: Circle(),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
+        )
         .accessibilityLabel("外观模式")
         .accessibilityValue(model.appearanceMode.label)
     }
@@ -543,7 +539,7 @@ private struct MediumReaderSettingsView: View {
     }
 
     private var presetCards: some View {
-        GlassEffectContainer(spacing: 10) {
+        NagiGlassEffectContainer(spacing: 10) {
             HStack(spacing: 10) {
                 ForEach(EPUBReaderPreset.allCases) { preset in
                     presetCard(preset)
@@ -577,9 +573,10 @@ private struct MediumReaderSettingsView: View {
             )
         }
         .buttonStyle(.plain)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .nagiGlass(
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
         )
         .accessibilityLabel("主题预设：\(preset.label)")
         .accessibilityAddTraits(isSelected ? .isSelected : [])
@@ -592,9 +589,10 @@ private struct MediumReaderSettingsView: View {
                 .frame(maxWidth: .infinity, minHeight: 48)
         }
         .buttonStyle(.plain)
-        .glassEffect(
-            .regular.interactive(),
-            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+        .nagiGlass(
+            in: RoundedRectangle(cornerRadius: 18, style: .continuous),
+            interactive: true,
+            enabled: readerSettingsUseLiquidGlass
         )
         .accessibilityHint("打开更多文字与布局选项")
     }
@@ -607,6 +605,8 @@ private struct MediumReaderSettingsView: View {
 
 private struct CustomReaderSettingsSheet: View {
     @Environment(\.dismiss) private var dismiss
+    @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
+    private var readerSettingsUseLiquidGlass = true
 
     let initialDraft: EPUBReaderDraft
     let previewText: String
@@ -794,9 +794,9 @@ private struct CustomReaderSettingsSheet: View {
                 .frame(minHeight: 48)
             }
             .padding(.horizontal, 16)
-            .glassEffect(
-                .regular,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .nagiGlass(
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous),
+                enabled: readerSettingsUseLiquidGlass
             )
 
             Text("字号在上一级面板调整。")
@@ -903,9 +903,9 @@ private struct CustomReaderSettingsSheet: View {
                 .frame(minHeight: 52)
             }
             .padding(.horizontal, 16)
-            .glassEffect(
-                .regular,
-                in: RoundedRectangle(cornerRadius: 20, style: .continuous)
+            .nagiGlass(
+                in: RoundedRectangle(cornerRadius: 20, style: .continuous),
+                enabled: readerSettingsUseLiquidGlass
             )
 
             Text("正文上下留白由系统安全区、页眉和阅读控件动态决定；首行缩进固定为 2；页边空白为 16–48 pt，默认 24 pt。开启出版方样式后，部分自定义排版可能由书籍本身覆盖。")

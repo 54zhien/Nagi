@@ -1,9 +1,3 @@
-//
-//  GlassTouchDriver.swift
-//  Nagi
-//
-//  Allocation-light touch tracking for a single persistent GlassControlView.
-//
 
 import QuartzCore
 import UIKit

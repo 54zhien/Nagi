@@ -1,9 +1,3 @@
-//
-//  ReadiumService.swift
-//  Nagi
-//
-//  Readium EPUB 入口：检索本地资源并构建 Publication。
-//
 
 import Foundation
 import ReadiumShared

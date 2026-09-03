@@ -1,11 +1,3 @@
-//
-//  NagiTabBarView.swift
-//  Nagi
-//
-//  Nagram TabBarComponent.View 的 Nagi 适配。
-//  Root 只决定整个浮动底栏最终位置；items / tabsSize / context frame /
-//  LiquidLens / Search 的内部几何全部在同一轮 update 中按 Nagram 算法生成。
-//
 
 import UIKit
 
@@ -14,6 +6,8 @@ struct NagiTabBarParams: Equatable {
     var selectedTab: AppTab
     var searchState: NagiTabBarSearchState
     var reduceTransparency: Bool
+    var showItemTitles: Bool
+    var liquidGlassEnabled: Bool
     var selectionGestureIndex: Int?
     var selectionGestureX: CGFloat?
     var overrideSelectedIndex: Int?
@@ -61,7 +55,7 @@ final class NagiTabBarView: UIView {
             NagiTabBarItemView(
                 tab: $0,
                 visualRole: .normal,
-                isInteractive: false
+                isInteractive: true
             )
         }
         selectedItemViews = tabs.map {
@@ -80,6 +74,11 @@ final class NagiTabBarView: UIView {
         clipsToBounds = false
         isUserInteractionEnabled = true
 
+        if #available(iOS 17.0, *) {
+            traitOverrides.verticalSizeClass = .compact
+            traitOverrides.horizontalSizeClass = .compact
+        }
+
         addSubview(glassContainer)
 
         mainTabsMotionContainer.backgroundColor = .clear
@@ -93,6 +92,14 @@ final class NagiTabBarView: UIView {
 
         for view in itemViews {
             view.isUserInteractionEnabled = false
+            view.onAccessibilityActivate = { [weak self, weak view] in
+                guard let self, let view,
+                      !self.currentSearchState.isActive else {
+                    return false
+                }
+                self.onTabSelected?(view.tab)
+                return true
+            }
             liquidLensView.contentView.addSubview(view)
         }
         for view in selectedItemViews {
@@ -119,8 +126,6 @@ final class NagiTabBarView: UIView {
             self?.onSearchQueryChanged?(query)
         }
 
-        // Nagram configures these references in LiquidLens init. Reassert the
-        // same references for compatibility with the Nagi adapter API.
         liquidLensView.configure(
             liftedContainerView: liquidLensView.dedicatedMainGlassContainer,
             liftedContentView: liquidLensView.selectedContentView,
@@ -135,13 +140,6 @@ final class NagiTabBarView: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // Internal geometry is exclusively owned by update(...), exactly like
-        // TabBarComponent.View. Do not retarget in-flight morphs here.
-        glassContainer.frame = bounds
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
@@ -174,6 +172,8 @@ final class NagiTabBarView: UIView {
                 selectedTab: previousParams.selectedTab,
                 searchState: previousParams.searchState,
                 reduceTransparency: previousParams.reduceTransparency,
+                showItemTitles: previousParams.showItemTitles,
+                liquidGlassEnabled: previousParams.liquidGlassEnabled,
                 transition: .immediate
             )
         }
@@ -184,6 +184,8 @@ final class NagiTabBarView: UIView {
         selectedTab: AppTab,
         searchState: NagiTabBarSearchState,
         reduceTransparency: Bool,
+        showItemTitles: Bool = true,
+        liquidGlassEnabled: Bool = true,
         transition: NagiTabTransition,
         completion: ((Bool) -> Void)? = nil
     ) {
@@ -196,6 +198,8 @@ final class NagiTabBarView: UIView {
             selectedTab: selectedTab,
             searchState: searchState,
             reduceTransparency: reduceTransparency,
+            showItemTitles: showItemTitles,
+            liquidGlassEnabled: liquidGlassEnabled,
             selectionGestureIndex: selectionGestureState?.hoveredIndex,
             selectionGestureX: selectionGestureState?.currentSelectionX,
             overrideSelectedIndex: overrideSelectedIndex
@@ -215,8 +219,6 @@ final class NagiTabBarView: UIView {
             height: layout.tabBarFrame.height
         )
 
-        // Nagram TabBarComponent: reserve 64pt standalone search + 8pt gap,
-        // then use equal-width main item slots.
         var availableItemsWidth = max(0, availableSize.width - innerInset * 2)
         availableItemsWidth = max(
             0,
@@ -274,8 +276,6 @@ final class NagiTabBarView: UIView {
 
         var tabsFrame = CGRect(origin: .zero, size: tabsSize)
         if searchState.isActive {
-            // Keep Nagi's existing outer/Y placement, but use the exact Nagram
-            // context geometry inside that Root frame.
             tabsFrame = localFrame(
                 layout.mainTabsFrame,
                 in: layout.tabBarFrame
@@ -374,11 +374,13 @@ final class NagiTabBarView: UIView {
             guard let self else { return }
 
             transition.setFrame(
+                view: glassContainer,
+                frame: CGRect(origin: .zero, size: availableSize)
+            )
+            transition.setFrame(
                 view: mainTabsMotionContainer,
                 frame: tabsFrame
             )
-            // This is the exact Nagram relation: the context frame collapses,
-            // but the LiquidLens outer host remains full tabsSize.
             transition.setFrame(
                 view: liquidLensView,
                 frame: CGRect(origin: .zero, size: tabsSize)
@@ -401,7 +403,8 @@ final class NagiTabBarView: UIView {
                 displayedIndex: displayedIndex,
                 transition: transition,
                 blurTransition: itemAlphaTransition,
-                isSearchActive: searchState.isActive
+                isSearchActive: searchState.isActive,
+                showItemTitles: showItemTitles
             )
 
             liquidLensView.apply(
@@ -425,8 +428,6 @@ final class NagiTabBarView: UIView {
                 transition: transition
             )
 
-            // Same order as Nagram NavigationSearchView: internal update first,
-            // then outer searchView frame.
             if searchChanged {
                 searchView.applyInternalGeometry(
                     params: searchParams,
@@ -512,7 +513,6 @@ final class NagiTabBarView: UIView {
             return
         }
 
-        // Nagram uses the current item view frame directly.
         let itemFrame = itemViews[hoveredIndex].frame
         let startX = itemFrame.minX - NagiTabBarMetrics.innerInset
         selectionGestureState = NagiSelectionGestureState(
@@ -577,6 +577,9 @@ final class NagiTabBarView: UIView {
             selectedTab: currentSelectedTab,
             searchState: currentSearchState,
             reduceTransparency: previousParams?.reduceTransparency ?? false,
+            showItemTitles: previousParams?.showItemTitles ?? true,
+            liquidGlassEnabled: previousParams?.liquidGlassEnabled
+                ?? NagiGlassStyleStore.liquidGlassEnabled,
             transition: transition
         )
     }
@@ -585,7 +588,8 @@ final class NagiTabBarView: UIView {
         displayedIndex: Int?,
         transition: NagiTabTransition,
         blurTransition: NagiTabTransition,
-        isSearchActive: Bool
+        isSearchActive: Bool,
+        showItemTitles: Bool
     ) {
         let selectedScale: CGFloat =
             selectionGestureState != nil && isLiftedStateEnabled
@@ -600,12 +604,16 @@ final class NagiTabBarView: UIView {
             itemView.update(
                 isSelected: isSelected,
                 usesPrivateLens: liquidLensView.usesPrivateLens,
-                isCompact: isSearchActive
+                isCompact: isSearchActive,
+                showsTitle: showItemTitles,
+                transition: blurTransition
             )
             selectedItemView.update(
                 isSelected: isSelected,
                 usesPrivateLens: liquidLensView.usesPrivateLens,
-                isCompact: isSearchActive
+                isCompact: isSearchActive,
+                showsTitle: showItemTitles,
+                transition: blurTransition
             )
 
             if isSearchActive {

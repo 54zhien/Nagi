@@ -1,11 +1,3 @@
-//
-//  BackdropGlassRenderer.swift
-//  Nagi
-//
-//  Public-API backdrop-style comparison backend.  It deliberately uses only
-//  UIVisualEffectView and UIBlurEffect; private compositor experiments remain
-//  outside the shipped target.
-//
 
 import UIKit
 

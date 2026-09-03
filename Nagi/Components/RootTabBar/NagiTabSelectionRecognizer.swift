@@ -1,12 +1,3 @@
-//
-//  NagiTabSelectionRecognizer.swift
-//  Nagi
-//
-//  Continuous one-finger selection tracking for the Main Root Tab surface.
-//  Touch delivery and translation semantics intentionally mirror Nagram's
-//  TabSelectionRecognizer; Nagi only adds a start-location gate so Search and
-//  the standalone slot stay outside the Main-tab gesture surface.
-//
 
 import UIKit
 

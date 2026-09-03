@@ -103,6 +103,7 @@
 		4A00000000000000000000AB /* NagiTabTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AB /* NagiTabTransition.swift */; };
 		4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AC /* NagiTabBarMetrics.swift */; };
 		4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */; };
+		4A00000000000000000000AE /* NagiGlassCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AE /* NagiGlassCompatibility.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -199,6 +200,7 @@
 		3A00000000000000000000AB /* NagiTabTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabTransition.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AC /* NagiTabBarMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarMetrics.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabSelectionRecognizer.swift; sourceTree = "<group>"; };
+		3A00000000000000000000AE /* NagiGlassCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiGlassCompatibility.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -340,6 +342,7 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000004 /* SettingsView.swift */,
+				3A00000000000000000000AE /* NagiGlassCompatibility.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -793,6 +796,7 @@
 				4A00000000000000000000AB /* NagiTabTransition.swift in Sources */,
 				4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */,
 				4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */,
+				4A00000000000000000000AE /* NagiGlassCompatibility.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -831,7 +835,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -868,7 +872,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;

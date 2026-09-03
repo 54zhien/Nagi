@@ -1,9 +1,3 @@
-//
-//  ReaderControllerRepresentable.swift
-//  Nagi
-//
-//  Stable SwiftUI-to-UIKit bridge for the high-frequency Reader surface.
-//
 
 import SwiftUI
 import UIKit

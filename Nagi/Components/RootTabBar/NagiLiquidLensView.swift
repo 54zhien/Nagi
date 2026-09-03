@@ -1,11 +1,3 @@
-//
-//  NagiLiquidLensView.swift
-//  Nagi
-//
-//  Nagram LiquidLensView 的直接 Nagi 适配。
-//  保留 Nagi 类型名，但 hierarchy / update order / private Lens workaround
-//  与 Nagram 对齐。
-//
 
 import QuartzCore
 import UIKit
@@ -108,11 +100,11 @@ final class NagiLiquidLensView: UIView {
         var isLifted: Bool
     }
 
-    // Nagram .externalContainer hierarchy.
     private let containerView: UIView
     let dedicatedMainGlassContainer: UIView
     private let backgroundView: NagiGlassBackgroundView
     private let liftedContainerView: UIView
+    private let fallbackSelectionView: NagiGlassBackgroundView
     let contentView: UIView
     private let restingBackgroundView: NagiLensRestingBackgroundView
     private let nativeLensView: UIView?
@@ -126,11 +118,12 @@ final class NagiLiquidLensView: UIView {
     private var isApplyingLensParams = false
     private var pendingLensParams: LensParams?
     private var liftedDisplayLink: CADisplayLink?
+    private var previousUsesNativeLiquidGlass: Bool?
 
     private(set) var isAnimating = false
 
     var usesPrivateLens: Bool {
-        nativeLensView != nil
+        nativeLensView != nil && NagiGlassStyleStore.usesNativeLiquidGlass
     }
 
     static var supportsNativeLiquidLens: Bool {
@@ -143,6 +136,7 @@ final class NagiLiquidLensView: UIView {
         dedicatedMainGlassContainer = UIView(frame: .zero)
         backgroundView = NagiGlassBackgroundView(frame: .zero)
         liftedContainerView = UIView(frame: .zero)
+        fallbackSelectionView = NagiGlassBackgroundView(frame: .zero)
         contentView = UIView(frame: .zero)
         restingBackgroundView = NagiLensRestingBackgroundView()
         nativeLensView = Self.makePrivateLensView()
@@ -173,12 +167,17 @@ final class NagiLiquidLensView: UIView {
         liftedContainerView.clipsToBounds = false
         liftedContainerView.layer.cornerCurve = .continuous
 
+        fallbackSelectionView.isUserInteractionEnabled = false
+        fallbackSelectionView.contentView.isUserInteractionEnabled = false
+        fallbackSelectionView.layer.cornerCurve = .continuous
+
         if let nativeLensView {
             dedicatedMainGlassContainer.layer.zPosition = 1
             nativeLensView.layer.zPosition = 10
             nativeLensView.isUserInteractionEnabled = false
 
             liftedContainerView.addSubview(restingBackgroundView)
+            liftedContainerView.addSubview(fallbackSelectionView)
             containerView.addSubview(liftedContainerView)
             containerView.addSubview(nativeLensView)
             containerView.addSubview(contentView)
@@ -206,8 +205,7 @@ final class NagiLiquidLensView: UIView {
                 forKey: "restingBackgroundColor"
             )
         } else {
-            // Deployment target is iOS 26, but keep normal content usable if a
-            // future OS removes the private class.
+            liftedContainerView.addSubview(fallbackSelectionView)
             containerView.addSubview(liftedContainerView)
             containerView.addSubview(contentView)
         }
@@ -221,9 +219,6 @@ final class NagiLiquidLensView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    // Kept for source compatibility with the old adapter. Nagram configures
-    // these three private Lens references during init; callers may reassert the
-    // same references without changing behavior.
     func configure(
         liftedContainerView: UIView,
         liftedContentView: UIView,
@@ -248,11 +243,20 @@ final class NagiLiquidLensView: UIView {
     }
 
     func apply(params: NagiLensParams, transition: NagiTabTransition) {
-        guard self.params != params else { return }
+        let usesNativeLiquidGlass = NagiGlassStyleStore.usesNativeLiquidGlass
+        let usesNativeLens = nativeLensView != nil && usesNativeLiquidGlass
+        guard self.params != params
+            || previousUsesNativeLiquidGlass != usesNativeLiquidGlass else {
+            return
+        }
 
         let isFirstTime = self.params == nil
         let effectiveTransition: NagiTabTransition = isFirstTime ? .immediate : transition
         self.params = params
+        previousUsesNativeLiquidGlass = usesNativeLiquidGlass
+
+        nativeLensView?.isHidden = !usesNativeLens
+        fallbackSelectionView.isHidden = usesNativeLens
 
         let contentOrigin = params.containerOrigin
         let contentFrame = CGRect(origin: contentOrigin, size: params.size)
@@ -279,6 +283,25 @@ final class NagiLiquidLensView: UIView {
                 reduceTransparency: params.reduceTransparency
             ),
             transition: effectiveTransition
+        )
+
+        fallbackSelectionView.update(
+            params: NagiGlassParams(
+                size: params.selectionSize,
+                cornerRadius: params.selectionSize.height * 0.5,
+                isDark: params.isDark,
+                tintColor: params.isDark
+                    ? UIColor.white.withAlphaComponent(0.025)
+                    : UIColor.white.withAlphaComponent(0.1),
+                isInteractive: false,
+                isVisible: true,
+                reduceTransparency: params.reduceTransparency
+            ),
+            transition: effectiveTransition
+        )
+        effectiveTransition.setFrame(
+            view: fallbackSelectionView,
+            frame: CGRect(origin: params.selectionOrigin, size: params.selectionSize)
         )
 
         if contentView.bounds.size != params.size {
@@ -315,15 +338,19 @@ final class NagiLiquidLensView: UIView {
             origin: params.selectionOrigin,
             size: params.selectionSize
         )
-        updateLens(
-            params: LensParams(
-                baseFrame: baseLensFrame,
-                inset: params.inset,
-                liftedInset: params.liftedInset,
-                isLifted: params.isLifted
-            ),
-            transition: effectiveTransition
-        )
+        if usesNativeLens {
+            updateLens(
+                params: LensParams(
+                    baseFrame: baseLensFrame,
+                    inset: params.inset,
+                    liftedInset: params.liftedInset,
+                    isLifted: params.isLifted
+                ),
+                transition: effectiveTransition
+            )
+        } else if let nativeLensView {
+            nativeLensView.layer.removeAllAnimations()
+        }
 
         effectiveTransition.setFrame(
             view: restingBackgroundView,
@@ -335,10 +362,10 @@ final class NagiLiquidLensView: UIView {
         )
         effectiveTransition.setAlpha(
             view: restingBackgroundView,
-            alpha: (params.isLifted || params.isCollapsed) ? 0 : 1
+            alpha: usesNativeLens && !params.isLifted && !params.isCollapsed ? 1 : 0
         )
 
-        updateLiftedDisplayLink(isLifted: params.isLifted)
+        updateLiftedDisplayLink(isLifted: params.isLifted && usesNativeLens)
     }
 
     private func updateLens(
@@ -449,8 +476,6 @@ final class NagiLiquidLensView: UIView {
                 nativeLensView.bounds = lensBounds
             }
 
-            // Nagram workaround: UIKit starts the bounds animation, then the
-            // Lens layer animations are discarded and final bounds are forced.
             nativeLensView.layer.removeAllAnimations()
             nativeLensView.bounds = lensBounds
 
@@ -468,7 +493,6 @@ final class NagiLiquidLensView: UIView {
                 }
             )
 
-            // Deliberately preserved from Nagram LiquidLensView.
             transition.animatePosition(
                 layer: nativeLensView.layer,
                 from: CGPoint(
@@ -484,6 +508,7 @@ final class NagiLiquidLensView: UIView {
 
     private func updateLiftedLensPosition() {
         guard !isApplyingLensParams,
+              NagiGlassStyleStore.usesNativeLiquidGlass,
               let nativeLensView,
               let params = appliedLensParams else {
             return
@@ -496,7 +521,9 @@ final class NagiLiquidLensView: UIView {
 
     private func updateLiftedDisplayLink(isLifted: Bool) {
         if isLifted {
-            guard liftedDisplayLink == nil, nativeLensView != nil else { return }
+            guard liftedDisplayLink == nil,
+                  nativeLensView != nil,
+                  NagiGlassStyleStore.usesNativeLiquidGlass else { return }
             let link = CADisplayLink(
                 target: self,
                 selector: #selector(onLiftedDisplayLink(_:))

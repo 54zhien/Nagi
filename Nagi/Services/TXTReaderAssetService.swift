@@ -1,10 +1,3 @@
-//
-//  TXTReaderAssetService.swift
-//  Nagi
-//
-//  把 TXT 转成阅读期使用的派生 EPUB，使 TXT / EPUB 走同一套 Readium Navigator。
-//  派生文件只服务于阅读，原始 TXT 路径仍保留在 Book.sourceURL 中。
-//
 
 import Foundation
 
@@ -25,7 +18,6 @@ enum TXTReaderAssetError: LocalizedError {
     }
 }
 
-/// TXT 派生阅读资源的文件位置管理。
 enum TXTReaderAssetStore {
     static func makeAssetURL(fileManager: FileManager = .default) throws -> URL {
         guard let documentsURL = fileManager.urls(
@@ -65,7 +57,6 @@ private struct TXTReaderDocument: Sendable {
     let chapters: [TXTChapter]
 }
 
-/// 生成最小、规范且可被 Readium 打开的 reflowable EPUB 3。
 enum TXTReaderAssetBuilder {
     static func build(
         sourceURL: URL,
@@ -75,8 +66,6 @@ enum TXTReaderAssetBuilder {
         try build(parsed: parsed, destinationURL: destinationURL)
     }
 
-    /// Import already parsed the TXT, so reuse that value and avoid reading a
-    /// large file twice during one import operation.
     static func build(
         parsed: ParsedBook,
         destinationURL: URL
@@ -341,7 +330,6 @@ enum TXTReaderAssetBuilder {
     </container>
     """
 
-    /// 不设置正文外边距；屏幕边缘到正文的距离由 Readium Navigator 的统一 inset 负责。
     private static let stylesheet = """
     html, body, main {
       box-sizing: border-box;
@@ -392,7 +380,6 @@ enum TXTReaderAssetBuilder {
     }
 }
 
-/// 统一解析入口：EPUB 直接使用原文件，TXT 按需生成并缓存派生 EPUB。
 @MainActor
 enum ReaderAssetResolver {
     static func resolve(book: Book) async throws -> URL {

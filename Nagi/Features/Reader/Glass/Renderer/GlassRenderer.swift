@@ -1,7 +1,3 @@
-//
-//  GlassRenderer.swift
-//  Nagi
-//
 
 import UIKit
 

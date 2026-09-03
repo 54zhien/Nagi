@@ -1,9 +1,3 @@
-//
-//  NagiApp.swift
-//  Nagi
-//
-//  App 入口。正式 Root 由持久化 UIKit 容器承载。
-//
 
 import SwiftUI
 import SwiftData
@@ -31,7 +25,6 @@ struct NagiApp: App {
         .modelContainer(Persistence.container)
     }
 
-    /// 处理通过「用 Nagi 打开」传入的文件。
     @MainActor
     private func handleIncomingFile(_ url: URL) {
         Task {

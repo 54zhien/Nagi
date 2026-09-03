@@ -1,9 +1,3 @@
-//
-//  SearchView.swift
-//  Nagi
-//
-//  搜索：按书名关键词实时过滤书库，并进入阅读页。
-//
 
 import SwiftUI
 import SwiftData
@@ -16,11 +10,6 @@ struct SearchView: View {
 
     var body: some View {
         searchContent
-            // Root already owns keyboard geometry through
-            // NagiKeyboardLayoutCoordinator. Do not let SwiftUI apply a
-            // second keyboard safe-area resize to this transparent overlay;
-            // otherwise the hosting background is exposed below the Search
-            // surface while the keyboard is being presented/dismissed.
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .transaction { transaction in
                 transaction.animation = nil
@@ -55,7 +44,7 @@ struct SearchView: View {
                 .allowsHitTesting(false)
         }
         .background(Color.clear)
-        .safeAreaBar(edge: .top, spacing: 0) {
+        .nagiSafeAreaBar(edge: .top, spacing: 0) {
             searchHeader
         }
         .transaction { transaction in
@@ -78,7 +67,7 @@ struct SearchView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(Color.clear)
-        .scrollEdgeEffectStyle(.soft, for: .top)
+        .nagiScrollEdgeEffectStyle()
     }
 
     private var searchEmptyState: some View {

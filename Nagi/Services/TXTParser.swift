@@ -1,9 +1,3 @@
-//
-//  TXTParser.swift
-//  Nagi
-//
-//  TXT 解析：编码检测 + 章节识别。
-//
 
 import Foundation
 
@@ -52,9 +46,6 @@ enum ParseError: LocalizedError {
 }
 
 struct TXTParser: Sendable {
-    /// Plain-text extensions accepted by both the document picker and the
-    /// import parser.  `public.plain-text` also covers `.text` files, so the
-    /// extension check must not be narrower than the picker.
     static let supportedExtensions: Set<String> = ["txt", "text"]
 
     func parse(url: URL) throws -> ParsedBook {
@@ -85,10 +76,6 @@ struct TXTParser: Sendable {
         )
     }
 
-    /// Decode the encodings commonly used by downloaded Chinese plain-text
-    /// books. BOMs are authoritative; a conservative NUL-byte heuristic also
-    /// covers the common ASCII-heavy UTF-16/32 files exported without a BOM
-    /// before trying UTF-8/GB18030.
     static func decode(_ data: Data) -> String {
         guard !data.isEmpty else { return "" }
 
@@ -157,8 +144,6 @@ struct TXTParser: Sendable {
             stride(from: offset, to: sample.count, by: 4)
                 .reduce(into: 0) { count, index in count += sample[index] == 0 ? 1 : 0 }
         }
-        // UTF-32 Chinese characters commonly use two non-zero low bytes, so
-        // detect the high-byte pair instead of requiring three zero bytes.
         let littleEndianHighByteZeros = zeroCounts[2] + zeroCounts[3]
         if littleEndianHighByteZeros * 2 >= quartetCount * 3,
            zeroCounts[0] + zeroCounts[1] < quartetCount * 3 {
@@ -173,12 +158,10 @@ struct TXTParser: Sendable {
         return nil
     }
 
-    /// 识别章节标题（如「第一章」「第1章」「Chapter 1」等），返回章节数。
     static func detectChapterCount(_ text: String) -> Int {
         splitIntoChapters(text, fallbackTitle: "正文").count
     }
 
-    /// 按章节标题切分 TXT。没有识别到标题时保留为一个完整章节，避免目录为空。
     static func splitIntoChapters(
         _ text: String,
         fallbackTitle: String
@@ -217,10 +200,6 @@ struct TXTParser: Sendable {
         return chapters
     }
 
-    /// Normalize all Unicode line separators before chapter detection and
-    /// pagination.  Files copied from rich-text editors can contain U+2028,
-    /// U+2029, or NEL instead of CR/LF; treating those as real paragraph
-    /// boundaries keeps the TXT renderer deterministic across encodings.
     private static func normalizeLineEndings(_ text: String) -> String {
         text
             .replacingOccurrences(of: "\r\n", with: "\n")

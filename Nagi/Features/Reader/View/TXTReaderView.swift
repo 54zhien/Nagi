@@ -1,9 +1,3 @@
-//
-//  TXTReaderView.swift
-//  Nagi
-//
-//  TXT 阅读界面：TextKit 分页/滚动渲染，chrome 与 EPUB 完全共用。
-//
 
 import SwiftUI
 import SwiftData
@@ -93,9 +87,6 @@ struct TXTReaderView: View {
 
     @ViewBuilder
     private var content: some View {
-        // GeometryReader must stay mounted while the file is opening and while
-        // the first page is being generated.  Otherwise the paged path can
-        // wait for a viewport that is hidden by its own progress placeholder.
         GeometryReader { geometry in
             let safeAreaInsets = Self.uiEdgeInsets(from: geometry.safeAreaInsets)
 
@@ -119,7 +110,7 @@ struct TXTReaderView: View {
                                 .frame(minHeight: 44)
                         }
                         .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive(), in: .capsule)
+                        .nagiGlass(in: .capsule, interactive: true)
                         .accessibilityLabel("重试打开 TXT")
                         .accessibilityHint("重新加载当前文本文件")
                     }

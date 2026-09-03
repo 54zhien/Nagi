@@ -1,9 +1,3 @@
-//
-//  LibraryView.swift
-//  Nagi
-//
-//  书库：书架列表 + 导入入口（右上角 + 导入 EPUB/TXT）
-//
 
 import SwiftUI
 import SwiftData
@@ -25,7 +19,6 @@ enum NagiPageHeaderMetrics {
     }
 }
 
-/// 页面级大标题，保持标题和右侧操作控件的视觉与动效一致。
 struct NagiPageHeader: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ScaledMetric(relativeTo: .largeTitle) private var titleFontSize: CGFloat = 38
@@ -90,7 +83,7 @@ struct NagiPageHeader: View {
                                 )
                         }
                         .buttonStyle(.plain)
-                        .glassEffect(.regular.interactive(), in: Circle())
+                        .nagiGlass(in: Circle(), interactive: true)
                         .blur(radius: buttonBlurRadius)
                         .opacity(buttonOpacity)
                         .allowsHitTesting(!isHeaderHidden)
@@ -225,7 +218,7 @@ struct LibraryView: View {
                         .padding(.bottom, 24)
                     }
                     .scrollIndicators(.automatic)
-                    .scrollEdgeEffectStyle(.soft, for: .top)
+                    .nagiScrollEdgeEffectStyle()
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -234,7 +227,7 @@ struct LibraryView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaBar(edge: .top, spacing: 0) {
+            .nagiSafeAreaBar(edge: .top, spacing: 0) {
                 libraryHeader
             }
             .alert(
@@ -336,7 +329,7 @@ struct LibraryView: View {
                 )
         }
         .buttonStyle(.plain)
-        .glassEffect(.regular.interactive(), in: Circle())
+        .nagiGlass(in: Circle(), interactive: true)
         .disabled(books.isEmpty)
         .accessibilityLabel("排序方式")
         .accessibilityValue(Text(sortOption.title))
@@ -384,7 +377,6 @@ struct LibraryView: View {
     }
 }
 
-// MARK: - 书籍控件
 
 enum BookCardLayout {
     case library
@@ -418,9 +410,9 @@ struct BookCardSurfaceModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         if isLiquidGlassEnabled {
-            content.glassEffect(
-                .regular.interactive(),
-                in: BookCardMetrics.cardShape
+            content.nagiGlass(
+                in: BookCardMetrics.cardShape,
+                interactive: true
             )
         } else {
             content.background(
@@ -666,7 +658,7 @@ private struct BookCardProgressTrack: View {
     private var track: some View {
         if usesLiquidGlass {
             Color.clear
-                .glassEffect(.regular, in: Capsule())
+                .nagiGlass(in: Capsule())
         } else {
             Capsule()
                 .fill(Color(uiColor: .secondarySystemFill))
@@ -685,10 +677,7 @@ private struct BookCardProgressTrack: View {
                     width: width,
                     height: BookCardProgressMetrics.height
                 )
-                .glassEffect(
-                    .regular.tint(.accentColor),
-                    in: Capsule()
-                )
+                .nagiGlass(in: Capsule(), tint: .accentColor)
         } else {
             Capsule()
                 .fill(.tint)
@@ -700,7 +689,6 @@ private struct BookCardProgressTrack: View {
     }
 }
 
-/// 给主页和书库页的整卡按钮提供一个真正占满卡片的标签区域。
 struct BookCardButtonLabel: View {
     let book: Book
     let layout: BookCardLayout
@@ -731,7 +719,6 @@ struct BookCardButtonLabel: View {
     }
 }
 
-// MARK: - 搜索结果行
 
 struct BookRow: View {
     let book: Book
@@ -742,7 +729,6 @@ struct BookRow: View {
 }
 
 extension UTType {
-    /// EPUB 的标准 UTI（IDPF），conformingTo 数据。
     static let epub = UTType(exportedAs: "org.idpf.epub-container", conformingTo: .data)
 }
 

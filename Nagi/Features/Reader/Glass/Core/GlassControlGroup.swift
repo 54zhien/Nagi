@@ -1,11 +1,3 @@
-//
-//  GlassControlGroup.swift
-//  Nagi
-//
-//  Persistent cache for adjacent GlassControlView instances.  The item
-//  identity is independent from the reader's observable state, so changing a
-//  label, tint, or enabled state does not recreate the control tree.
-//
 
 import UIKit
 
@@ -23,6 +15,7 @@ final class GlassControlGroup<ID: Hashable>: UIView {
         let isSelected: Bool
         let cornerRadius: CGFloat?
         let contentColor: UIColor?
+        let usesGlass: Bool
         let action: (() -> Void)?
 
         init(
@@ -37,6 +30,7 @@ final class GlassControlGroup<ID: Hashable>: UIView {
             cornerRadius: CGFloat? = nil,
             contentColor: UIColor? = nil,
             fillColor: UIColor? = nil,
+            usesGlass: Bool = true,
             action: (() -> Void)? = nil
         ) {
             self.id = id
@@ -50,6 +44,7 @@ final class GlassControlGroup<ID: Hashable>: UIView {
             self.isSelected = isSelected
             self.cornerRadius = cornerRadius
             self.contentColor = contentColor
+            self.usesGlass = usesGlass
             self.action = action
         }
     }
@@ -119,7 +114,8 @@ final class GlassControlGroup<ID: Hashable>: UIView {
                 isSelected: item.isSelected,
                 cornerRadius: item.cornerRadius,
                 contentColor: item.contentColor,
-                fillColor: item.fillColor
+                fillColor: item.fillColor,
+                usesGlass: item.usesGlass
             )
             actionTargets[item.id]?.action = item.action
         }
@@ -127,8 +123,6 @@ final class GlassControlGroup<ID: Hashable>: UIView {
         setNeedsLayout()
     }
 
-    /// Frames are expressed in this group's coordinate space.  The cache is
-    /// updated only by the reader controller's real layout pass.
     func setItemFrames(_ frames: [ID: CGRect]) {
         guard itemFrames != frames else { return }
         itemFrames = frames

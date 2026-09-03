@@ -1,9 +1,3 @@
-//
-//  HomeView.swift
-//  Nagi
-//
-//  主页：继续阅读入口
-//
 
 import SwiftUI
 import SwiftData
@@ -59,7 +53,7 @@ struct HomeView: View {
                         .padding(.bottom, 24)
                     }
                     .scrollIndicators(.automatic)
-                    .scrollEdgeEffectStyle(.soft, for: .top)
+                    .nagiScrollEdgeEffectStyle()
                     .onScrollGeometryChange(for: CGFloat.self) { geometry in
                         max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
                     } action: { _, scrollOffset in
@@ -68,7 +62,7 @@ struct HomeView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaBar(edge: .top, spacing: 0) {
+            .nagiSafeAreaBar(edge: .top, spacing: 0) {
                 NagiPageHeader(
                     title: "主页",
                     transitionProgress: headerTransitionProgress,

@@ -1,10 +1,3 @@
-//
-//  ReaderChromeView.swift
-//  Nagi
-//
-//  Persistent UIKit Reader Chrome.  Its controls are created once per reader
-//  session and only their state/layer properties change afterwards.
-//
 
 import UIKit
 

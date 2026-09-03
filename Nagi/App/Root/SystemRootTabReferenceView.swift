@@ -1,10 +1,3 @@
-//
-//  SystemRootTabReferenceView.swift
-//  Nagi
-//
-//  只用于开发阶段和截图对照的原生系统视觉参考。它不在 NagiApp 的
-//  正式 hierarchy 中，正式 Root 始终是 NagiRootRepresentable。
-//
 
 #if DEBUG
 import SwiftUI

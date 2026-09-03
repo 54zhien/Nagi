@@ -1,9 +1,3 @@
-//
-//  GlassState.swift
-//  Nagi
-//
-//  Small, value-typed state snapshots for the UIKit reader glass layer.
-//
 
 import UIKit
 

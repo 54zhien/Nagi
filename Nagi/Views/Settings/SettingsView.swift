@@ -1,17 +1,6 @@
-//
-//  SettingsView.swift
-//  Nagi
-//
-//  设置与关于
-//
 
 import SwiftUI
 import UIKit
-
-enum NagiAppearanceSettings {
-    static let bookCardsUseLiquidGlassKey = "appearance.liquidGlass.bookCards"
-    static let readerSettingsUseLiquidGlassKey = "appearance.liquidGlass.readerSettings"
-}
 
 struct SettingsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -37,14 +26,14 @@ struct SettingsView: View {
                     }
                 }
             }
-            .scrollEdgeEffectStyle(.soft, for: .top)
+            .nagiScrollEdgeEffectStyle()
             .onScrollGeometryChange(for: CGFloat.self) { geometry in
                 max(geometry.contentOffset.y + geometry.contentInsets.top, 0)
             } action: { _, scrollOffset in
                 updateHeaderVisibility(for: scrollOffset)
             }
             .toolbar(.hidden, for: .navigationBar)
-            .safeAreaBar(edge: .top, spacing: 0) {
+            .nagiSafeAreaBar(edge: .top, spacing: 0) {
                 NagiPageHeader(
                     title: "设置",
                     transitionProgress: headerTransitionProgress,
@@ -75,22 +64,40 @@ struct SettingsView: View {
 }
 
 private struct AppearanceView: View {
+    @AppStorage(NagiAppearanceSettings.liquidGlassEnabledKey)
+    private var liquidGlassEnabled = true
     @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
     private var bookCardsUseLiquidGlass = true
     @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
     private var readerSettingsUseLiquidGlass = true
+    @AppStorage(NagiAppearanceSettings.showTabBarLabelsKey)
+    private var showTabBarLabels = true
     @State private var isLiquidGlassExpanded = false
 
     var body: some View {
         List {
             Section {
+                Toggle(isOn: $liquidGlassEnabled) {
+                    Label("Liquid Glass 控件", systemImage: "rectangle.on.rectangle")
+                }
+
                 DisclosureGroup(
                     isExpanded: $isLiquidGlassExpanded
                 ) {
                     Toggle("书籍卡片", isOn: $bookCardsUseLiquidGlass)
                     Toggle("阅读设置项", isOn: $readerSettingsUseLiquidGlass)
                 } label: {
-                    Label("Liquid Glass 控件", systemImage: "rectangle.on.rectangle")
+                    Label("组件选项", systemImage: "slider.horizontal.3")
+                }
+
+                Text("开启时，iOS 26 使用原生 Liquid Glass；关闭时使用半透明模拟玻璃。iOS 18–25 会自动使用兼容样式。")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("底栏") {
+                Toggle(isOn: $showTabBarLabels) {
+                    Label("显示标签文字", systemImage: "textformat")
                 }
             }
         }

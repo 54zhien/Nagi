@@ -1,9 +1,3 @@
-//
-//  ReadiumNavigatorView.swift
-//  Nagi
-//
-//  将 Readium 的 UIKit Navigator 嵌入 SwiftUI。
-//
 
 import ReadiumNavigator
 import SwiftUI
@@ -23,22 +17,12 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
         _ uiViewController: EPUBNavigatorViewController,
         context: Context
     ) {
-        // Reflowable hierarchy normalization is intentionally not repeated
-        // from SwiftUI's update hook. The navigator owns pages that can be
-        // created after this callback; the model handles the one-time scan
-        // when a navigator/spread is created and when the app returns to the
-        // foreground. Fixed-layout documents only need their outer fallback
-        // color updated here.
         guard !isReflowable else { return }
         uiViewController.view.backgroundColor = UIColor(background)
     }
 }
 
 extension EPUBNavigatorViewController {
-    /// The UIKit ReaderViewController owns the full reflowable background.
-    /// Readium's hierarchy must therefore stay transparent, including the
-    /// scroll-view and WKWebView containers created after the navigator is
-    /// initialized.
     func applyNagiReaderBaseAppearance(
         isReflowable: Bool,
         fallbackBackground: UIColor
@@ -51,10 +35,6 @@ extension EPUBNavigatorViewController {
         makeNagiReaderHierarchyTransparent(view)
     }
 
-    /// Applies an app-owned document override to the visible spread only.
-    /// `evaluateJavaScript(_:)` on the navigator targets the current spread;
-    /// direct WebView evaluation is preferred when the spread is available so
-    /// a newly visible page is never held behind an off-screen preload.
     @MainActor
     func applyNagiReaderOverridesToVisible(_ script: String) async {
         let webViews = makeNagiReaderWebViews(in: view)
@@ -76,9 +56,6 @@ extension EPUBNavigatorViewController {
 
     }
 
-    /// Updates off-screen/preloaded spread WebViews after the visible spread
-    /// has received its mutation. This path yields between documents so it
-    /// cannot serialize an all-preload pass into the user-visible transition.
     @MainActor
     func applyNagiReaderOverridesToPreloaded(_ script: String) async {
         let webViews = makeNagiReaderWebViews(in: view)
@@ -95,9 +72,6 @@ extension EPUBNavigatorViewController {
         }
     }
 
-    /// Waits for the current spread to paint two animation frames after a
-    /// mutation. A single short fallback covers a document that was still
-    /// attaching its body; there is deliberately no long retry ladder.
     @MainActor
     func waitForNagiReaderReadiness(_ script: String) async {
         let visibleWebViews = makeNagiReaderWebViews(in: view)

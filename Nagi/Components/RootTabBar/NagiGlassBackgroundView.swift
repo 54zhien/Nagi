@@ -1,11 +1,3 @@
-//
-//  NagiGlassBackgroundView.swift
-//  Nagi
-//
-//  单个持久化 native Glass surface。Effect settings 通过与 Nagram 相同的
-//  iOS 26 backdrop luma runtime hook 生效，surface 和 native effect 的
-//  geometry 由调用方传入的同一个 NagiTabTransition 驱动。
-//
 
 import ObjectiveC.runtime
 import QuartzCore
@@ -154,14 +146,14 @@ final class NagiGlassBackgroundView: UIView {
     private var previousParams: NagiGlassParams?
     private var currentEffectKey: String?
     private var currentTintColor: UIColor?
+    private var currentUsesNativeLiquidGlass: Bool?
     private var hasPendingEffect = false
     private var pendingEffect: UIVisualEffect?
 
     override init(frame: CGRect) {
-        let glassEffect = UIGlassEffect(style: .regular)
-        glassEffect.isInteractive = false
-
-        let effectView = UIVisualEffectView(effect: glassEffect)
+        let effectView = UIVisualEffectView(
+            effect: UIBlurEffect(style: .systemMaterial)
+        )
         let nativeParamsView = NagiEffectSettingsContainerView(frame: .zero)
         let fallbackView = UIView(frame: .zero)
 
@@ -204,29 +196,50 @@ final class NagiGlassBackgroundView: UIView {
 
     @discardableResult
     func prepare(params: NagiGlassParams) -> Bool {
-        guard params != previousParams else {
+        let usesNativeLiquidGlass = NagiGlassStyleStore.usesNativeLiquidGlass
+        guard params != previousParams
+            || usesNativeLiquidGlass != currentUsesNativeLiquidGlass else {
             return false
         }
 
         previousParams = params
+        currentUsesNativeLiquidGlass = usesNativeLiquidGlass
 
-        let effectKey = "regular|\(params.isDark)|\(params.isInteractive)"
-        let useFallback = params.reduceTransparency
+        let effectName = usesNativeLiquidGlass ? "native" : "backdrop"
+        let effectKey = "\(effectName)|\(params.isDark)|\(params.isInteractive)"
+        let useOpaqueFallback = params.reduceTransparency
         let shouldRebuildEffect =
-            !useFallback &&
             (
-                currentEffectKey != effectKey ||
-                !NagiGlassParams.colorsEqual(
-                    currentTintColor,
-                    params.tintColor
-                ) ||
-                effectView.effect == nil
+                !useOpaqueFallback &&
+                (
+                    currentEffectKey != effectKey ||
+                    !NagiGlassParams.colorsEqual(
+                        currentTintColor,
+                        params.tintColor
+                    ) ||
+                    effectView.effect == nil
+                )
+            ) ||
+            (
+                useOpaqueFallback && effectView.effect != nil
             )
 
         if shouldRebuildEffect {
-            let effect = UIGlassEffect(style: .regular)
-            effect.tintColor = params.tintColor
-            effect.isInteractive = params.isInteractive
+            let effect: UIVisualEffect?
+            if useOpaqueFallback {
+                effect = nil
+            } else if usesNativeLiquidGlass {
+                if #available(iOS 26.0, *) {
+                    let glassEffect = UIGlassEffect(style: .regular)
+                    glassEffect.tintColor = params.tintColor
+                    glassEffect.isInteractive = params.isInteractive
+                    effect = glassEffect
+                } else {
+                    effect = UIBlurEffect(style: .systemMaterial)
+                }
+            } else {
+                effect = UIBlurEffect(style: .systemMaterial)
+            }
             pendingEffect = effect
             hasPendingEffect = true
             currentEffectKey = effectKey
@@ -235,20 +248,25 @@ final class NagiGlassBackgroundView: UIView {
 
         effectView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
 
-        if params.isDark {
+        if usesNativeLiquidGlass && !useOpaqueFallback && params.isDark {
             nativeParamsView.lumaMin = 0.0
             nativeParamsView.lumaMax = 0.15
-        } else {
+        } else if usesNativeLiquidGlass && !useOpaqueFallback {
             nativeParamsView.lumaMin = 0.8
             nativeParamsView.lumaMax = 0.801
+        } else {
+            nativeParamsView.lumaMin = 0
+            nativeParamsView.lumaMax = 1
         }
 
-        fallbackView.isHidden = !useFallback
-
-        if useFallback {
-            pendingEffect = nil
-            hasPendingEffect = true
-        }
+        fallbackView.isHidden = !useOpaqueFallback
+        effectView.contentView.backgroundColor = useOpaqueFallback
+            ? .clear
+            : usesNativeLiquidGlass
+                ? .clear
+                : params.tintColor?.withAlphaComponent(
+                    params.isDark ? 0.14 : 0.12
+                )
 
         return true
     }

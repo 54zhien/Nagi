@@ -1,10 +1,3 @@
-//
-//  ReaderRenderer.swift
-//  Nagi
-//
-//  TXT 与 EPUB 的渲染适配器。两种格式的活动阅读路径都交给 Readium；
-//  TextKit 实现暂时保留为兼容代码，工厂不会再选择它。
-//
 
 import Foundation
 import SwiftUI
@@ -321,9 +314,6 @@ final class ReadiumRenderer: ReaderRenderer {
     }
 
     func readingPosition() -> ReadingPosition? {
-        // Do not re-persist a legacy TXT location JSON as if it were a
-        // Readium Locator.  The model only exposes a value after validation or
-        // after the navigator reports a new location.
         guard let locatorJSON = model.currentLocatorJSON else { return nil }
         return ReadingPosition(
             bookID: book.id,

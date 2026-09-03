@@ -1,14 +1,8 @@
-//
-//  NativeGlassRenderer.swift
-//  Nagi
-//
-//  Public iOS 26 Liquid Glass backend.  The effect view is created once;
-//  replacing its effect is reserved for an actual tint change.
-//
 
 import UIKit
 
 @MainActor
+@available(iOS 26.0, *)
 final class NativeGlassRenderer: GlassRenderer {
     private var glassEffect: UIGlassEffect
 

@@ -1,10 +1,3 @@
-//
-//  ReaderViewController.swift
-//  Nagi
-//
-//  UIKit host for the persistent Reader content, chrome, gestures and
-//  transition cover.
-//
 
 import SwiftUI
 import UIKit

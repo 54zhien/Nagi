@@ -1,7 +1,3 @@
-//
-//  GlassSurfaceView.swift
-//  Nagi
-//
 
 import UIKit
 
@@ -16,7 +12,11 @@ final class GlassSurfaceView: UIView {
         let resolvedRenderer: any GlassRenderer
         switch resolvedBackend {
         case .native:
-            resolvedRenderer = NativeGlassRenderer()
+            if #available(iOS 26.0, *), NagiGlassStyleStore.usesNativeLiquidGlass {
+                resolvedRenderer = NativeGlassRenderer()
+            } else {
+                resolvedRenderer = BackdropGlassRenderer()
+            }
         case .backdrop, .hybrid:
             resolvedRenderer = BackdropGlassRenderer()
         }
