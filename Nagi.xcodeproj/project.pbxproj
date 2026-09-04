@@ -77,19 +77,6 @@
 		4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000091 /* ReaderMutationScheduler.swift */; };
 		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
 		4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */; };
-		4A00000000000000000000A0 /* NagiRootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A0 /* NagiRootViewController.swift */; };
-		4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A1 /* NagiRootRepresentable.swift */; };
-		4A00000000000000000000A2 /* NagiRootState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A2 /* NagiRootState.swift */; };
-		4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */; };
-		4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A5 /* NagiTabBarView.swift */; };
-		4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A6 /* NagiTabBarItemView.swift */; };
-		4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A7 /* NagiNavigationSearchView.swift */; };
-		4A00000000000000000000A8 /* NagiGlassBackgroundView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A8 /* NagiGlassBackgroundView.swift */; };
-		4A00000000000000000000A9 /* NagiGlassContainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A9 /* NagiGlassContainerView.swift */; };
-		4A00000000000000000000AA /* NagiLiquidLensView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AA /* NagiLiquidLensView.swift */; };
-		4A00000000000000000000AB /* NagiTabTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AB /* NagiTabTransition.swift */; };
-		4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AC /* NagiTabBarMetrics.swift */; };
-		4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -160,19 +147,6 @@
 		3A0000000000000000000091 /* ReaderMutationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderMutationScheduler.swift; sourceTree = "<group>"; };
 		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
 		3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFontSizeStepperControl.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A0 /* NagiRootViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootViewController.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A1 /* NagiRootRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootRepresentable.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A2 /* NagiRootState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootState.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiKeyboardLayoutCoordinator.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A5 /* NagiTabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A6 /* NagiTabBarItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarItemView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A7 /* NagiNavigationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiNavigationSearchView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A8 /* NagiGlassBackgroundView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiGlassBackgroundView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A9 /* NagiGlassContainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiGlassContainerView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000AA /* NagiLiquidLensView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiLiquidLensView.swift; sourceTree = "<group>"; };
-		3A00000000000000000000AB /* NagiTabTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabTransition.swift; sourceTree = "<group>"; };
-		3A00000000000000000000AC /* NagiTabBarMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarMetrics.swift; sourceTree = "<group>"; };
-		3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabSelectionRecognizer.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -202,7 +176,6 @@
 			isa = PBXGroup;
 			children = (
 				2A0000000000000000000003 /* App */,
-				2A0000000000000000000020 /* Components */,
 				2A0000000000000000000004 /* Views */,
 				2A0000000000000000000014 /* Resources */,
 				3A0000000000000000000006 /* Assets.xcassets */,
@@ -222,44 +195,8 @@
 			children = (
 				3A0000000000000000000001 /* NagiApp.swift */,
 				3A000000000000000000002D /* AppImportState.swift */,
-				2A0000000000000000000021 /* Root */,
 			);
 			path = App;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000021 /* Root */ = {
-			isa = PBXGroup;
-			children = (
-				3A00000000000000000000A0 /* NagiRootViewController.swift */,
-				3A00000000000000000000A1 /* NagiRootRepresentable.swift */,
-				3A00000000000000000000A2 /* NagiRootState.swift */,
-				3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */,
-			);
-			path = Root;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000020 /* Components */ = {
-			isa = PBXGroup;
-			children = (
-				2A0000000000000000000022 /* RootTabBar */,
-			);
-			path = Components;
-			sourceTree = "<group>";
-		};
-		2A0000000000000000000022 /* RootTabBar */ = {
-			isa = PBXGroup;
-			children = (
-				3A00000000000000000000A5 /* NagiTabBarView.swift */,
-				3A00000000000000000000A6 /* NagiTabBarItemView.swift */,
-				3A00000000000000000000A7 /* NagiNavigationSearchView.swift */,
-				3A00000000000000000000A8 /* NagiGlassBackgroundView.swift */,
-				3A00000000000000000000A9 /* NagiGlassContainerView.swift */,
-				3A00000000000000000000AA /* NagiLiquidLensView.swift */,
-				3A00000000000000000000AB /* NagiTabTransition.swift */,
-				3A00000000000000000000AC /* NagiTabBarMetrics.swift */,
-				3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */,
-			);
-			path = RootTabBar;
 			sourceTree = "<group>";
 		};
 		2A0000000000000000000004 /* Views */ = {
@@ -712,19 +649,6 @@
 				4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */,
 				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
 				4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */,
-				4A00000000000000000000A0 /* NagiRootViewController.swift in Sources */,
-				4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */,
-				4A00000000000000000000A2 /* NagiRootState.swift in Sources */,
-				4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */,
-				4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */,
-				4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */,
-				4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */,
-				4A00000000000000000000A8 /* NagiGlassBackgroundView.swift in Sources */,
-				4A00000000000000000000A9 /* NagiGlassContainerView.swift in Sources */,
-				4A00000000000000000000AA /* NagiLiquidLensView.swift in Sources */,
-				4A00000000000000000000AB /* NagiTabTransition.swift in Sources */,
-				4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */,
-				4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -818,7 +742,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 133;
+			CURRENT_PROJECT_VERSION = 134;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -827,7 +751,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.37.1;
+			MARKETING_VERSION = 0.37.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -844,7 +768,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 133;
+			CURRENT_PROJECT_VERSION = 134;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -853,7 +777,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.37.1;
+			MARKETING_VERSION = 0.37.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
