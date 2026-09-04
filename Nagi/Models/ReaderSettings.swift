@@ -1,5 +1,6 @@
 
 import UIKit
+import SwiftUI
 
 enum ReaderThemePalette {
     static let originalLightBackground = UIColor.white
