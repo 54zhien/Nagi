@@ -182,14 +182,14 @@ final class GlassControlView: UIControl {
 
     override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
         guard let touch else {
-            touchDriver.end(at: startPointForCancelledTouch, cancelled: true)
+            touchDriver.end()
             super.endTracking(touch, with: event)
             return
         }
 
         let point = touch.location(in: self)
         let endedInside = bounds.contains(point)
-        touchDriver.end(at: point, cancelled: false)
+        touchDriver.end()
         super.endTracking(touch, with: event)
         if endedInside, isEnabled {
             sendActions(for: .primaryActionTriggered)
@@ -197,7 +197,7 @@ final class GlassControlView: UIControl {
     }
 
     override func cancelTracking(with event: UIEvent?) {
-        touchDriver.end(at: startPointForCancelledTouch, cancelled: true)
+        touchDriver.end()
         super.cancelTracking(with: event)
     }
 
@@ -246,12 +246,8 @@ final class GlassControlView: UIControl {
 
     func applyTouchEnded(
         from transform: CATransform3D,
-        at point: CGPoint,
-        cancelled: Bool,
         reduceMotion: Bool
     ) {
-        _ = point
-        _ = cancelled
         layer.removeAnimation(forKey: "glassTouchPress")
         highlightLayer.opacity = 0
         suppressTouchHighlight = false
@@ -282,10 +278,6 @@ final class GlassControlView: UIControl {
             y: max(0, min(1, point.y / height))
         )
         highlightLayer.opacity = opacity
-    }
-
-    private var startPointForCancelledTouch: CGPoint {
-        CGPoint(x: bounds.midX, y: bounds.midY)
     }
 
     override func layoutSubviews() {

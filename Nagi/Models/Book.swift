@@ -23,7 +23,6 @@ final class Book {
     var progressPercent: Double
     var readerLocatorJSON: String?
     var readerAssetURL: String?
-    var txtReadingLocationJSON: String?
 
     init(
         title: String,
@@ -47,7 +46,6 @@ final class Book {
         self.progressPercent = 0
         self.readerLocatorJSON = nil
         self.readerAssetURL = readerAssetURL
-        self.txtReadingLocationJSON = nil
     }
 
     var format: BookFormat {

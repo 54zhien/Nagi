@@ -3,7 +3,7 @@ import UIKit
 final class NagiGlassContainerView: UIView {
     private let nativeParamsView: NagiEffectSettingsContainerView
     private let spacing: CGFloat
-    let effectView: UIVisualEffectView
+    private let effectView: UIVisualEffectView
     private var currentUsesNativeLiquidGlass: Bool?
 
     var contentView: UIView {

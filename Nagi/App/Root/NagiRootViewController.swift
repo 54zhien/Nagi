@@ -494,7 +494,6 @@ final class NagiRootViewController: UIViewController {
             bounds: nextState.bounds,
             safeAreaInsets: nextState.safeAreaInsets,
             keyboardFrame: nextState.keyboardFrame,
-            selectedTab: nextState.selectedTab,
             searchState: nextState.searchState
         )
         let resolvedTransition = effectiveTransition(transition)

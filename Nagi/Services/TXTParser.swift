@@ -158,10 +158,6 @@ struct TXTParser: Sendable {
         return nil
     }
 
-    static func detectChapterCount(_ text: String) -> Int {
-        splitIntoChapters(text, fallbackTitle: "正文").count
-    }
-
     static func splitIntoChapters(
         _ text: String,
         fallbackTitle: String

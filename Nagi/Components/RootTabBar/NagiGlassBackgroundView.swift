@@ -7,8 +7,6 @@ struct NagiGlassParams: Equatable {
     var cornerRadius: CGFloat
     var isDark: Bool
     var tintColor: UIColor?
-    var isInteractive: Bool
-    var isVisible: Bool
     var reduceTransparency: Bool
 
     static func == (lhs: NagiGlassParams, rhs: NagiGlassParams) -> Bool {
@@ -16,8 +14,6 @@ struct NagiGlassParams: Equatable {
         lhs.cornerRadius == rhs.cornerRadius &&
         lhs.isDark == rhs.isDark &&
         colorsEqual(lhs.tintColor, rhs.tintColor) &&
-        lhs.isInteractive == rhs.isInteractive &&
-        lhs.isVisible == rhs.isVisible &&
         lhs.reduceTransparency == rhs.reduceTransparency
     }
 
@@ -214,7 +210,7 @@ final class NagiGlassBackgroundView: UIView {
         previousParams = params
         currentUsesNativeLiquidGlass = usesNativeLiquidGlass
 
-        let effectKey = "\(usesNativeLiquidGlass)|\(params.reduceTransparency)|\(params.isDark)|\(params.isInteractive)|\(params.isVisible)"
+        let effectKey = "\(usesNativeLiquidGlass)|\(params.reduceTransparency)|\(params.isDark)"
         let tintChanged = !NagiGlassParams.colorsEqual(
             currentTintColor,
             params.tintColor
@@ -224,10 +220,10 @@ final class NagiGlassBackgroundView: UIView {
 
         if shouldRebuildEffect {
             let effect: UIVisualEffect?
-            if usesNativeLiquidGlass && !params.reduceTransparency && params.isVisible {
+            if usesNativeLiquidGlass && !params.reduceTransparency {
                 let glassEffect = UIGlassEffect(style: .regular)
                 glassEffect.tintColor = params.tintColor
-                glassEffect.isInteractive = params.isInteractive
+                glassEffect.isInteractive = true
                 effect = glassEffect
             } else {
                 effect = nil
@@ -241,7 +237,7 @@ final class NagiGlassBackgroundView: UIView {
         effectView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
         opaqueView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
 
-        if usesNativeLiquidGlass && !params.reduceTransparency && params.isVisible {
+        if usesNativeLiquidGlass && !params.reduceTransparency {
             if params.isDark {
                 nativeParamsView.lumaMin = 0.0
                 nativeParamsView.lumaMax = 0.15
@@ -254,9 +250,7 @@ final class NagiGlassBackgroundView: UIView {
             nativeParamsView.lumaMax = 1
         }
 
-        opaqueView.isHidden = usesNativeLiquidGlass
-            && !params.reduceTransparency
-            && params.isVisible
+        opaqueView.isHidden = usesNativeLiquidGlass && !params.reduceTransparency
         effectView.contentView.backgroundColor = .clear
 
         return true
@@ -300,10 +294,7 @@ final class NagiGlassBackgroundView: UIView {
         )
 
         if applyVisibility {
-            transition.setAlpha(
-                view: self,
-                alpha: params.isVisible ? 1 : 0
-            )
+            transition.setAlpha(view: self, alpha: 1)
         }
     }
 

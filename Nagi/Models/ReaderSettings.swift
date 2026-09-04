@@ -1,5 +1,4 @@
 
-import SwiftUI
 import UIKit
 
 enum ReaderThemePalette {
@@ -19,48 +18,11 @@ enum ReaderThemePalette {
     static let paperDarkContent = UIColor(red: 242 / 255, green: 238 / 255, blue: 229 / 255, alpha: 1)
 }
 
-enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
+enum ReaderTheme: String, Equatable {
     case light
     case quiet
     case sepia
     case dark
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .light: return "白色"
-        case .quiet: return "安静"
-        case .sepia: return "米黄"
-        case .dark: return "深色"
-        }
-    }
-
-    var background: Color {
-        switch self {
-        case .light: return Color(uiColor: ReaderThemePalette.originalLightBackground)
-        case .quiet: return Color(uiColor: ReaderThemePalette.quietBackground)
-        case .sepia: return Color(uiColor: ReaderThemePalette.paperLightBackground)
-        case .dark: return Color(uiColor: ReaderThemePalette.originalDarkBackground)
-        }
-    }
-
-    var foreground: Color {
-        switch self {
-        case .light: return Color(uiColor: ReaderThemePalette.originalLightContent)
-        case .quiet: return Color(uiColor: ReaderThemePalette.quietContent)
-        case .sepia: return Color(uiColor: ReaderThemePalette.paperLightContent)
-        case .dark: return Color(uiColor: ReaderThemePalette.originalDarkContent)
-        }
-    }
-
-    var foregroundUIColor: UIColor {
-        UIColor(foreground)
-    }
-
-    var contentUIColor: UIColor {
-        foregroundUIColor
-    }
 
     func readerBackgroundUIColor(isDarkAppearance: Bool) -> UIColor {
         switch self {
@@ -98,35 +60,6 @@ enum ReaderTheme: String, CaseIterable, Identifiable, Hashable {
         }
     }
 
-    func adjustedBackgroundUIColor(brightness _: Double) -> UIColor {
-        readerBackgroundUIColor(isDarkAppearance: false)
-    }
-
-    func adjustedForegroundUIColor(brightness _: Double) -> UIColor {
-        readerContentUIColor(isDarkAppearance: false)
-    }
-}
-
-enum ReaderFlowMode: String, CaseIterable, Identifiable, Hashable {
-    case paged
-    case scroll
-
-    var id: String { rawValue }
-    var label: String { self == .paged ? "横向分页" : "上下滚动" }
-}
-
-enum ReaderPageTransitionMode: String, CaseIterable, Identifiable, Hashable {
-    case pageCurl
-    case cover
-
-    var id: String { rawValue }
-
-    var label: String {
-        switch self {
-        case .pageCurl: return "仿真翻页"
-        case .cover: return "覆盖翻页"
-        }
-    }
 }
 
 enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Sendable {
@@ -137,9 +70,6 @@ enum ReaderFontFamily: String, CaseIterable, Hashable, Identifiable, Codable, Se
     case yuan
 
     static var options: [ReaderFontFamily] { allCases }
-
-    static var allOptions: [ReaderFontFamily] { options }
-    static var builtInCases: [ReaderFontFamily] { options }
 
     var id: String { rawValue }
 

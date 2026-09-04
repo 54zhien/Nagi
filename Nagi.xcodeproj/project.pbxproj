@@ -42,12 +42,7 @@
 		4A0000000000000000000021 /* FileManager+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000021 /* FileManager+ZIP.swift */; };
 		4A0000000000000000000022 /* FileManager+ZIPDeprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000022 /* FileManager+ZIPDeprecated.swift */; };
 		4A0000000000000000000023 /* URL+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000023 /* URL+ZIP.swift */; };
-		4A0000000000000000000024 /* Chapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000024 /* Chapter.swift */; };
 		4A0000000000000000000025 /* ReaderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000025 /* ReaderSettings.swift */; };
-		4A0000000000000000000026 /* TextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000026 /* TextPaginator.swift */; };
-		4A0000000000000000000027 /* TXTReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000027 /* TXTReaderModel.swift */; };
-		4A0000000000000000000028 /* PageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000028 /* PageTextView.swift */; };
-		4A0000000000000000000029 /* PageViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000029 /* PageViewController.swift */; };
 		4A000000000000000000002A /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002A /* ReaderView.swift */; };
 		4A000000000000000000002B /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002B /* DocumentPicker.swift */; };
 		4A000000000000000000002C /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002C /* ShareSheet.swift */; };
@@ -56,7 +51,6 @@
 		4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000071 /* EPUBReaderModel.swift */; };
 		4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000072 /* ReadiumNavigatorView.swift */; };
 		4A0000000000000000000077 /* ReaderChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000077 /* ReaderChrome.swift */; };
-		4A0000000000000000000078 /* TXTReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000078 /* TXTReaderView.swift */; };
 		4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000079 /* ReaderArchitecture.swift */; };
 		4A000000000000000000007A /* ReaderRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007A /* ReaderRenderer.swift */; };
 		4A000000000000000000007B /* ReaderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007B /* ReaderSettingsView.swift */; };
@@ -89,7 +83,6 @@
 		4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A1 /* NagiRootRepresentable.swift */; };
 		4A00000000000000000000A2 /* NagiRootState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A2 /* NagiRootState.swift */; };
 		4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */; };
-		4A00000000000000000000A4 /* SystemRootTabReferenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */; };
 		4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A5 /* NagiTabBarView.swift */; };
 		4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A6 /* NagiTabBarItemView.swift */; };
 		4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A7 /* NagiNavigationSearchView.swift */; };
@@ -99,7 +92,7 @@
 		4A00000000000000000000AB /* NagiTabTransition.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AB /* NagiTabTransition.swift */; };
 		4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AC /* NagiTabBarMetrics.swift */; };
 		4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */; };
-		4A00000000000000000000AE /* NagiGlassCompatibility.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AE /* NagiGlassCompatibility.swift */; };
+		4A00000000000000000000AE /* NagiAppearanceGlass.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AE /* NagiAppearanceGlass.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -139,12 +132,7 @@
 		3A0000000000000000000021 /* FileManager+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+ZIP.swift"; sourceTree = "<group>"; };
 		3A0000000000000000000022 /* FileManager+ZIPDeprecated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+ZIPDeprecated.swift"; sourceTree = "<group>"; };
 		3A0000000000000000000023 /* URL+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ZIP.swift"; sourceTree = "<group>"; };
-		3A0000000000000000000024 /* Chapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chapter.swift; sourceTree = "<group>"; };
 		3A0000000000000000000025 /* ReaderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettings.swift; sourceTree = "<group>"; };
-		3A0000000000000000000026 /* TextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPaginator.swift; sourceTree = "<group>"; };
-		3A0000000000000000000027 /* TXTReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderModel.swift; sourceTree = "<group>"; };
-		3A0000000000000000000028 /* PageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTextView.swift; sourceTree = "<group>"; };
-		3A0000000000000000000029 /* PageViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageViewController.swift; sourceTree = "<group>"; };
 		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		3A000000000000000000002B /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
 		3A000000000000000000002C /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
@@ -152,7 +140,6 @@
 		3A0000000000000000000071 /* EPUBReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderModel.swift; sourceTree = "<group>"; };
 		3A0000000000000000000072 /* ReadiumNavigatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000077 /* ReaderChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChrome.swift; sourceTree = "<group>"; };
-		3A0000000000000000000078 /* TXTReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000079 /* ReaderArchitecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderArchitecture.swift; sourceTree = "<group>"; };
 		3A000000000000000000007A /* ReaderRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderRenderer.swift; sourceTree = "<group>"; };
 		3A000000000000000000007B /* ReaderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsView.swift; sourceTree = "<group>"; };
@@ -182,7 +169,6 @@
 		3A00000000000000000000A1 /* NagiRootRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootRepresentable.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A2 /* NagiRootState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootState.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiKeyboardLayoutCoordinator.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemRootTabReferenceView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A5 /* NagiTabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A6 /* NagiTabBarItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarItemView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A7 /* NagiNavigationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiNavigationSearchView.swift; sourceTree = "<group>"; };
@@ -192,7 +178,7 @@
 		3A00000000000000000000AB /* NagiTabTransition.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabTransition.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AC /* NagiTabBarMetrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarMetrics.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AD /* NagiTabSelectionRecognizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabSelectionRecognizer.swift; sourceTree = "<group>"; };
-		3A00000000000000000000AE /* NagiGlassCompatibility.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiGlassCompatibility.swift; sourceTree = "<group>"; };
+		3A00000000000000000000AE /* NagiAppearanceGlass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiAppearanceGlass.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -254,7 +240,6 @@
 				3A00000000000000000000A1 /* NagiRootRepresentable.swift */,
 				3A00000000000000000000A2 /* NagiRootState.swift */,
 				3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */,
-				3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
@@ -334,7 +319,7 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000004 /* SettingsView.swift */,
-				3A00000000000000000000AE /* NagiGlassCompatibility.swift */,
+				3A00000000000000000000AE /* NagiAppearanceGlass.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -366,7 +351,6 @@
 			isa = PBXGroup;
 			children = (
 				3A000000000000000000000A /* Book.swift */,
-				3A0000000000000000000024 /* Chapter.swift */,
 				3A0000000000000000000025 /* ReaderSettings.swift */,
 			);
 			path = Models;
@@ -417,7 +401,6 @@
 			children = (
 				3A0000000000000000000079 /* ReaderArchitecture.swift */,
 				3A000000000000000000007A /* ReaderRenderer.swift */,
-				3A0000000000000000000026 /* TextPaginator.swift */,
 			);
 			path = Engine;
 			sourceTree = "<group>";
@@ -425,7 +408,6 @@
 		2A0000000000000000000012 /* ViewModel */ = {
 			isa = PBXGroup;
 			children = (
-				3A0000000000000000000027 /* TXTReaderModel.swift */,
 				3A0000000000000000000071 /* EPUBReaderModel.swift */,
 			);
 			path = ViewModel;
@@ -434,11 +416,8 @@
 		2A0000000000000000000013 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				3A0000000000000000000028 /* PageTextView.swift */,
-				3A0000000000000000000029 /* PageViewController.swift */,
 				3A000000000000000000002A /* ReaderView.swift */,
 				3A0000000000000000000077 /* ReaderChrome.swift */,
-				3A0000000000000000000078 /* TXTReaderView.swift */,
 				3A000000000000000000007B /* ReaderSettingsView.swift */,
 				3A0000000000000000000072 /* ReadiumNavigatorView.swift */,
 			);
@@ -714,12 +693,7 @@
 				4A0000000000000000000021 /* FileManager+ZIP.swift in Sources */,
 				4A0000000000000000000022 /* FileManager+ZIPDeprecated.swift in Sources */,
 				4A0000000000000000000023 /* URL+ZIP.swift in Sources */,
-				4A0000000000000000000024 /* Chapter.swift in Sources */,
 				4A0000000000000000000025 /* ReaderSettings.swift in Sources */,
-				4A0000000000000000000026 /* TextPaginator.swift in Sources */,
-				4A0000000000000000000027 /* TXTReaderModel.swift in Sources */,
-				4A0000000000000000000028 /* PageTextView.swift in Sources */,
-				4A0000000000000000000029 /* PageViewController.swift in Sources */,
 				4A000000000000000000002A /* ReaderView.swift in Sources */,
 				4A000000000000000000002B /* DocumentPicker.swift in Sources */,
 				4A000000000000000000002C /* ShareSheet.swift in Sources */,
@@ -727,7 +701,6 @@
 				4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */,
 				4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */,
 				4A0000000000000000000077 /* ReaderChrome.swift in Sources */,
-				4A0000000000000000000078 /* TXTReaderView.swift in Sources */,
 				4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */,
 				4A000000000000000000007A /* ReaderRenderer.swift in Sources */,
 				4A000000000000000000007B /* ReaderSettingsView.swift in Sources */,
@@ -754,7 +727,6 @@
 				4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */,
 				4A00000000000000000000A2 /* NagiRootState.swift in Sources */,
 				4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */,
-				4A00000000000000000000A4 /* SystemRootTabReferenceView.swift in Sources */,
 				4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */,
 				4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */,
 				4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */,
@@ -764,7 +736,7 @@
 				4A00000000000000000000AB /* NagiTabTransition.swift in Sources */,
 				4A00000000000000000000AC /* NagiTabBarMetrics.swift in Sources */,
 				4A00000000000000000000AD /* NagiTabSelectionRecognizer.swift in Sources */,
-				4A00000000000000000000AE /* NagiGlassCompatibility.swift in Sources */,
+				4A00000000000000000000AE /* NagiAppearanceGlass.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -12,7 +12,7 @@ struct EPUBParser: Sendable {
 
         let title = extractTag(opfXml, tag: "title") ?? url.deletingPathExtension().lastPathComponent
         let author = extractTag(opfXml, tag: "creator")
-        let chapters = try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
+        let chapterCount = try chapterCount(from: archive, opfXml: opfXml, opfDir: opfDir)
         let coverData: Data?
         do {
             coverData = try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
@@ -23,7 +23,7 @@ struct EPUBParser: Sendable {
         return ParsedBook(
             title: title,
             author: author,
-            chapterCount: chapters.count,
+            chapterCount: chapterCount,
             content: "",
             coverData: coverData
         )
@@ -33,12 +33,6 @@ struct EPUBParser: Sendable {
         let archive = try openArchive(url)
         let (opfXml, opfDir) = try opfDocument(archive)
         return try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
-    }
-
-    func loadChapters(url: URL) throws -> [BookChapter] {
-        let archive = try openArchive(url)
-        let (opfXml, opfDir) = try opfDocument(archive)
-        return try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
     }
 
     func loadChapterContent(url: URL, href: String) throws -> String {
@@ -75,30 +69,24 @@ struct EPUBParser: Sendable {
         return (opfXml, opfDir)
     }
 
-    private func chapters(from archive: Archive, opfXml: String, opfDir: String) throws -> [BookChapter] {
+    private func chapterCount(from archive: Archive, opfXml: String, opfDir: String) throws -> Int {
         let manifest = parseManifest(opfXml)
         let spine = parseSpine(opfXml)
         guard !spine.isEmpty else {
             throw ParseError.invalidArchive
         }
 
-        var chapters: [BookChapter] = []
+        var chapterCount = 0
         for idref in spine {
             guard let href = manifest[idref] else { continue }
             let fullPath = resolve(href: href, relativeTo: opfDir)
             guard entry(in: archive, path: fullPath) != nil else { continue }
-            let index = chapters.count
-            chapters.append(BookChapter(
-                id: fullPath,
-                title: "第 \(index + 1) 章",
-                href: fullPath,
-                index: index
-            ))
+            chapterCount += 1
         }
-        guard !chapters.isEmpty else {
+        guard chapterCount > 0 else {
             throw ParseError.invalidArchive
         }
-        return chapters
+        return chapterCount
     }
 
     private struct ManifestItem {

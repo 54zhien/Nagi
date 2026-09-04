@@ -12,8 +12,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var contentHostController: UIHostingController<ReaderContentHostView>?
     private var contentSignature: ReaderContentSignature?
     private var panGestureRecognizer: UIPanGestureRecognizer?
-    private var tapGestureRecognizer: UITapGestureRecognizer?
-
     private var latestStateRevision = 0
     private var latestTitle: String
     private var latestTitleColor: UIColor
@@ -115,14 +113,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         contentController.view.addGestureRecognizer(pan)
         panGestureRecognizer = pan
 
-        if model.handlesContentTap {
-            let tap = UITapGestureRecognizer(target: self, action: #selector(handleTap(_:)))
-            tap.cancelsTouchesInView = false
-            tap.delegate = self
-            contentController.view.addGestureRecognizer(tap)
-            tapGestureRecognizer = tap
-        }
-
         updateChrome()
         setNeedsStatusBarAppearanceUpdate()
     }
@@ -202,11 +192,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     func dismantle() {
         panGestureRecognizer?.removeTarget(nil, action: nil)
-        tapGestureRecognizer?.removeTarget(nil, action: nil)
         panGestureRecognizer?.delegate = nil
-        tapGestureRecognizer?.delegate = nil
         panGestureRecognizer = nil
-        tapGestureRecognizer = nil
 
         readerTransitionCoordinator.cancel()
         chromeView.onDismiss = nil
@@ -232,13 +219,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         chromeView.hideControlsForSwipe()
     }
 
-    @objc private func handleTap(_ gesture: UITapGestureRecognizer) {
-        guard gesture.state == .ended else { return }
-
-        chromeView.noteInteraction()
-        chromeView.toggleControls()
-    }
-
     @objc private func accessibilityToggleControls(
         _ action: UIAccessibilityCustomAction
     ) -> Bool {
@@ -253,9 +233,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer
     ) -> Bool {
         let isManagedGesture = gestureRecognizer === panGestureRecognizer
-            || gestureRecognizer === tapGestureRecognizer
         let isOtherManagedGesture = otherGestureRecognizer === panGestureRecognizer
-            || otherGestureRecognizer === tapGestureRecognizer
         guard isManagedGesture || isOtherManagedGesture,
               let contentView = contentHostController?.view else {
             return false
@@ -301,7 +279,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func makeContentSignature() -> ReaderContentSignature {
         ReaderContentSignature(
-            hasDocument: model.document != nil,
+            hasDocument: model.isDocumentLoaded,
             errorMessage: model.errorMessage
         )
     }

@@ -68,7 +68,7 @@ final class NagiTabSelectionRecognizer: UIGestureRecognizer {
         state = .cancelled
     }
 
-    func translation(in targetView: UIView?) -> CGPoint {
+    func translation() -> CGPoint {
         if let initialTouchLocation, let currentTouchLocation {
             return CGPoint(
                 x: currentTouchLocation.x - initialTouchLocation.x,

@@ -14,7 +14,6 @@ struct NagiTabBarParams: Equatable {
 }
 
 private struct NagiSelectionGestureState: Equatable {
-    let originalIndex: Int
     var hoveredIndex: Int
     let startSelectionX: CGFloat
     var currentSelectionX: CGFloat
@@ -35,10 +34,8 @@ final class NagiTabBarView: UIView {
     private var currentSelectedTab: AppTab = .home
     private var currentSearchState = NagiTabBarSearchState.inactive
     private var currentItemFramesInRoot: [CGRect] = []
-    private var currentTabsSize: CGSize = .zero
     private var selectionGestureState: NagiSelectionGestureState?
     private var overrideSelectedIndex: Int?
-    private let isLiftedStateEnabled = true
     private var lastTraitStyle: UIUserInterfaceStyle
 
     var onTabSelected: ((AppTab) -> Void)?
@@ -131,8 +128,8 @@ final class NagiTabBarView: UIView {
         )
 
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
-            (view: NagiTabBarView, previousTraitCollection) in
-            view.handleTraitCollectionChange(previousTraitCollection)
+            (view: NagiTabBarView, _) in
+            view.handleTraitCollectionChange()
         }
     }
 
@@ -156,9 +153,7 @@ final class NagiTabBarView: UIView {
         return collapsedFrame.contains(point)
     }
 
-    private func handleTraitCollectionChange(
-        _ previousTraitCollection: UITraitCollection
-    ) {
+    private func handleTraitCollectionChange() {
         let style = traitCollection.userInterfaceStyle
         guard style != lastTraitStyle else { return }
         lastTraitStyle = style
@@ -232,8 +227,6 @@ final class NagiTabBarView: UIView {
             width: min(availableSize.width, contentWidth),
             height: barHeight
         )
-        currentTabsSize = tabsSize
-
         let selectedIndex = mainIndex(for: selectedTab)
         let displayedIndex =
             selectionGestureState?.hoveredIndex
@@ -358,7 +351,6 @@ final class NagiTabBarView: UIView {
                 )
                 : .zero,
             isActive: searchState.isActive,
-            isExpandedStandaloneBar: false,
             isDark: isDark,
             reduceTransparency: reduceTransparency
         )
@@ -408,7 +400,6 @@ final class NagiTabBarView: UIView {
             liquidLensView.apply(
                 params: NagiLensParams(
                     size: lensSize,
-                    containerOrigin: .zero,
                     selectionOrigin: CGPoint(x: lensSelection.x, y: 0),
                     selectionSize: CGSize(
                         width: lensSelection.width,
@@ -417,9 +408,7 @@ final class NagiTabBarView: UIView {
                     isDark: isDark,
                     inset: innerInset,
                     liftedInset: innerInset,
-                    isLifted:
-                        selectionGestureState != nil
-                        && isLiftedStateEnabled,
+                    isLifted: selectionGestureState != nil,
                     isCollapsed: searchState.isActive,
                     reduceTransparency: reduceTransparency
                 ),
@@ -506,7 +495,6 @@ final class NagiTabBarView: UIView {
                 at: location,
                 requiresMainFrameHit: true
               ),
-              let originalIndex = mainIndex(for: currentSelectedTab),
               itemViews.indices.contains(hoveredIndex) else {
             return
         }
@@ -514,7 +502,6 @@ final class NagiTabBarView: UIView {
         let itemFrame = itemViews[hoveredIndex].frame
         let startX = itemFrame.minX - NagiTabBarMetrics.innerInset
         selectionGestureState = NagiSelectionGestureState(
-            originalIndex: originalIndex,
             hoveredIndex: hoveredIndex,
             startSelectionX: startX,
             currentSelectionX: startX,
@@ -529,7 +516,7 @@ final class NagiTabBarView: UIView {
         guard var gesture = selectionGestureState else { return }
 
         gesture.currentSelectionX = gesture.startSelectionX
-            + recognizer.translation(in: self).x
+            + recognizer.translation().x
         if let hovered = mainIndex(
             at: recognizer.currentLocation,
             requiresMainFrameHit: false
@@ -590,7 +577,7 @@ final class NagiTabBarView: UIView {
         showItemTitles: Bool
     ) {
         let selectedScale: CGFloat =
-            selectionGestureState != nil && isLiftedStateEnabled
+            selectionGestureState != nil
             ? 1.15
             : 1.0
 
@@ -604,7 +591,7 @@ final class NagiTabBarView: UIView {
                 usesPrivateLens: liquidLensView.usesPrivateLens,
                 isCompact: isSearchActive,
                 showsTitle: showItemTitles,
-                availableSize: itemView.bounds.size,
+                availableSize: itemView.frame.size,
                 transition: blurTransition
             )
             selectedItemView.update(
@@ -612,7 +599,7 @@ final class NagiTabBarView: UIView {
                 usesPrivateLens: liquidLensView.usesPrivateLens,
                 isCompact: isSearchActive,
                 showsTitle: showItemTitles,
-                availableSize: itemView.bounds.size,
+                availableSize: itemView.frame.size,
                 transition: blurTransition
             )
 

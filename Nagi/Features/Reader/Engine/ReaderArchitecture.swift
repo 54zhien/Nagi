@@ -10,46 +10,12 @@ enum ReaderSystemSymbol {
     }
 }
 
-
 struct ReaderChapter: Identifiable, Hashable, Sendable {
     let id: String
     let title: String
     let index: Int
     let depth: Int
 }
-
-struct ReaderDocument: Identifiable, Sendable {
-    let id: UUID
-    let title: String
-    let author: String?
-    let chapters: [ReaderChapter]
-}
-
-struct ReaderBookDescriptor: Sendable, Equatable {
-    let id: UUID
-    let title: String
-    let author: String?
-    let format: BookFormat
-    let sourceURL: URL
-    let progressPercent: Double
-    let readerLocatorJSON: String?
-    let txtReadingLocationJSON: String?
-    let currentChapterIndex: Int
-
-    @MainActor
-    init(book: Book) {
-        id = book.id
-        title = book.title
-        author = book.author
-        format = book.format
-        sourceURL = URL(fileURLWithPath: book.sourceURL)
-        progressPercent = book.progressPercent
-        readerLocatorJSON = book.readerLocatorJSON
-        txtReadingLocationJSON = book.txtReadingLocationJSON
-        currentChapterIndex = book.currentChapterIndex
-    }
-}
-
 
 enum ReaderAppearanceMode: String, CaseIterable, Identifiable, Codable, Sendable, Hashable {
     case light
@@ -136,14 +102,6 @@ enum ReaderThemePreset: String, CaseIterable, Identifiable, Codable, Sendable, H
         case .paper: return .sepia
         }
     }
-
-    func backgroundColor(isDarkAppearance: Bool) -> Color {
-        return Color(uiColor: paletteTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance))
-    }
-
-    func contentColor(isDarkAppearance: Bool) -> Color {
-        Color(uiColor: paletteTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance))
-    }
 }
 
 enum ReaderFontSize {
@@ -158,7 +116,7 @@ enum ReaderFontSize {
 
 enum ReaderLayoutMetrics {
     static let pageHeaderHeight = 48.0
-    static let fixedParagraphIndent = 2.0
+    static let defaultParagraphIndent = 2.0
 
     static let pageMarginBase = 24.0
     static let pageMarginsRange = 16.0 ... 48.0
@@ -172,8 +130,6 @@ enum ReaderLayoutMetrics {
     static let defaultWordSpacing = 0.0
 
     static let spacingReferencePointSize = 24.0
-
-    static let readiumRootPointSize = 16.0
 
     static func clampPageMargins(_ value: Double) -> Double {
         min(max(value, pageMarginsRange.lowerBound), pageMarginsRange.upperBound)
@@ -203,15 +159,6 @@ enum ReaderLayoutMetrics {
         CGFloat(spacingReferencePointSize * percentage / 100)
     }
 
-    static func readiumLetterSpacing(for percentage: Double) -> Double {
-        Double(spacingPoints(for: clampCharacterSpacing(percentage)))
-            / readiumRootPointSize * 2
-    }
-
-    static func readiumWordSpacing(for percentage: Double) -> Double {
-        Double(spacingPoints(for: clampWordSpacing(percentage))) / readiumRootPointSize
-    }
-
     static func migrateLegacyPageMargins(_ value: Double?) -> Double {
         guard let value else { return defaultPageMargins }
         return clampPageMargins(pageMarginBase * value)
@@ -228,15 +175,12 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var fontFamily: ReaderFontFamily
     var boldText: Bool
     var lineHeight: Double
-    var paragraphSpacing: Double
     var pageMargins: Double
-    var paragraphIndent: Double
     var characterSpacing: Double
     var wordSpacing: Double
     var publisherStyles: Bool
     var themePreset: ReaderThemePreset
     var appearanceMode: ReaderAppearanceMode
-    var brightness: Double
     var pageTransition: ReaderPageTransition
     var showBookTitleInPageHeader: Bool
 
@@ -245,32 +189,25 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         fontFamily: ReaderFontFamily = .original,
         boldText: Bool = false,
         lineHeight: Double = ReaderLayoutMetrics.defaultLineHeight,
-        paragraphSpacing: Double = 10,
         pageMargins: Double = ReaderLayoutMetrics.defaultPageMargins,
-        paragraphIndent: Double = ReaderLayoutMetrics.fixedParagraphIndent,
         characterSpacing: Double = ReaderLayoutMetrics.defaultCharacterSpacing,
         wordSpacing: Double = ReaderLayoutMetrics.defaultWordSpacing,
         publisherStyles: Bool = false,
         themePreset: ReaderThemePreset = .original,
         appearanceMode: ReaderAppearanceMode = .system,
-        brightness: Double = 1,
         pageTransition: ReaderPageTransition = .slide,
         showBookTitleInPageHeader: Bool = false
     ) {
-        _ = paragraphIndent
         self.fontSize = fontSize
         self.fontFamily = fontFamily
         self.boldText = boldText
         self.lineHeight = ReaderLayoutMetrics.clampLineHeight(lineHeight)
-        self.paragraphSpacing = paragraphSpacing
         self.pageMargins = ReaderLayoutMetrics.clampPageMargins(pageMargins)
-        self.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
         self.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(characterSpacing)
         self.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(wordSpacing)
         self.publisherStyles = publisherStyles
         self.themePreset = themePreset
         self.appearanceMode = appearanceMode
-        self.brightness = brightness
         self.pageTransition = pageTransition
         self.showBookTitleInPageHeader = showBookTitleInPageHeader
     }
@@ -281,20 +218,17 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case fontFamily
         case boldText
         case lineHeight
-        case paragraphSpacing
         case pageMargins
-        case paragraphIndent
         case characterSpacing
         case wordSpacing
         case publisherStyles
         case themePreset
         case appearanceMode
-        case brightness
         case pageTransition
         case showBookTitleInPageHeader
     }
 
-    private static let currentStorageVersion = 4
+    private static let currentStorageVersion = 5
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -317,14 +251,12 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
             fontFamily: try container.decodeIfPresent(ReaderFontFamily.self, forKey: .fontFamily) ?? .original,
             boldText: try container.decodeIfPresent(Bool.self, forKey: .boldText) ?? false,
             lineHeight: try container.decodeIfPresent(Double.self, forKey: .lineHeight) ?? ReaderLayoutMetrics.defaultLineHeight,
-            paragraphSpacing: try container.decodeIfPresent(Double.self, forKey: .paragraphSpacing) ?? 10,
             pageMargins: pageMargins,
             characterSpacing: try container.decodeIfPresent(Double.self, forKey: .characterSpacing) ?? ReaderLayoutMetrics.defaultCharacterSpacing,
             wordSpacing: try container.decodeIfPresent(Double.self, forKey: .wordSpacing) ?? ReaderLayoutMetrics.defaultWordSpacing,
             publisherStyles: try container.decodeIfPresent(Bool.self, forKey: .publisherStyles) ?? false,
             themePreset: try container.decodeIfPresent(ReaderThemePreset.self, forKey: .themePreset) ?? .original,
             appearanceMode: try container.decodeIfPresent(ReaderAppearanceMode.self, forKey: .appearanceMode) ?? .system,
-            brightness: try container.decodeIfPresent(Double.self, forKey: .brightness) ?? 1,
             pageTransition: try container.decodeIfPresent(ReaderPageTransition.self, forKey: .pageTransition) ?? .slide,
             showBookTitleInPageHeader: try container.decodeIfPresent(Bool.self, forKey: .showBookTitleInPageHeader) ?? false
         )
@@ -337,37 +269,14 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         try container.encode(fontFamily, forKey: .fontFamily)
         try container.encode(boldText, forKey: .boldText)
         try container.encode(lineHeight, forKey: .lineHeight)
-        try container.encode(paragraphSpacing, forKey: .paragraphSpacing)
         try container.encode(pageMargins, forKey: .pageMargins)
-        try container.encode(paragraphIndent, forKey: .paragraphIndent)
         try container.encode(characterSpacing, forKey: .characterSpacing)
         try container.encode(wordSpacing, forKey: .wordSpacing)
         try container.encode(publisherStyles, forKey: .publisherStyles)
         try container.encode(themePreset, forKey: .themePreset)
         try container.encode(appearanceMode, forKey: .appearanceMode)
-        try container.encode(brightness, forKey: .brightness)
         try container.encode(pageTransition, forKey: .pageTransition)
         try container.encode(showBookTitleInPageHeader, forKey: .showBookTitleInPageHeader)
-    }
-}
-
-enum ReaderContentInsetResolver {
-    static func resolve(
-        safeAreaInsets: UIEdgeInsets,
-        top: CGFloat,
-        bottom: CGFloat,
-        horizontal: CGFloat = 0
-    ) -> UIEdgeInsets {
-        let requestedTop = max(0, top)
-        let requestedBottom = max(0, bottom)
-        let requestedHorizontal = max(0, horizontal)
-
-        return UIEdgeInsets(
-            top: max(safeAreaInsets.top, requestedTop),
-            left: max(safeAreaInsets.left, requestedHorizontal),
-            bottom: max(safeAreaInsets.bottom, requestedBottom),
-            right: max(safeAreaInsets.right, requestedHorizontal)
-        )
     }
 }
 
@@ -390,57 +299,10 @@ struct ReaderCustomizationDraft: Equatable, Sendable {
     var boldText: Bool
     var lineHeight: Double
     var pageMargins: Double
-    var paragraphIndent: Double
     var characterSpacing: Double
     var wordSpacing: Double
     var publisherStyles: Bool
 }
-
-enum ReaderChromeLayout: Sendable {
-    case legacyOverlay
-    case cornerAligned
-}
-
-
-struct TextReadingPosition: Codable, Hashable, Sendable {
-    let chapterID: String
-    let utf16Offset: Int
-    let prefix: String
-    let suffix: String
-}
-
-struct EPUBReadingPosition: Codable, Hashable, Sendable {
-    let locatorJSON: String
-    let href: String?
-    let progression: Double?
-}
-
-enum ReadingPositionPayload: Codable, Hashable, Sendable {
-    case text(TextReadingPosition)
-    case epub(EPUBReadingPosition)
-}
-
-struct ReadingPosition: Codable, Hashable, Sendable {
-    let version: Int
-    let bookID: UUID
-    let chapterID: String?
-    let progression: Double?
-    let payload: ReadingPositionPayload
-
-    init(
-        bookID: UUID,
-        chapterID: String?,
-        progression: Double?,
-        payload: ReadingPositionPayload
-    ) {
-        version = 1
-        self.bookID = bookID
-        self.chapterID = chapterID
-        self.progression = progression
-        self.payload = payload
-    }
-}
-
 
 enum ReaderPreferenceCommitBehavior: Sendable, Equatable {
     case coalesced
@@ -463,9 +325,8 @@ enum ReaderVisualMutationKind: Sendable, Equatable {
 
 @MainActor
 protocol ReaderRenderer: AnyObject {
-    var document: ReaderDocument? { get }
+    var isDocumentLoaded: Bool { get }
     var title: String { get }
-    var isLoading: Bool { get }
     var errorMessage: String? { get }
     var currentChapterID: String? { get }
     var progress: Double { get }
@@ -477,10 +338,6 @@ protocol ReaderRenderer: AnyObject {
     var backgroundColor: UIColor { get }
     var contentColor: UIColor { get }
     var headerColor: UIColor { get }
-    var chromeLayout: ReaderChromeLayout { get }
-    var handlesContentTap: Bool { get }
-    var canGoNext: Bool { get }
-    var canGoPrevious: Bool { get }
     var onStateChange: (() -> Void)? { get set }
 
     func load() async
@@ -499,43 +356,26 @@ protocol ReaderRenderer: AnyObject {
     func updateSystemAppearance(isDark: Bool)
     func selectPreset(_ preset: ReaderThemePreset)
     func tearDown()
-    func clearError()
-    func goForward()
-    func goBackward()
     func selectChapter(at index: Int)
     func saveProgress()
-    func readingPosition() -> ReadingPosition?
 }
 
 
 @MainActor
 final class ReaderRepository {
     let book: Book
-    let descriptor: ReaderBookDescriptor
 
     init(book: Book) {
         self.book = book
-        descriptor = ReaderBookDescriptor(book: book)
     }
 
     func makeRenderer() -> any ReaderRenderer {
         ReaderRendererFactory.make(book: book)
     }
 
-    func persist(position: ReadingPosition?, progress: Double) {
+    func persist(progress: Double) {
         book.progressPercent = min(max(progress, 0), 1)
         book.lastReadAt = .now
-
-        guard let position else { return }
-        switch position.payload {
-        case .text(let textPosition):
-            if let data = try? JSONEncoder().encode(textPosition),
-               let json = String(data: data, encoding: .utf8) {
-                book.txtReadingLocationJSON = json
-            }
-        case .epub(let epubPosition):
-            book.readerLocatorJSON = epubPosition.locatorJSON
-        }
     }
 }
 
@@ -546,7 +386,7 @@ final class ReaderEngine {
     let repository: ReaderRepository
     let renderer: any ReaderRenderer
 
-    private(set) var document: ReaderDocument?
+    private(set) var isDocumentLoaded = false
     private(set) var preferences: ReaderPreferences
     var onStateChange: (() -> Void)?
 
@@ -555,8 +395,7 @@ final class ReaderEngine {
         let renderer = repository.makeRenderer()
         self.repository = repository
         self.renderer = renderer
-        var initialPreferences = ReaderPreferencesStore.load() ?? renderer.preferences
-        initialPreferences.brightness = 1
+        let initialPreferences = ReaderPreferencesStore.load() ?? renderer.preferences
         preferences = initialPreferences
         renderer.apply(
             preferences: preferences,
@@ -610,10 +449,8 @@ final class ReaderEngine {
         preferences: ReaderPreferences,
         commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
     ) {
-        var normalizedPreferences = preferences
-        normalizedPreferences.brightness = 1
         renderer.apply(
-            preferences: normalizedPreferences,
+            preferences: preferences,
             commitBehavior: commitBehavior
         )
         synchronizeFromRenderer()
@@ -633,31 +470,18 @@ final class ReaderEngine {
         renderer.tearDown()
     }
 
-    func clearError() {
-        renderer.clearError()
-        synchronizeFromRenderer()
-    }
-
-    func goForward() {
-        renderer.goForward()
-    }
-
-    func goBackward() {
-        renderer.goBackward()
-    }
-
     func selectChapter(at index: Int) {
         renderer.selectChapter(at: index)
     }
 
     func saveProgress() {
         renderer.saveProgress()
-        repository.persist(position: renderer.readingPosition(), progress: renderer.progress)
+        repository.persist(progress: renderer.progress)
         synchronizeFromRenderer()
     }
 
     private func synchronizeFromRenderer() {
-        document = renderer.document
+        isDocumentLoaded = renderer.isDocumentLoaded
         preferences = renderer.preferences
         ReaderPreferencesStore.save(preferences)
     }
@@ -669,9 +493,8 @@ final class ReaderViewModel {
     let book: Book
     let engine: ReaderEngine
 
-    private(set) var document: ReaderDocument?
+    private(set) var isDocumentLoaded = false
     private(set) var title: String
-    private(set) var isLoading = false
     private(set) var errorMessage: String?
     private(set) var currentChapterID: String?
     private(set) var progress = 0.0
@@ -695,10 +518,6 @@ final class ReaderViewModel {
     var backgroundColor: UIColor { engine.renderer.backgroundColor }
     var contentColor: UIColor { engine.renderer.contentColor }
     var headerColor: UIColor { engine.renderer.headerColor }
-    var chromeLayout: ReaderChromeLayout { engine.renderer.chromeLayout }
-    var handlesContentTap: Bool { engine.renderer.handlesContentTap }
-    var canGoNext: Bool { engine.renderer.canGoNext }
-    var canGoPrevious: Bool { engine.renderer.canGoPrevious }
 
     func loadIfNeeded() async {
         await engine.loadIfNeeded()
@@ -747,17 +566,6 @@ final class ReaderViewModel {
         synchronize()
     }
 
-    func binding<Value>(_ keyPath: WritableKeyPath<ReaderPreferences, Value>) -> Binding<Value> {
-        Binding(
-            get: { self.preferences[keyPath: keyPath] },
-            set: { [weak self] value in
-                self?.setPreference { preferences in
-                    preferences[keyPath: keyPath] = value
-                }
-            }
-        )
-    }
-
     func setFontSize(_ size: Double) {
         setPreference {
             $0.fontSize = min(max(size, ReaderFontSize.minimum), ReaderFontSize.maximum)
@@ -798,7 +606,6 @@ final class ReaderViewModel {
             boldText: preferences.boldText,
             lineHeight: preferences.lineHeight,
             pageMargins: preferences.pageMargins,
-            paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             characterSpacing: preferences.characterSpacing,
             wordSpacing: preferences.wordSpacing,
             publisherStyles: preferences.publisherStyles
@@ -822,8 +629,7 @@ final class ReaderViewModel {
             || preferences.publisherStyles != draft.publisherStyles {
             include(.typography)
         }
-        if preferences.pageMargins != draft.pageMargins
-            || preferences.paragraphIndent != draft.paragraphIndent {
+        if preferences.pageMargins != draft.pageMargins {
             include(.geometry)
         }
 
@@ -837,23 +643,12 @@ final class ReaderViewModel {
                 preferences.boldText = draft.boldText
                 preferences.lineHeight = ReaderLayoutMetrics.clampLineHeight(draft.lineHeight)
                 preferences.pageMargins = ReaderLayoutMetrics.clampPageMargins(draft.pageMargins)
-                preferences.paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
                 preferences.characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(draft.characterSpacing)
                 preferences.wordSpacing = ReaderLayoutMetrics.clampWordSpacing(draft.wordSpacing)
                 preferences.publisherStyles = draft.publisherStyles
             },
             commitBehavior: .immediate
         )
-    }
-
-    func goForward() {
-        engine.goForward()
-        synchronize()
-    }
-
-    func goBackward() {
-        engine.goBackward()
-        synchronize()
     }
 
     func selectChapter(at index: Int) {
@@ -866,16 +661,10 @@ final class ReaderViewModel {
         synchronize()
     }
 
-    func clearError() {
-        engine.clearError()
-        synchronize()
-    }
-
     private func synchronize() {
         let renderer = engine.renderer
-        document = engine.document ?? renderer.document
+        isDocumentLoaded = engine.isDocumentLoaded
         title = renderer.title
-        isLoading = renderer.isLoading
         errorMessage = renderer.errorMessage
         currentChapterID = renderer.currentChapterID
         progress = renderer.progress

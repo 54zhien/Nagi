@@ -4,7 +4,6 @@ import UIKit
 
 struct NagiLensParams: Equatable {
     var size: CGSize
-    var containerOrigin: CGPoint
     var selectionOrigin: CGPoint
     var selectionSize: CGSize
     var isDark: Bool
@@ -119,14 +118,8 @@ final class NagiLiquidLensView: UIView {
     private var liftedDisplayLink: CADisplayLink?
     private var previousUsesNativeLiquidGlass: Bool?
 
-    private(set) var isAnimating = false
-
     var usesPrivateLens: Bool {
         nativeLensView != nil && NagiGlassStyleStore.usesNativeLiquidGlass
-    }
-
-    static var supportsNativeLiquidLens: Bool {
-        return makePrivateLensView() != nil
     }
 
     override init(frame: CGRect) {
@@ -251,14 +244,12 @@ final class NagiLiquidLensView: UIView {
         nativeLensView?.isHidden = !usesNativeLens
         liftedContainerView.isHidden = !usesNativeLens
 
-        let contentOrigin = params.containerOrigin
-        let contentFrame = CGRect(origin: contentOrigin, size: params.size)
         let innerFrame = CGRect(origin: .zero, size: params.size)
 
         effectiveTransition.setFrame(view: containerView, frame: innerFrame)
         effectiveTransition.setFrame(
             view: dedicatedMainGlassContainer,
-            frame: contentFrame
+            frame: innerFrame
         )
         effectiveTransition.setFrame(view: backgroundView, frame: innerFrame)
 
@@ -271,8 +262,6 @@ final class NagiLiquidLensView: UIView {
                 tintColor: params.isDark
                     ? UIColor.white.withAlphaComponent(0.025)
                     : UIColor.white.withAlphaComponent(0.1),
-                isInteractive: true,
-                isVisible: true,
                 reduceTransparency: params.reduceTransparency
             ),
             transition: effectiveTransition
@@ -358,7 +347,6 @@ final class NagiLiquidLensView: UIView {
         appliedLensParams = params
 
         if previousParams?.isLifted != params.isLifted {
-            isAnimating = true
             let selector = PrivateSelector.setLifted
             var shouldScheduleUpdate = false
             var didProcessUpdate = false
@@ -408,12 +396,7 @@ final class NagiLiquidLensView: UIView {
                             }
                         }
                     },
-                    { [weak self] in
-                        guard let self else { return }
-                        if !self.isApplyingLensParams {
-                            self.isAnimating = false
-                        }
-                    }
+                    nil
                 )
             }
 
@@ -453,19 +436,7 @@ final class NagiLiquidLensView: UIView {
             nativeLensView.layer.removeAllAnimations()
             nativeLensView.bounds = lensBounds
 
-            if !transition.isImmediate {
-                isAnimating = true
-            }
-            transition.setPosition(
-                view: nativeLensView,
-                position: lensCenter,
-                completion: { [weak self] flag in
-                    guard let self, flag else { return }
-                    if !self.isApplyingLensParams {
-                        self.isAnimating = false
-                    }
-                }
-            )
+            transition.setPosition(view: nativeLensView, position: lensCenter)
 
             transition.animatePosition(
                 layer: nativeLensView.layer,

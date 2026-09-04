@@ -6,8 +6,6 @@ final class ReaderChromeAnimator {
     private let targets: [UIView]
     private var activeAnimator: UIViewPropertyAnimator?
 
-    private(set) var isVisible = true
-
     init(targets: [UIView]) {
         self.targets = targets
     }
@@ -20,8 +18,6 @@ final class ReaderChromeAnimator {
     ) {
         activeAnimator?.stopAnimation(true)
         activeAnimator = nil
-        isVisible = visible
-
         let targetTransform = visible
             ? CGAffineTransform.identity
             : CGAffineTransform(scaleX: 0.94, y: 0.94)

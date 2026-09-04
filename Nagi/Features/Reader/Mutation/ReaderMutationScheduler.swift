@@ -26,10 +26,6 @@ final class ReaderMutationScheduler<Value> {
         self.commit = commit
     }
 
-    var hasPendingValue: Bool {
-        pendingValue != nil
-    }
-
     func waitForPendingCommit() async -> UInt64 {
         let targetGeneration = pendingValue == nil
             ? committedGeneration

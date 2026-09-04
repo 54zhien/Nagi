@@ -1,6 +1,5 @@
 
 import Foundation
-import UIKit
 
 @MainActor
 final class ReaderPerformanceController {
@@ -12,8 +11,6 @@ final class ReaderPerformanceController {
 
     private(set) var thermalState: ProcessInfo.ThermalState
     private(set) var isLowPowerModeEnabled: Bool
-    let supportsHighRefreshRate: Bool
-
     var shouldReduceNonessentialEffects: Bool {
         if isLowPowerModeEnabled {
             return true
@@ -32,8 +29,6 @@ final class ReaderPerformanceController {
     private init() {
         thermalState = processInfo.thermalState
         isLowPowerModeEnabled = processInfo.isLowPowerModeEnabled
-        supportsHighRefreshRate = UIScreen.main.maximumFramesPerSecond >= 120
-
         observerTokens.append(
             notificationCenter.addObserver(
                 forName: ProcessInfo.thermalStateDidChangeNotification,

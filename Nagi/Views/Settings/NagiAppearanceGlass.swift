@@ -71,33 +71,6 @@ private struct NagiGlassModifier<GlassShape: Shape>: ViewModifier {
     }
 }
 
-struct NagiGlassEffectContainer<Content: View>: View {
-    let spacing: CGFloat
-    let content: Content
-
-    @AppStorage(NagiAppearanceSettings.liquidGlassEnabledKey)
-    private var liquidGlassEnabled = true
-
-    init(
-        spacing: CGFloat = 0,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.spacing = spacing
-        self.content = content()
-    }
-
-    @ViewBuilder
-    var body: some View {
-        if liquidGlassEnabled {
-            GlassEffectContainer(spacing: spacing) {
-                content
-            }
-        } else {
-            content
-        }
-    }
-}
-
 private struct NagiSafeAreaBarModifier<BarContent: View>: ViewModifier {
     let edge: VerticalEdge
     let alignment: HorizontalAlignment
