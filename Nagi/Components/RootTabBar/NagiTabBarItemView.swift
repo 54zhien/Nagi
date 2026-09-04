@@ -9,12 +9,17 @@ final class NagiTabBarItemView: UIView {
     let tab: AppTab
     private let button: UIButton
     private let iconView: UIImageView
+    private let titleLabel: UILabel
     private let isInteractive: Bool
     private let visualRole: VisualRole
 
     private static let tabSymbolConfiguration = UIImage.SymbolConfiguration(
         pointSize: 22,
         weight: .medium
+    )
+    private static let tabTitleFont = UIFont.systemFont(
+        ofSize: 10,
+        weight: .semibold
     )
 
     init(
@@ -25,6 +30,7 @@ final class NagiTabBarItemView: UIView {
         self.tab = tab
         self.button = UIButton(type: .system)
         self.iconView = UIImageView(frame: .zero)
+        self.titleLabel = UILabel(frame: .zero)
         self.isInteractive = isInteractive
         self.visualRole = visualRole
         super.init(frame: .zero)
@@ -43,17 +49,15 @@ final class NagiTabBarItemView: UIView {
         button.addSubview(iconView)
         button.imageView?.isHidden = true
 
-        switch tab {
-        case .home:
-            button.accessibilityLabel = "主页"
-            iconView.image = UIImage(systemName: "book.closed")
-        case .library:
-            button.accessibilityLabel = "书库"
-            iconView.image = UIImage(systemName: "books.vertical")
-        case .settings:
-            button.accessibilityLabel = "设置"
-            iconView.image = UIImage(systemName: "gearshape")
-        }
+        titleLabel.text = tab.title
+        titleLabel.font = Self.tabTitleFont
+        titleLabel.textAlignment = .center
+        titleLabel.adjustsFontForContentSizeCategory = true
+        titleLabel.isUserInteractionEnabled = false
+        button.addSubview(titleLabel)
+
+        button.accessibilityLabel = tab.title
+        iconView.image = UIImage(systemName: tab.symbolName)
 
         iconView.preferredSymbolConfiguration = Self.tabSymbolConfiguration
         update(isSelected: false, usesPrivateLens: true)
@@ -66,24 +70,49 @@ final class NagiTabBarItemView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         button.frame = bounds
-        iconView.frame = bounds
+
+        let titleHeight: CGFloat = 12
+        let titleY = max(0, bounds.height - 8 - titleHeight)
+        titleLabel.frame = CGRect(
+            x: 0,
+            y: titleY,
+            width: bounds.width,
+            height: titleHeight
+        )
+        iconView.frame = CGRect(
+            x: 0,
+            y: 3,
+            width: bounds.width,
+            height: max(0, titleY - 3)
+        )
     }
 
     func update(
         isSelected: Bool,
         usesPrivateLens: Bool,
-        isCompact: Bool = false
+        isCompact: Bool = false,
+        titleTransition: NagiTabTransition? = nil
     ) {
+        let tintColor: UIColor
         switch visualRole {
         case .normal:
-            iconView.tintColor = !usesPrivateLens && isSelected
+            tintColor = !usesPrivateLens && isSelected
                 ? nagiAccentColor
                 : .secondaryLabel
         case .selected:
-            iconView.tintColor = isCompact
+            tintColor = isCompact
                 ? .secondaryLabel
                 : nagiAccentColor
         }
+        iconView.tintColor = tintColor
+        titleLabel.textColor = tintColor
+        let titleAlpha: CGFloat = isCompact ? 0 : 1
+        if let titleTransition {
+            titleTransition.setAlpha(view: titleLabel, alpha: titleAlpha)
+        } else {
+            titleLabel.alpha = titleAlpha
+        }
+
         guard isInteractive else { return }
         button.accessibilityTraits = isSelected ? [.button, .selected] : [.button]
     }

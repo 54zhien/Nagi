@@ -6,6 +6,28 @@ enum AppTab: Hashable {
     case home
     case library
     case settings
+
+    var title: String {
+        switch self {
+        case .home:
+            return "主页"
+        case .library:
+            return "书库"
+        case .settings:
+            return "设置"
+        }
+    }
+
+    var symbolName: String {
+        switch self {
+        case .home:
+            return "book.closed"
+        case .library:
+            return "books.vertical"
+        case .settings:
+            return "gearshape"
+        }
+    }
 }
 
 struct NagiTabBarSearchState: Equatable {

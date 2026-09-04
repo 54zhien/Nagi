@@ -194,8 +194,7 @@ enum NagiTabTransition {
         }
     }
 
-    // Nagram ComponentTransition itself has no outer animation transaction.
-    // This helper only aggregates completions for Nagi callers.
+    // Apply one transition while collecting completion callbacks for the caller.
     func perform(_ changes: () -> Void, completion: ((Bool) -> Void)? = nil) {
         guard !isImmediate else {
             changes()

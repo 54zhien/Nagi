@@ -67,6 +67,9 @@ final class NagiTabBarView: UIView {
         lastTraitStyle = .unspecified
         super.init(frame: .zero)
 
+        traitOverrides.verticalSizeClass = .compact
+        traitOverrides.horizontalSizeClass = .compact
+
         clipsToBounds = false
         isUserInteractionEnabled = true
 
@@ -199,8 +202,7 @@ final class NagiTabBarView: UIView {
             height: layout.tabBarFrame.height
         )
 
-        // Nagram TabBarComponent: reserve 64pt standalone search + 8pt gap,
-        // then use equal-width main item slots.
+        // Reserve the standalone search slot, then give each main tab the same width.
         var availableItemsWidth = max(0, availableSize.width - innerInset * 2)
         availableItemsWidth = max(
             0,
@@ -258,8 +260,7 @@ final class NagiTabBarView: UIView {
 
         var tabsFrame = CGRect(origin: .zero, size: tabsSize)
         if searchState.isActive {
-            // Keep Nagi's existing outer/Y placement, but use the exact Nagram
-            // context geometry inside that Root frame.
+            // Keep the existing outer placement while the tab content collapses.
             tabsFrame = localFrame(
                 layout.mainTabsFrame,
                 in: layout.tabBarFrame
@@ -491,7 +492,7 @@ final class NagiTabBarView: UIView {
             return
         }
 
-        // Nagram uses the current item view frame directly.
+        // Start the lens from the item frame currently under the touch.
         let itemFrame = itemViews[hoveredIndex].frame
         let startX = itemFrame.minX - NagiTabBarMetrics.innerInset
         selectionGestureState = NagiSelectionGestureState(
@@ -576,12 +577,14 @@ final class NagiTabBarView: UIView {
             itemView.update(
                 isSelected: isSelected,
                 usesPrivateLens: liquidLensView.usesPrivateLens,
-                isCompact: isSearchActive
+                isCompact: isSearchActive,
+                titleTransition: blurTransition
             )
             selectedItemView.update(
                 isSelected: isSelected,
                 usesPrivateLens: liquidLensView.usesPrivateLens,
-                isCompact: isSearchActive
+                isCompact: isSearchActive,
+                titleTransition: blurTransition
             )
 
             if isSearchActive {

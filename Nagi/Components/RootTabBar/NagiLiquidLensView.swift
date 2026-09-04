@@ -99,7 +99,7 @@ final class NagiLiquidLensView: UIView {
         var isLifted: Bool
     }
 
-    // Nagram .externalContainer hierarchy.
+    // Keep the lens in its own glass container so it can move independently.
     private let containerView: UIView
     let dedicatedMainGlassContainer: UIView
     private let backgroundView: NagiGlassBackgroundView
