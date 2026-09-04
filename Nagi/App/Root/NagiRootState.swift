@@ -32,6 +32,7 @@ enum AppTab: Hashable {
 
 struct NagiTabBarSearchState: Equatable {
     var isActive: Bool
+    var keepsKeyboardPosition: Bool = false
 
     static let inactive = NagiTabBarSearchState(isActive: false)
 }

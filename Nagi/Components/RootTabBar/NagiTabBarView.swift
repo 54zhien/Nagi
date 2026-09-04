@@ -362,10 +362,9 @@ final class NagiTabBarView: UIView {
                 view: mainTabsMotionContainer,
                 frame: tabsFrame
             )
-            // Keep the outer Lens host at full width while the tab container collapses.
             transition.setFrame(
                 view: liquidLensView,
-                frame: CGRect(origin: .zero, size: tabsSize)
+                frame: CGRect(origin: .zero, size: tabsFrame.size)
             )
 
             for index in itemViews.indices {

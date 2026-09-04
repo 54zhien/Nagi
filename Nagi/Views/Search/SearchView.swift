@@ -9,11 +9,6 @@ struct SearchView: View {
 
     var body: some View {
         searchContent
-            // Root already owns keyboard geometry through
-            // NagiKeyboardLayoutCoordinator. Do not let SwiftUI apply a
-            // second keyboard safe-area resize to this transparent overlay;
-            // otherwise the hosting background is exposed below the Search
-            // surface while the keyboard is being presented/dismissed.
             .ignoresSafeArea(.keyboard, edges: .bottom)
             .transaction { transaction in
                 transaction.animation = nil
@@ -33,26 +28,27 @@ struct SearchView: View {
             }
     }
 
+    @ViewBuilder
     private var searchContent: some View {
-        ZStack {
-            searchResultsList
-                .opacity(searchTerms.isEmpty ? 0 : 1)
-                .allowsHitTesting(!searchTerms.isEmpty)
+        if searchTerms.isEmpty {
+            Color.clear
+                .ignoresSafeArea()
+        } else {
+            ZStack {
+                searchResultsList
 
-            searchEmptyState
-                .opacity(
-                    !searchTerms.isEmpty && matchingBooks.isEmpty
-                        ? 1
-                        : 0
-                )
-                .allowsHitTesting(false)
-        }
-        .background(Color.clear)
-        .safeAreaBar(edge: .top, spacing: 0) {
-            searchHeader
-        }
-        .transaction { transaction in
-            transaction.animation = nil
+                if matchingBooks.isEmpty {
+                    searchEmptyState
+                        .allowsHitTesting(false)
+                }
+            }
+            .background(Color.clear)
+            .safeAreaBar(edge: .top, spacing: 0) {
+                searchHeader
+            }
+            .transaction { transaction in
+                transaction.animation = nil
+            }
         }
     }
 

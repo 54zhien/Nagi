@@ -74,12 +74,13 @@ enum NagiTabBarMetrics {
         }
 
         var tabBarBottomInset = normalVisualBottomInset
-        if searchState.isActive, inputHeight > 0 {
-            // Equivalent to placing the bar 8pt above the keyboard top.
+        let keepsKeyboardPosition =
+            searchState.isActive || searchState.keepsKeyboardPosition
+        if keepsKeyboardPosition, inputHeight > 0 {
             tabBarBottomInset = max(tabBarBottomInset, inputHeight + 8)
         }
 
-        let sideInsetReference = searchState.isActive && inputHeight > 0
+        let sideInsetReference = keepsKeyboardPosition && inputHeight > 0
             ? tabBarBottomInset
             : systemPanelsBottomInset
         let sideInset: CGFloat = sideInsetReference <= 28 ? 20 : 12

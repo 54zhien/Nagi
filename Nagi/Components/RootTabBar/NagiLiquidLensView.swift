@@ -97,16 +97,18 @@ final class NagiLiquidLensView: UIView {
         var inset: CGFloat
         var liftedInset: CGFloat
         var isLifted: Bool
+        var isDark: Bool
+        var reduceTransparency: Bool
     }
 
-    // Keep the lens in its own glass container so it can move independently.
     private let containerView: UIView
     let dedicatedMainGlassContainer: UIView
     private let backgroundView: NagiGlassBackgroundView
     private let liftedContainerView: UIView
     let contentView: UIView
     private let restingBackgroundView: NagiLensRestingBackgroundView
-    private let nativeLensView: UIView?
+    private var nativeLensView: UIView?
+    private var fallbackSelectionView: NagiGlassBackgroundView?
 
     var selectedContentView: UIView {
         liftedContainerView
@@ -131,8 +133,11 @@ final class NagiLiquidLensView: UIView {
         liftedContainerView = UIView(frame: .zero)
         contentView = UIView(frame: .zero)
         restingBackgroundView = NagiLensRestingBackgroundView()
-        nativeLensView = Self.makePrivateLensView()
+        nativeLensView = nil
+        fallbackSelectionView = nil
         super.init(frame: frame)
+
+        nativeLensView = Self.makePrivateLensView()
 
         clipsToBounds = false
         isUserInteractionEnabled = true
@@ -187,12 +192,20 @@ final class NagiLiquidLensView: UIView {
             invoke(PrivateSelector.setLiftedContentMode, on: nativeLensView, integer: 1)
             invoke(PrivateSelector.setStyle, on: nativeLensView, integer: 1)
             invoke(PrivateSelector.setWarpsContentBelow, on: nativeLensView, boolean: true)
-            nativeLensView.setValue(
-                UIColor(white: 0.0, alpha: 0.1),
-                forKey: "restingBackgroundColor"
-            )
+            if nativeLensView.responds(
+                to: NSSelectorFromString("setRestingBackgroundColor:")
+            ) {
+                nativeLensView.setValue(
+                    UIColor(white: 0.0, alpha: 0.1),
+                    forKey: "restingBackgroundColor"
+                )
+            }
         } else {
-            // Keep the content path usable when the private class is absent.
+            let selectionView = NagiGlassBackgroundView(frame: .zero)
+            selectionView.isUserInteractionEnabled = false
+            fallbackSelectionView = selectionView
+            backgroundView.contentView.insertSubview(selectionView, at: 0)
+
             containerView.addSubview(liftedContainerView)
             containerView.addSubview(contentView)
         }
@@ -303,7 +316,9 @@ final class NagiLiquidLensView: UIView {
                 baseFrame: baseLensFrame,
                 inset: params.inset,
                 liftedInset: params.liftedInset,
-                isLifted: params.isLifted
+                isLifted: params.isLifted,
+                isDark: params.isDark,
+                reduceTransparency: params.reduceTransparency
             ),
             transition: effectiveTransition
         )
@@ -328,8 +343,6 @@ final class NagiLiquidLensView: UIView {
         params: LensParams,
         transition: NagiTabTransition
     ) {
-        guard let nativeLensView else { return }
-
         if isApplyingLensParams {
             pendingLensParams = params
             return
@@ -338,6 +351,13 @@ final class NagiLiquidLensView: UIView {
         isApplyingLensParams = true
         let previousParams = appliedLensParams
         appliedLensParams = params
+
+        guard let nativeLensView else {
+            updateFallbackSelection(params: params, transition: transition)
+            isAnimating = false
+            isApplyingLensParams = false
+            return
+        }
 
         if previousParams?.isLifted != params.isLifted {
             isAnimating = true
@@ -397,70 +417,124 @@ final class NagiLiquidLensView: UIView {
                         }
                     }
                 )
-            }
 
-            if didProcessUpdate {
-                transition.animateView {
-                    nativeLensView.center = CGPoint(
-                        x: params.baseFrame.midX,
-                        y: params.baseFrame.midY
-                    )
+                if didProcessUpdate {
+                    transition.animateView {
+                        nativeLensView.center = CGPoint(
+                            x: params.baseFrame.midX,
+                            y: params.baseFrame.midY
+                        )
+                    }
+                    pendingLensParams = nil
+                    isApplyingLensParams = false
+                } else {
+                    shouldScheduleUpdate = true
                 }
+            } else {
+                applyDirectLensGeometry(
+                    to: nativeLensView,
+                    params: params,
+                    transition: transition
+                )
                 pendingLensParams = nil
                 isApplyingLensParams = false
-            } else {
-                shouldScheduleUpdate = true
+                isAnimating = false
             }
         } else {
-            let liftedInset = params.isLifted
-                ? params.liftedInset
-                : -params.inset
-            let lensBounds = CGRect(
-                origin: .zero,
-                size: CGSize(
-                    width: params.baseFrame.width + liftedInset * 2,
-                    height: params.baseFrame.height + liftedInset * 2
-                )
-            )
-            let lensCenter = CGPoint(
-                x: params.baseFrame.midX,
-                y: params.baseFrame.midY
-            )
-
-            let previousBounds = nativeLensView.bounds
-            transition.animateView {
-                nativeLensView.bounds = lensBounds
-            }
-
-            // Commit the final bounds before applying the position compensation.
-            nativeLensView.layer.removeAllAnimations()
-            nativeLensView.bounds = lensBounds
-
-            if !transition.isImmediate {
-                isAnimating = true
-            }
-            transition.setPosition(
-                view: nativeLensView,
-                position: lensCenter,
-                completion: { [weak self] flag in
-                    guard let self, flag else { return }
-                    if !self.isApplyingLensParams {
-                        self.isAnimating = false
-                    }
-                }
-            )
-
-            transition.animatePosition(
-                layer: nativeLensView.layer,
-                from: CGPoint(
-                    x: (lensBounds.width - previousBounds.width) * 0.5,
-                    y: 0
-                ),
-                to: .zero,
-                additive: true
+            applyDirectLensGeometry(
+                to: nativeLensView,
+                params: params,
+                transition: transition
             )
             isApplyingLensParams = false
         }
+    }
+
+    private func updateFallbackSelection(
+        params: LensParams,
+        transition: NagiTabTransition
+    ) {
+        guard let fallbackSelectionView else { return }
+
+        let lensFrame = params.baseFrame.insetBy(
+            dx: params.inset,
+            dy: params.inset
+        )
+        let effectiveLensFrame = lensFrame.insetBy(
+            dx: params.isLifted ? -2 : 0,
+            dy: params.isLifted ? -2 : 0
+        )
+        let size = effectiveLensFrame.size
+        fallbackSelectionView.update(
+            params: NagiGlassParams(
+                size: size,
+                cornerRadius: min(size.width, size.height) * 0.5,
+                isDark: params.isDark,
+                tintColor: UIColor(
+                    white: params.isDark ? 1 : 0,
+                    alpha: params.isDark ? 0.1 : 0.075
+                ),
+                isInteractive: false,
+                isVisible: true,
+                reduceTransparency: params.reduceTransparency
+            ),
+            transition: transition
+        )
+        transition.setFrame(
+            view: fallbackSelectionView,
+            frame: effectiveLensFrame
+        )
+    }
+
+    private func applyDirectLensGeometry(
+        to lensView: UIView,
+        params: LensParams,
+        transition: NagiTabTransition
+    ) {
+        let liftedInset = params.isLifted
+            ? params.liftedInset
+            : -params.inset
+        let lensBounds = CGRect(
+            origin: .zero,
+            size: CGSize(
+                width: params.baseFrame.width + liftedInset * 2,
+                height: params.baseFrame.height + liftedInset * 2
+            )
+        )
+        let lensCenter = CGPoint(
+            x: params.baseFrame.midX,
+            y: params.baseFrame.midY
+        )
+        let previousBounds = lensView.bounds
+
+        transition.animateView {
+            lensView.bounds = lensBounds
+        }
+        lensView.layer.removeAllAnimations()
+        lensView.bounds = lensBounds
+
+        if !transition.isImmediate {
+            isAnimating = true
+        }
+        transition.setPosition(
+            view: lensView,
+            position: lensCenter,
+            completion: { [weak self] flag in
+                guard let self, flag else { return }
+                if !self.isApplyingLensParams {
+                    self.isAnimating = false
+                }
+            }
+        )
+        transition.animatePosition(
+            layer: lensView.layer,
+            from: CGPoint(
+                x: (lensBounds.width - previousBounds.width) * 0.5,
+                y: 0
+            ),
+            to: .zero,
+            additive: true
+        )
     }
 
     private func updateLiftedLensPosition() {
@@ -503,6 +577,7 @@ final class NagiLiquidLensView: UIView {
     }
 
     private static func makePrivateLensView() -> UIView? {
+        guard #available(iOS 26.0, *) else { return nil }
         guard let viewClass = NSClassFromString("_UILiquidLensView") as AnyObject? as? NSObjectProtocol else {
             return nil
         }
@@ -520,11 +595,7 @@ final class NagiLiquidLensView: UIView {
         let required = [
             PrivateSelector.setLiftedContainerView,
             PrivateSelector.setLiftedContentView,
-            PrivateSelector.setOverridePunchoutView,
-            PrivateSelector.setLiftedContentMode,
-            PrivateSelector.setStyle,
-            PrivateSelector.setWarpsContentBelow,
-            PrivateSelector.setLifted
+            PrivateSelector.setOverridePunchoutView
         ]
         guard required.allSatisfy({ lensView.responds(to: $0) }) else {
             return nil

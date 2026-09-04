@@ -46,9 +46,19 @@ final class NagiKeyboardLayoutCoordinator {
     private func handle(notification: Notification) {
         guard let view else { return }
         let frame = (notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue
-        let convertedFrame = frame.map { view.convert($0, from: nil) }
+        let coordinateSpace = (notification.object as? UIScreen)?.coordinateSpace
+            ?? view.window?.screen.coordinateSpace
+        let convertedFrame = frame.map { frame in
+            if let coordinateSpace {
+                return coordinateSpace.convert(frame, to: view)
+            }
+            return view.convert(frame, from: nil)
+        }
         let effectiveFrame: CGRect?
-        if let convertedFrame, convertedFrame.minY < view.bounds.maxY, convertedFrame.height > 0 {
+        if let convertedFrame,
+           convertedFrame.height > 0,
+           convertedFrame.maxY > view.bounds.minY,
+           convertedFrame.minY < view.bounds.maxY {
             effectiveFrame = convertedFrame
         } else {
             effectiveFrame = nil

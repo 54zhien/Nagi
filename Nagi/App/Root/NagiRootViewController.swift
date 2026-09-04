@@ -241,14 +241,22 @@ final class NagiRootViewController: UIViewController {
     private func deactivateSearch() {
         guard state.tabBarSearchState.isActive else { return }
 
-        tabBarView.resignSearchFirstResponder()
+        let keepsKeyboardPosition = observedKeyboardFrame != nil
         state.searchText = ""
         tabBarView.setSearchQuery("")
         searchOverlayDismissTapGesture.isEnabled = false
-        state.tabBarSearchState = .inactive
+        state.tabBarSearchState = NagiTabBarSearchState(
+            isActive: false,
+            keepsKeyboardPosition: keepsKeyboardPosition
+        )
+
+        if !keepsKeyboardPosition {
+            state.tabBarSearchState = .inactive
+        }
 
         let transition = effectiveTransition(.spring(duration: 0.5))
         reconcileLayout(transition: transition)
+        tabBarView.resignSearchFirstResponder()
         dismissSearchOverlay()
     }
 
@@ -500,6 +508,13 @@ final class NagiRootViewController: UIViewController {
         transition: NagiTabTransition
     ) {
         observedKeyboardFrame = frame
+
+        if frame == nil,
+           !state.tabBarSearchState.isActive,
+           state.tabBarSearchState.keepsKeyboardPosition {
+            state.tabBarSearchState = .inactive
+        }
+
         reconcileLayout(transition: effectiveTransition(transition))
     }
 
