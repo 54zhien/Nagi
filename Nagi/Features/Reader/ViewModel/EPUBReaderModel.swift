@@ -189,6 +189,8 @@ final class EPUBReaderModel {
         theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
         appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
             .flatMap(ReaderAppearanceMode.init) ?? .system
+        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
+            .flatMap(ReaderPageTransition.init) ?? .slide
         publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
         showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
         selectedPreset = defaults.string(forKey: PreferenceKey.selectedPreset).flatMap(ReaderThemePreset.init)
