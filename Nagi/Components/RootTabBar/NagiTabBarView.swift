@@ -364,7 +364,7 @@ final class NagiTabBarView: UIView {
             )
             transition.setFrame(
                 view: liquidLensView,
-                frame: CGRect(origin: .zero, size: tabsFrame.size)
+                frame: CGRect(origin: .zero, size: tabsSize)
             )
 
             for index in itemViews.indices {
