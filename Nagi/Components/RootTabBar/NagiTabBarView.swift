@@ -399,7 +399,6 @@ final class NagiTabBarView: UIView {
                     isDark: isDark,
                     inset: innerInset,
                     liftedInset: innerInset,
-                    isLifted:
                     isLifted: selectionGestureState != nil,
                     isCollapsed: searchState.isActive,
                     reduceTransparency: reduceTransparency
