@@ -72,10 +72,8 @@ final class NagiGlassContainerView: UIView {
 
         let frame = CGRect(origin: .zero, size: size)
         transition.setFrame(view: nativeParamsView, frame: frame)
-        if effectView.frame != frame {
-            transition.animateView {
-                self.effectView.frame = frame
-            }
+        transition.animateView {
+            self.effectView.frame = frame
         }
     }
 }

@@ -5,6 +5,7 @@ struct NagiSearchParams: Equatable {
     var backgroundFrame: CGRect
     var closeFrame: CGRect
     var isActive: Bool
+    var isExpandedStandaloneBar: Bool
     var isDark: Bool
     var reduceTransparency: Bool
 }
@@ -22,6 +23,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
     private let backgroundView: NagiGlassBackgroundView
     private let iconView: UIImageView
+    private let placeholderLabel: UILabel
     private var close: (background: NagiGlassBackgroundView, iconView: UIImageView)?
     private var closingClose: (background: NagiGlassBackgroundView, iconView: UIImageView)?
     private var activeInput: ActiveInput?
@@ -45,6 +47,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 withConfiguration: Self.searchSymbolConfiguration
             )
         )
+        self.placeholderLabel = UILabel(frame: .zero)
         self.close = nil
         self.closingClose = nil
         self.activeInput = nil
@@ -63,6 +66,13 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         iconView.isUserInteractionEnabled = false
         backgroundView.contentView.addSubview(iconView)
 
+        placeholderLabel.text = "搜索书名"
+        placeholderLabel.textColor = .secondaryLabel
+        placeholderLabel.font = .preferredFont(forTextStyle: .body)
+        placeholderLabel.adjustsFontForContentSizeCategory = true
+        placeholderLabel.isUserInteractionEnabled = false
+        backgroundView.contentView.addSubview(placeholderLabel)
+
         let recognizer = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
         recognizer.cancelsTouchesInView = false
         recognizer.delegate = self
@@ -80,16 +90,25 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         }
 
         let previousIsActive = isActive
+        let previousShowsClose = previousParams.map {
+            $0.isActive && !$0.isExpandedStandaloneBar
+        } ?? false
+        let showsClose = params.isActive && !params.isExpandedStandaloneBar
+
         previousParams = params
         isActive = params.isActive
 
         if previousIsActive != params.isActive {
             inputGeneration += 1
+        }
+        if previousShowsClose != showsClose {
             closeGeneration += 1
         }
 
         if params.isActive {
-            ensureCloseSurface(for: params)
+            if showsClose {
+                ensureCloseSurface(for: params)
+            }
             ensureActiveInput()
         }
 
@@ -116,7 +135,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 isDark: params.isDark,
                 tintColor: glassTintColor(isDark: params.isDark),
                 isInteractive: true,
-                isVisible: params.isActive,
+                isVisible: true,
                 reduceTransparency: params.reduceTransparency
             ))
         } else {
@@ -132,6 +151,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     ) {
         let backgroundSize = params.backgroundFrame.size
         let backgroundRadius = min(backgroundSize.width, backgroundSize.height) * 0.5
+        let showsClose = params.isActive && !params.isExpandedStandaloneBar
 
         transition.setFrame(view: backgroundView, frame: params.backgroundFrame)
         backgroundView.applyGeometry(
@@ -148,8 +168,9 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         )
 
         if let close {
-            if !params.isActive {
-                // Allow a new close surface while the old one fades out.
+            if !showsClose {
+                // Match NavigationSearchView: detach the logical Close surface
+                // immediately, but keep its native Glass alive while alpha fades.
                 self.close = nil
                 closingClose = close
             }
@@ -171,13 +192,13 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                     isDark: params.isDark,
                     tintColor: glassTintColor(isDark: params.isDark),
                     isInteractive: true,
-                    isVisible: params.isActive,
+                    isVisible: true,
                     reduceTransparency: params.reduceTransparency
                 ),
                 transition: transition,
                 applyVisibility: false
             )
-            if params.isActive {
+            if showsClose {
                 transition.setCornerRadius(
                     view: close.background,
                     radius: closeRadius
@@ -187,8 +208,8 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             let generation = closeGeneration
             transition.setAlpha(
                 view: close.background,
-                alpha: params.isActive ? 1.0 : 0.0,
-                completion: params.isActive
+                alpha: showsClose ? 1.0 : 0.0,
+                completion: showsClose
                     ? nil
                     : { [weak self, weak closeBackground = close.background] completed in
                         guard completed, let closeBackground else {
@@ -197,7 +218,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
                         closeBackground.removeFromSuperview()
                         guard let self,
-                              !self.isActive,
+                              !(self.previousParams?.isActive == true && self.previousParams?.isExpandedStandaloneBar == false),
                               self.closeGeneration == generation,
                               self.closingClose?.background === closeBackground else {
                             return
@@ -206,7 +227,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                         self.closingClose = nil
                     }
             )
-            close.background.isUserInteractionEnabled = params.isActive
+            close.background.isUserInteractionEnabled = showsClose
         }
 
         backgroundView.contentView.clipsToBounds = true
@@ -215,7 +236,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
     }
 
     private func resolvedCloseFrame(for params: NagiSearchParams) -> CGRect {
-        if params.isActive {
+        if params.isActive && !params.isExpandedStandaloneBar {
             return params.closeFrame
         }
 
@@ -244,8 +265,11 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             reduceTransparency: params.reduceTransparency
         )
 
-        // Initialize the glass at its first real size before insertion.
-        background.prepare(params: closeGlassParams)
+        // Fully initialize the native Glass before the surface is inserted
+        // into the active search hierarchy. This gives the first animated
+        // frame a real 48pt effect view, content view, corner radius and luma
+        // range instead of starting from the zero-sized initializer state.
+        _ = background.prepare(params: closeGlassParams)
         background.applyGeometry(
             params: closeGlassParams,
             transition: .immediate,
@@ -365,11 +389,12 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             size: params.backgroundFrame.size
         )
         let active = params.isActive
+        let usesLeadingIcon = active || params.isExpandedStandaloneBar
 
         let baseIconSize = iconView.image?.size ?? CGSize(width: 22, height: 22)
         let targetIconSize: CGSize
 
-        if active {
+        if usesLeadingIcon {
             let iconFraction: CGFloat = 0.8
             targetIconSize = CGSize(
                 width: baseIconSize.width * iconFraction,
@@ -381,7 +406,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         let targetIconFrame: CGRect
 
-        if active {
+        if usesLeadingIcon {
             targetIconFrame = CGRect(
                 x: 12,
                 y: floor((backgroundBounds.height - targetIconSize.height) * 0.5),
@@ -418,6 +443,21 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 : .secondaryLabel
         )
         transition.setAlpha(view: iconView, alpha: 1)
+
+        let placeholderFrame = CGRect(
+            x: 44,
+            y: 0,
+            width: max(0, backgroundBounds.width - 56),
+            height: backgroundBounds.height
+        )
+        transition.setFrame(view: placeholderLabel, frame: placeholderFrame)
+        let placeholderAlphaTransition: NagiTabTransition = transition.isImmediate
+            ? .immediate
+            : .easeInOut(duration: 0.25)
+        placeholderAlphaTransition.setAlpha(
+            view: placeholderLabel,
+            alpha: !active && params.isExpandedStandaloneBar ? 1 : 0
+        )
 
         if active, let input = activeInput {
             transition.setFrame(
@@ -474,7 +514,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         }
 
         if let close {
-            if active {
+            if active && !params.isExpandedStandaloneBar {
                 let closeBounds = CGRect(origin: .zero, size: params.closeFrame.size)
                 transition.setFrame(
                     view: close.iconView,

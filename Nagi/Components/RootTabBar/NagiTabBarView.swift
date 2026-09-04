@@ -20,10 +20,7 @@ private struct NagiSelectionGestureState: Equatable {
 
 final class NagiTabBarView: UIView {
     private let glassContainer: NagiGlassContainerView
-
-    // Translation belongs to this container; the lens only changes its size.
     private let mainTabsMotionContainer: UIView
-
     private let itemViews: [NagiTabBarItemView]
     private let selectedItemViews: [NagiTabBarItemView]
     private let searchView: NagiNavigationSearchView
@@ -34,6 +31,8 @@ final class NagiTabBarView: UIView {
     private var currentLayout: NagiTabBarLayout?
     private var currentSelectedTab: AppTab = .home
     private var currentSearchState = NagiTabBarSearchState.inactive
+    private var currentItemFramesInRoot: [CGRect] = []
+    private var currentTabsSize: CGSize = .zero
     private var selectionGestureState: NagiSelectionGestureState?
     private var overrideSelectedIndex: Int?
     private var lastTraitStyle: UIUserInterfaceStyle
@@ -44,34 +43,29 @@ final class NagiTabBarView: UIView {
     var onSearchQueryChanged: ((String) -> Void)?
 
     init() {
-        self.glassContainer = NagiGlassContainerView(spacing: 7)
-        self.mainTabsMotionContainer = UIView(frame: .zero)
+        glassContainer = NagiGlassContainerView(spacing: 7)
+        mainTabsMotionContainer = UIView(frame: .zero)
 
-        let mainTabs: [AppTab] = [.home, .library, .settings]
-        self.itemViews = mainTabs.map {
+        let tabs: [AppTab] = [.home, .library, .settings]
+        itemViews = tabs.map {
             NagiTabBarItemView(
                 tab: $0,
                 visualRole: .normal,
                 isInteractive: false
             )
         }
-        self.selectedItemViews = mainTabs.map {
+        selectedItemViews = tabs.map {
             NagiTabBarItemView(
                 tab: $0,
                 visualRole: .selected,
                 isInteractive: false
             )
         }
-        self.searchView = NagiNavigationSearchView(frame: .zero)
-        self.liquidLensView = NagiLiquidLensView(frame: .zero)
-        self.tabSelectionRecognizer = NagiTabSelectionRecognizer(target: nil, action: nil)
-        self.lastTraitStyle = .unspecified
+        searchView = NagiNavigationSearchView(frame: .zero)
+        liquidLensView = NagiLiquidLensView(frame: .zero)
+        tabSelectionRecognizer = NagiTabSelectionRecognizer(target: nil, action: nil)
+        lastTraitStyle = .unspecified
         super.init(frame: .zero)
-
-        registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
-            (view: NagiTabBarView, _) in
-            view.handleTraitCollectionChange()
-        }
 
         clipsToBounds = false
         isUserInteractionEnabled = true
@@ -85,8 +79,16 @@ final class NagiTabBarView: UIView {
         glassContainer.contentView.addSubview(mainTabsMotionContainer)
         mainTabsMotionContainer.addSubview(liquidLensView)
 
-        // Search stays outside the moving main-tab container.
         glassContainer.contentView.addSubview(searchView)
+
+        for view in itemViews {
+            view.isUserInteractionEnabled = false
+            liquidLensView.contentView.addSubview(view)
+        }
+        for view in selectedItemViews {
+            view.isUserInteractionEnabled = false
+            liquidLensView.selectedContentView.addSubview(view)
+        }
 
         tabSelectionRecognizer.addTarget(
             self,
@@ -95,18 +97,7 @@ final class NagiTabBarView: UIView {
         tabSelectionRecognizer.shouldBeginAtLocation = { [weak self] location in
             self?.shouldBeginTabSelectionGesture(at: location) ?? false
         }
-        // Keep the recognizer on the host so the collapsed bar remains reachable.
         addGestureRecognizer(tabSelectionRecognizer)
-
-        for itemView in itemViews {
-            itemView.isUserInteractionEnabled = false
-            liquidLensView.contentView.addSubview(itemView)
-        }
-
-        for selectedItemView in selectedItemViews {
-            selectedItemView.isUserInteractionEnabled = false
-            liquidLensView.selectedContentView.addSubview(selectedItemView)
-        }
 
         searchView.onActivate = { [weak self] in
             self?.onSearchActivated?()
@@ -123,10 +114,20 @@ final class NagiTabBarView: UIView {
             liftedContentView: liquidLensView.selectedContentView,
             punchoutView: liquidLensView.contentView
         )
+
+        registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
+            (view: NagiTabBarView, _) in
+            view.handleTraitCollectionChange()
+        }
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        glassContainer.frame = bounds
     }
 
     override func point(inside point: CGPoint, with event: UIEvent?) -> Bool {
@@ -134,20 +135,15 @@ final class NagiTabBarView: UIView {
             return true
         }
 
-        guard let currentLayout, currentLayout.isSearchActive else {
+        guard currentSearchState.isActive,
+              let currentLayout else {
             return false
         }
-        let collapsedMainFrame = localFrame(
+        let collapsedFrame = localFrame(
             currentLayout.mainTabsFrame,
             in: currentLayout.tabBarFrame
         )
-        return collapsedMainFrame.contains(point)
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // Transition code owns child geometry during a morph.
-        glassContainer.frame = bounds
+        return collapsedFrame.contains(point)
     }
 
     private func handleTraitCollectionChange() {
@@ -192,140 +188,239 @@ final class NagiTabBarView: UIView {
             completion?(true)
             return
         }
-
-        let oldParams = previousParams
         previousParams = nextParams
 
         let isDark = traitCollection.userInterfaceStyle == .dark
-        let localMainTabsFrame = localFrame(
-            layout.mainTabsFrame,
-            in: layout.tabBarFrame
-        )
-        let localLensContainerFrame = localFrame(
-            layout.lensContainerFrame,
-            in: layout.mainTabsFrame
-        )
-        let localSearchContainerFrame = localFrame(
-            layout.searchContainerFrame,
-            in: layout.tabBarFrame
+        let innerInset = NagiTabBarMetrics.innerInset
+        let itemHeight = NagiTabBarMetrics.itemHeight
+        let barHeight = itemHeight + innerInset * 2
+        let availableSize = CGSize(
+            width: min(500, layout.tabBarFrame.width),
+            height: layout.tabBarFrame.height
         )
 
-        let searchContainerFrameChanged: Bool
-        if let oldParams {
-            let previousLocalSearchContainerFrame = localFrame(
-                oldParams.layout.searchContainerFrame,
-                in: oldParams.layout.tabBarFrame
-            )
-            searchContainerFrameChanged =
-                previousLocalSearchContainerFrame != localSearchContainerFrame
-        } else {
-            searchContainerFrameChanged = true
-        }
+        // Nagram TabBarComponent: reserve 64pt standalone search + 8pt gap,
+        // then use equal-width main item slots.
+        var availableItemsWidth = max(0, availableSize.width - innerInset * 2)
+        availableItemsWidth = max(
+            0,
+            availableItemsWidth - barHeight - NagiTabBarMetrics.standaloneGap
+        )
+        let equalWidth = floorToScreenPixels(
+            availableItemsWidth / CGFloat(max(1, itemViews.count))
+        )
+        let itemWidths = Array(repeating: equalWidth, count: itemViews.count)
+        let totalItemsWidth = itemWidths.reduce(0, +)
+        let contentWidth = innerInset * 2 + totalItemsWidth
+        let tabsSize = CGSize(
+            width: min(availableSize.width, contentWidth),
+            height: barHeight
+        )
+        currentTabsSize = tabsSize
 
-        let localItemFrames = layout.itemFrames.map {
-            localFrame($0, in: layout.lensContainerFrame)
-        }
         let selectedIndex = mainIndex(for: selectedTab)
         let displayedIndex =
-            selectionGestureState?.hoveredIndex ??
-            overrideSelectedIndex ??
-            selectedIndex
+            selectionGestureState?.hoveredIndex
+            ?? overrideSelectedIndex
+            ?? selectedIndex
 
+        var itemFrames: [CGRect] = []
+        var selectionFrame: CGRect?
+        var nextItemX = innerInset
+        for index in itemViews.indices {
+            let itemSize = CGSize(width: itemWidths[index], height: itemHeight)
+            var itemFrame = CGRect(
+                x: nextItemX,
+                y: floor((tabsSize.height - itemSize.height) * 0.5),
+                width: itemSize.width,
+                height: itemSize.height
+            )
+            nextItemX += itemSize.width
+
+            if displayedIndex == index {
+                if itemFrame.width < itemFrame.height {
+                    selectionFrame = itemFrame.insetBy(
+                        dx: floor((itemFrame.height * 1.2 - itemFrame.width) * -0.5),
+                        dy: 0
+                    )
+                } else {
+                    selectionFrame = itemFrame
+                }
+            }
+
+            if searchState.isActive, displayedIndex == index {
+                itemFrame.origin.x = floor(
+                    (NagiTabBarMetrics.collapsedLensDiameter - itemSize.width) * 0.5
+                )
+            }
+            itemFrames.append(itemFrame)
+        }
+
+        var tabsFrame = CGRect(origin: .zero, size: tabsSize)
+        if searchState.isActive {
+            // Keep Nagi's existing outer/Y placement, but use the exact Nagram
+            // context geometry inside that Root frame.
+            tabsFrame = localFrame(
+                layout.mainTabsFrame,
+                in: layout.tabBarFrame
+            )
+        }
+
+        currentItemFramesInRoot = itemFrames.map {
+            $0.offsetBy(dx: tabsFrame.minX, dy: tabsFrame.minY)
+        }
+
+        var lensSelection: (x: CGFloat, width: CGFloat)
+        if let gesture = selectionGestureState {
+            lensSelection = (
+                gesture.currentSelectionX,
+                gesture.itemWidth + innerInset * 2
+            )
+        } else if let selectionFrame {
+            lensSelection = (
+                selectionFrame.minX - innerInset,
+                selectionFrame.width + innerInset * 2
+            )
+        } else {
+            lensSelection = (0, 56)
+        }
+
+        var lensSize = tabsSize
+        if searchState.isActive {
+            lensSize = CGSize(
+                width: NagiTabBarMetrics.collapsedLensDiameter,
+                height: NagiTabBarMetrics.collapsedLensDiameter
+            )
+            lensSelection = (0, NagiTabBarMetrics.collapsedLensDiameter)
+        }
+        lensSelection.x = max(
+            0,
+            min(lensSelection.x, lensSize.width - lensSelection.width)
+        )
+
+        let searchSize: CGSize
+        let searchFrame: CGRect
+        if searchState.isActive {
+            searchSize = CGSize(
+                width: availableSize.width,
+                height: NagiTabBarMetrics.activeSearchHeight
+            )
+            searchFrame = CGRect(
+                x: 0,
+                y: tabsSize.height - searchSize.height,
+                width: searchSize.width,
+                height: searchSize.height
+            )
+        } else {
+            searchSize = CGSize(width: barHeight, height: barHeight)
+            searchFrame = CGRect(
+                x: availableSize.width - searchSize.width,
+                y: 0,
+                width: searchSize.width,
+                height: searchSize.height
+            )
+        }
+
+        let searchBackgroundSize = searchState.isActive
+            ? CGSize(
+                width: max(
+                    0,
+                    searchSize.width
+                        - NagiTabBarMetrics.searchCloseDiameter
+                        - NagiTabBarMetrics.standaloneGap
+                ),
+                height: searchSize.height
+            )
+            : searchSize
         let searchParams = NagiSearchParams(
-            containerSize: localSearchContainerFrame.size,
-            backgroundFrame: localFrame(
-                layout.searchBackgroundFrame,
-                in: layout.searchContainerFrame
-            ),
-            closeFrame: localFrame(
-                layout.searchCloseFrame,
-                in: layout.searchContainerFrame
-            ),
+            containerSize: searchSize,
+            backgroundFrame: CGRect(origin: .zero, size: searchBackgroundSize),
+            closeFrame: searchState.isActive
+                ? CGRect(
+                    x: searchSize.width - NagiTabBarMetrics.searchCloseDiameter,
+                    y: 0,
+                    width: NagiTabBarMetrics.searchCloseDiameter,
+                    height: NagiTabBarMetrics.searchCloseDiameter
+                )
+                : .zero,
             isActive: searchState.isActive,
+            isExpandedStandaloneBar: false,
             isDark: isDark,
             reduceTransparency: reduceTransparency
         )
-        let searchParamsChanged = searchView.prepare(params: searchParams)
+        let searchChanged = searchView.prepare(params: searchParams)
 
-        let itemBlurTransition: NagiTabTransition = transition.isImmediate
+        let itemAlphaTransition: NagiTabTransition = transition.isImmediate
             ? .immediate
             : .easeInOut(duration: 0.25)
 
         transition.perform { [weak self] in
             guard let self else { return }
 
-            // Move the main container; keep the lens at local zero.
             transition.setFrame(
-                view: self.mainTabsMotionContainer,
-                frame: localMainTabsFrame
+                view: mainTabsMotionContainer,
+                frame: tabsFrame
             )
+            // Keep the outer Lens host at full width while the tab container collapses.
             transition.setFrame(
-                view: self.liquidLensView,
-                frame: CGRect(
-                    origin: .zero,
-                    size: localLensContainerFrame.size
-                )
+                view: liquidLensView,
+                frame: CGRect(origin: .zero, size: tabsSize)
             )
-            self.liquidLensView.contentView.isUserInteractionEnabled =
-                !layout.isSearchActive
 
-            for ((itemView, selectedItemView), itemFrame) in zip(
-                zip(self.itemViews, self.selectedItemViews),
-                localItemFrames
-            ) {
-                transition.setFrame(view: itemView, frame: itemFrame)
+            for index in itemViews.indices {
+                let frame = itemFrames[index]
+                transition.setFrame(view: itemViews[index], frame: frame)
                 transition.setPosition(
-                    view: selectedItemView,
-                    position: CGPoint(x: itemFrame.midX, y: itemFrame.midY)
+                    view: selectedItemViews[index],
+                    position: CGPoint(x: frame.midX, y: frame.midY)
                 )
                 transition.setBounds(
-                    view: selectedItemView,
-                    bounds: CGRect(origin: .zero, size: itemFrame.size)
+                    view: selectedItemViews[index],
+                    bounds: CGRect(origin: .zero, size: frame.size)
                 )
             }
 
-            self.updateItemSelectionPresentation(
+            updateItemSelectionPresentation(
                 displayedIndex: displayedIndex,
                 transition: transition,
-                blurTransition: itemBlurTransition,
-                scaleTransition: transition,
-                isSearchActive: layout.isSearchActive
+                blurTransition: itemAlphaTransition,
+                isSearchActive: searchState.isActive
             )
 
-            self.liquidLensView.apply(
-                params: self.makeLensParams(
-                    layout: layout,
-                    displayedIndex: displayedIndex,
-                    isLifted: self.selectionGestureState != nil,
+            liquidLensView.apply(
+                params: NagiLensParams(
+                    size: lensSize,
+                    containerOrigin: .zero,
+                    selectionOrigin: CGPoint(x: lensSelection.x, y: 0),
+                    selectionSize: CGSize(
+                        width: lensSelection.width,
+                        height: lensSize.height
+                    ),
                     isDark: isDark,
+                    inset: innerInset,
+                    liftedInset: innerInset,
+                    isLifted:
+                    isLifted: selectionGestureState != nil,
+                    isCollapsed: searchState.isActive,
                     reduceTransparency: reduceTransparency
                 ),
                 transition: transition
             )
 
-            // Update search internals before moving the outer search view.
-            if searchParamsChanged || oldParams == nil {
-                self.searchView.applyInternalGeometry(
+            if searchChanged {
+                searchView.applyInternalGeometry(
                     params: searchParams,
                     transition: transition
                 )
             }
-            if searchContainerFrameChanged {
-                transition.setFrame(
-                    view: self.searchView,
-                    frame: localSearchContainerFrame
-                )
-            }
+            transition.setFrame(view: searchView, frame: searchFrame)
 
-            // Update the shared glass container after its children.
-            self.glassContainer.update(
-                size: layout.tabBarFrame.size,
+            glassContainer.update(
+                size: availableSize,
                 isDark: isDark,
                 transition: transition
             )
-        } completion: { completed in
-            completion?(completed)
-        }
+        } completion: completion
 
         if selectionGestureState == nil,
            overrideSelectedIndex == selectedIndex {
@@ -347,34 +442,22 @@ final class NagiTabBarView: UIView {
     }
 
     private func shouldBeginTabSelectionGesture(at location: CGPoint) -> Bool {
-        guard let currentLayout else {
-            return false
-        }
-
-        if currentLayout.isSearchActive {
-            let collapsedMainFrame = localFrame(
+        if currentSearchState.isActive {
+            guard let currentLayout else { return false }
+            return localFrame(
                 currentLayout.mainTabsFrame,
                 in: currentLayout.tabBarFrame
-            )
-            return collapsedMainFrame.contains(location)
+            ).contains(location)
         }
-
-        return mainIndex(
-            at: location,
-            requiresMainFrameHit: true
-        ) != nil
+        return mainIndex(at: location, requiresMainFrameHit: true) != nil
     }
 
-    @objc
-    private func handleTabSelectionGesture(
+    @objc private func handleTabSelectionGesture(
         _ recognizer: NagiTabSelectionRecognizer
     ) {
         if currentSearchState.isActive {
-            switch recognizer.state {
-            case .ended, .cancelled:
+            if recognizer.state == .ended || recognizer.state == .cancelled {
                 onSearchCancelled?()
-            default:
-                break
             }
             return
         }
@@ -399,35 +482,25 @@ final class NagiTabBarView: UIView {
 
     private func beginTabSelection(at location: CGPoint) {
         guard selectionGestureState == nil,
-              let currentLayout,
-              !currentLayout.isSearchActive,
+              !currentSearchState.isActive,
               let hoveredIndex = mainIndex(
                 at: location,
                 requiresMainFrameHit: true
               ),
-              let originalIndex = mainIndex(for: currentSelectedTab) else {
+              let originalIndex = mainIndex(for: currentSelectedTab),
+              itemViews.indices.contains(hoveredIndex) else {
             return
         }
 
-        let localItemFrames = currentLayout.itemFrames.map {
-            localFrame($0, in: currentLayout.lensContainerFrame)
-        }
-        guard localItemFrames.indices.contains(hoveredIndex) else {
-            return
-        }
-
-        let touchedItemFrame = localItemFrames[hoveredIndex]
-        let startSelectionX =
-            touchedItemFrame.minX - NagiTabBarMetrics.innerInset
-        let itemWidth = touchedItemFrame.width
-        guard itemWidth > 0 else { return }
-
+        // Nagram uses the current item view frame directly.
+        let itemFrame = itemViews[hoveredIndex].frame
+        let startX = itemFrame.minX - NagiTabBarMetrics.innerInset
         selectionGestureState = NagiSelectionGestureState(
             originalIndex: originalIndex,
             hoveredIndex: hoveredIndex,
-            startSelectionX: startSelectionX,
-            currentSelectionX: startSelectionX,
-            itemWidth: itemWidth
+            startSelectionX: startX,
+            currentSelectionX: startX,
+            itemWidth: itemFrame.width
         )
         renderCurrentLayout(transition: .spring(duration: 0.4))
     }
@@ -435,27 +508,22 @@ final class NagiTabBarView: UIView {
     private func updateTabSelection(
         using recognizer: NagiTabSelectionRecognizer
     ) {
-        guard var gestureState = selectionGestureState else {
-            return
-        }
+        guard var gesture = selectionGestureState else { return }
 
-        let translation = recognizer.translation()
-        let currentSelectionX =
-            gestureState.startSelectionX + translation.x
-        let hoveredIndex = mainIndex(
+        gesture.currentSelectionX = gesture.startSelectionX
+            + recognizer.translation().x
+        if let hovered = mainIndex(
             at: recognizer.currentLocation,
             requiresMainFrameHit: false
-        ) ?? gestureState.hoveredIndex
-
-        gestureState.currentSelectionX = currentSelectionX
-        gestureState.hoveredIndex = hoveredIndex
-        selectionGestureState = gestureState
-
+        ) {
+            gesture.hoveredIndex = hovered
+        }
+        selectionGestureState = gesture
         renderCurrentLayout(transition: .immediate)
     }
 
     private func finishTabSelection() {
-        guard let gestureState = selectionGestureState,
+        guard let gesture = selectionGestureState,
               let actualIndex = mainIndex(for: currentSelectedTab) else {
             cancelTabSelection()
             return
@@ -463,33 +531,20 @@ final class NagiTabBarView: UIView {
 
         let finalIndex = max(
             0,
-            min(
-                NagiTabBarMetrics.mainItemCount - 1,
-                gestureState.hoveredIndex
-            )
+            min(itemViews.count - 1, gesture.hoveredIndex)
         )
-        let finalTab = tab(forMainIndex: finalIndex)
-        let actualTab = tab(forMainIndex: actualIndex)
         selectionGestureState = nil
 
-        if finalTab != actualTab {
+        if finalIndex != actualIndex {
             overrideSelectedIndex = finalIndex
-            onTabSelected?(finalTab)
-            return
+            onTabSelected?(tab(forMainIndex: finalIndex))
+        } else {
+            overrideSelectedIndex = nil
+            renderCurrentLayout(transition: .spring(duration: 0.4))
         }
-
-        overrideSelectedIndex = nil
-        renderCurrentLayout(transition: .spring(duration: 0.4))
     }
 
     private func cancelTabSelection() {
-        guard currentLayout != nil,
-              mainIndex(for: currentSelectedTab) != nil else {
-            selectionGestureState = nil
-            overrideSelectedIndex = nil
-            return
-        }
-
         selectionGestureState = nil
         overrideSelectedIndex = nil
         renderCurrentLayout(transition: .spring(duration: 0.4))
@@ -501,29 +556,23 @@ final class NagiTabBarView: UIView {
             layout: currentLayout,
             selectedTab: currentSelectedTab,
             searchState: currentSearchState,
-            reduceTransparency:
-                previousParams?.reduceTransparency ?? false,
+            reduceTransparency: previousParams?.reduceTransparency ?? false,
             transition: transition
         )
     }
 
     private func updateItemSelectionPresentation(
         displayedIndex: Int?,
-        transition: NagiTabTransition = .immediate,
-        blurTransition: NagiTabTransition? = nil,
-        scaleTransition: NagiTabTransition? = nil,
-        isSearchActive: Bool = false
+        transition: NagiTabTransition,
+        blurTransition: NagiTabTransition,
+        isSearchActive: Bool
     ) {
-        let resolvedBlurTransition = blurTransition ?? transition
-        let resolvedScaleTransition = scaleTransition ?? transition
-        let selectedContentScale: CGFloat = selectionGestureState != nil ? 1.15 : 1.0
+        let selectedScale: CGFloat = selectionGestureState != nil ? 1.15 : 1.0
 
-        for (itemView, selectedItemView) in zip(
-            itemViews,
-            selectedItemViews
-        ) {
-            let isSelected =
-                displayedIndex == mainIndex(for: itemView.tab)
+        for index in itemViews.indices {
+            let isSelected = displayedIndex == index
+            let itemView = itemViews[index]
+            let selectedItemView = selectedItemViews[index]
 
             itemView.update(
                 isSelected: isSelected,
@@ -536,188 +585,84 @@ final class NagiTabBarView: UIView {
                 isCompact: isSearchActive
             )
 
-            let isVisible = !isSearchActive || isSelected
-            transition.setAlpha(
-                view: itemView,
-                alpha: isVisible ? 1 : 0
-            )
-            transition.setAlpha(
+            if isSearchActive {
+                if isSelected {
+                    transition.setAlpha(view: itemView, alpha: 1)
+                    blurTransition.setBlur(layer: itemView.layer, radius: 0)
+                    transition.setAlpha(view: selectedItemView, alpha: 1)
+                    blurTransition.setBlur(layer: selectedItemView.layer, radius: 0)
+                } else {
+                    transition.setAlpha(view: itemView, alpha: 0)
+                    blurTransition.setBlur(layer: itemView.layer, radius: 10)
+                    transition.setAlpha(view: selectedItemView, alpha: 0)
+                    blurTransition.setBlur(layer: selectedItemView.layer, radius: 10)
+                }
+            } else {
+                transition.setAlpha(view: itemView, alpha: 1)
+                blurTransition.setBlur(layer: itemView.layer, radius: 0)
+                transition.setAlpha(view: selectedItemView, alpha: 1)
+                blurTransition.setBlur(layer: selectedItemView.layer, radius: 0)
+            }
+
+            transition.setScale(
                 view: selectedItemView,
-                alpha: isVisible ? 1 : 0
-            )
-            resolvedBlurTransition.setBlur(
-                layer: itemView.layer,
-                radius: isVisible ? 0 : 10
-            )
-            resolvedBlurTransition.setBlur(
-                layer: selectedItemView.layer,
-                radius: isVisible ? 0 : 10
-            )
-            resolvedScaleTransition.setScale(
-                view: selectedItemView,
-                scale: selectedContentScale
+                scale: selectedScale
             )
         }
-    }
-
-    private func makeLensSelectionGeometry(
-        layout: NagiTabBarLayout,
-        displayedIndex: Int?
-    ) -> (origin: CGPoint, size: CGSize) {
-        let containerSize = layout.lensContainerFrame.size
-        let inset = NagiTabBarMetrics.innerInset
-
-        if layout.isLensCollapsed {
-            return (
-                origin: .zero,
-                size: CGSize(
-                    width: min(
-                        NagiTabBarMetrics.collapsedLensDiameter,
-                        containerSize.width
-                    ),
-                    height: containerSize.height
-                )
-            )
-        }
-
-        if let gestureState = selectionGestureState {
-            let selectionWidth =
-                gestureState.itemWidth + inset * 2.0
-            let maxX = max(0, containerSize.width - selectionWidth)
-            let x = min(
-                max(0, gestureState.currentSelectionX),
-                maxX
-            )
-            return (
-                origin: CGPoint(x: x, y: 0),
-                size: CGSize(
-                    width: selectionWidth,
-                    height: containerSize.height
-                )
-            )
-        }
-
-        if let displayedIndex,
-           layout.itemFrames.indices.contains(displayedIndex) {
-            let itemFrame = localFrame(
-                layout.itemFrames[displayedIndex],
-                in: layout.lensContainerFrame
-            )
-            let selectionWidth = itemFrame.width + inset * 2.0
-            let maxX = max(0, containerSize.width - selectionWidth)
-            let x = min(
-                max(0, itemFrame.minX - inset),
-                maxX
-            )
-            return (
-                origin: CGPoint(x: x, y: 0),
-                size: CGSize(
-                    width: selectionWidth,
-                    height: containerSize.height
-                )
-            )
-        }
-
-        return (
-            origin: .zero,
-            size: CGSize(
-                width: min(56, containerSize.width),
-                height: containerSize.height
-            )
-        )
-    }
-
-    private func makeLensParams(
-        layout: NagiTabBarLayout,
-        displayedIndex: Int?,
-        isLifted: Bool,
-        isDark: Bool,
-        reduceTransparency: Bool
-    ) -> NagiLensParams {
-        let selection = makeLensSelectionGeometry(
-            layout: layout,
-            displayedIndex: displayedIndex
-        )
-
-        return NagiLensParams(
-            size: layout.lensContainerFrame.size,
-            // The parent owns translation; the native glass stays at local zero.
-            containerOrigin: .zero,
-            selectionOrigin: selection.origin,
-            selectionSize: selection.size,
-            isDark: isDark,
-            inset: NagiTabBarMetrics.innerInset,
-            liftedInset: NagiTabBarMetrics.innerInset,
-            isLifted: isLifted,
-            isCollapsed: layout.isLensCollapsed,
-            reduceTransparency: reduceTransparency
-        )
     }
 
     private func mainIndex(
         at location: CGPoint,
         requiresMainFrameHit: Bool
     ) -> Int? {
-        guard let currentLayout,
-              !currentLayout.isSearchActive else {
+        guard !currentSearchState.isActive,
+              !currentItemFramesInRoot.isEmpty else {
             return nil
         }
 
-        let mainFrame = localFrame(
-            currentLayout.mainTabsFrame,
-            in: currentLayout.tabBarFrame
-        )
-        if requiresMainFrameHit && !mainFrame.contains(location) {
+        let unionFrame = currentItemFramesInRoot.reduce(CGRect.null) {
+            $0.union($1)
+        }
+        if requiresMainFrameHit && !unionFrame.insetBy(
+            dx: -NagiTabBarMetrics.innerInset,
+            dy: -NagiTabBarMetrics.innerInset
+        ).contains(location) {
             return nil
         }
 
-        let itemFrames = currentLayout.itemFrames.map {
-            localFrame($0, in: currentLayout.tabBarFrame)
-        }
-        guard !itemFrames.isEmpty else { return nil }
-
-        if let index = itemFrames.firstIndex(where: {
+        if let index = currentItemFramesInRoot.firstIndex(where: {
             $0.contains(location)
         }) {
             return index
         }
 
-        return itemFrames.indices.min {
-            abs(itemFrames[$0].midX - location.x) <
-            abs(itemFrames[$1].midX - location.x)
+        return currentItemFramesInRoot.indices.min {
+            abs(currentItemFramesInRoot[$0].midX - location.x)
+                < abs(currentItemFramesInRoot[$1].midX - location.x)
         }
     }
 
     private func tab(forMainIndex index: Int) -> AppTab {
         switch index {
-        case 0:
-            return .home
-        case 1:
-            return .library
-        default:
-            return .settings
+        case 0: return .home
+        case 1: return .library
+        default: return .settings
         }
     }
 
-    private func localFrame(
-        _ frame: CGRect,
-        in parentFrame: CGRect
-    ) -> CGRect {
+    private func mainIndex(for tab: AppTab) -> Int? {
+        switch tab {
+        case .home: return 0
+        case .library: return 1
+        case .settings: return 2
+        }
+    }
+
+    private func localFrame(_ frame: CGRect, in parentFrame: CGRect) -> CGRect {
         guard !frame.isEmpty else { return .zero }
         return frame.offsetBy(
             dx: -parentFrame.minX,
             dy: -parentFrame.minY
         )
-    }
-
-    private func mainIndex(for tab: AppTab) -> Int? {
-        switch tab {
-        case .home:
-            return 0
-        case .library:
-            return 1
-        case .settings:
-            return 2
-        }
     }
 }
