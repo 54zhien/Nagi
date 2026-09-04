@@ -9,6 +9,10 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
     let isReflowable: Bool
 
     func makeUIViewController(context: Context) -> EPUBNavigatorViewController {
+        navigator.applyNagiReaderBaseAppearance(
+            isReflowable: isReflowable,
+            fallbackBackground: UIColor(background)
+        )
         return navigator
     }
 
@@ -16,12 +20,6 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
         _ uiViewController: EPUBNavigatorViewController,
         context: Context
     ) {
-        // Reflowable hierarchy normalization is intentionally not repeated
-        // from SwiftUI's update hook. The navigator owns pages that can be
-        // created after this callback; the model handles the one-time scan
-        // when a navigator/spread is created and when the app returns to the
-        // foreground. Fixed-layout documents only need their outer fallback
-        // color updated here.
         guard !isReflowable else { return }
         uiViewController.view.backgroundColor = UIColor(background)
     }
@@ -89,10 +87,10 @@ extension EPUBNavigatorViewController {
     }
 
     /// Waits for the current spread to paint two animation frames after a
-    /// mutation. A single short fallback covers a document that was still
-    /// attaching its body; there is deliberately no long retry ladder.
+    /// mutation. The caller can retry while the first spread is attaching.
     @MainActor
-    func waitForNagiReaderReadiness(_ script: String) async {
+    @discardableResult
+    func waitForNagiReaderReadiness(_ script: String) async -> Bool {
         let visibleWebViews = makeNagiReaderWebViews(in: view)
             .filter { isNagiReaderWebViewVisible($0, in: view) }
         let firstPass: Bool
@@ -106,21 +104,26 @@ extension EPUBNavigatorViewController {
         } else {
             firstPass = await evaluateNagiReaderReadiness(script, in: view)
         }
-        guard !firstPass, !Task.isCancelled else { return }
+        guard !firstPass else { return true }
+        guard !Task.isCancelled else { return false }
 
         do {
             try await Task.sleep(nanoseconds: 60_000_000)
         } catch {
-            return
+            return false
         }
 
-        guard !Task.isCancelled else { return }
+        guard !Task.isCancelled else { return false }
         let currentWebViews = makeNagiReaderWebViews(in: view)
             .filter { isNagiReaderWebViewVisible($0, in: view) }
         if currentWebViews.isEmpty {
-            _ = await evaluateJavaScript(script)
+            let result = await evaluateJavaScript(script)
+            if case let .success(value) = result {
+                return (value as? String) == "ready"
+            }
+            return false
         } else {
-            _ = await evaluateNagiReaderReadiness(script, in: view)
+            return await evaluateNagiReaderReadiness(script, in: view)
         }
     }
 }

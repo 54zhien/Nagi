@@ -124,6 +124,15 @@ final class EPUBReaderModel {
     private var pendingVisualMutationKind: ReaderVisualMutationKind?
     private var latestCommittedVisualMutationKind: ReaderVisualMutationKind = .full
 
+    private static let readerAppearanceRetryDelays: [UInt64] = [
+        0,
+        16_000_000,
+        50_000_000,
+        100_000_000,
+        200_000_000,
+        400_000_000
+    ]
+
     private enum PreferenceKey {
         static let fontScale = "reader.epub.fontScale"
         static let fontFamily = "reader.epub.fontFamily"
@@ -605,17 +614,47 @@ final class EPUBReaderModel {
         readerOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
             guard let self, let navigator else { return }
             guard self.latestOverrideRequestGeneration == requestGeneration else { return }
+
+            for delay in Self.readerAppearanceRetryDelays {
+                if delay > 0 {
+                    do {
+                        try await Task.sleep(nanoseconds: delay)
+                    } catch {
+                        return
+                    }
+                }
+
+                guard !Task.isCancelled,
+                      self.latestOverrideRequestGeneration == requestGeneration else {
+                    return
+                }
+                if let generation {
+                    guard self.latestPreferenceGeneration == generation else { return }
+                }
+
+                // The navigator can create its visible WebView after this
+                // task starts. Reapply both UIKit and document appearance so
+                // the first spread cannot expose Readium's white fallback.
+                self.applyVisibleReaderBaseAppearance()
+                await navigator.applyNagiReaderOverridesToVisible(script)
+
+                guard !Task.isCancelled,
+                      self.latestOverrideRequestGeneration == requestGeneration else {
+                    return
+                }
+                if let generation {
+                    guard self.latestPreferenceGeneration == generation else { return }
+                }
+
+                if await navigator.waitForNagiReaderReadiness(script) {
+                    break
+                }
+            }
+
+            guard !Task.isCancelled,
+                  self.latestOverrideRequestGeneration == requestGeneration else { return }
             if let generation {
                 guard self.latestPreferenceGeneration == generation else { return }
-            }
-            await navigator.applyNagiReaderOverridesToVisible(script)
-            if let generation {
-                guard !Task.isCancelled,
-                      self.latestOverrideRequestGeneration == requestGeneration,
-                      self.latestPreferenceGeneration == generation else { return }
-            } else {
-                guard !Task.isCancelled,
-                      self.latestOverrideRequestGeneration == requestGeneration else { return }
             }
 
             self.preloadedReaderOverrideTask = Task { @MainActor [weak self, weak navigator] in

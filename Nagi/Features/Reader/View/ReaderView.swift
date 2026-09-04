@@ -30,13 +30,13 @@ struct ReaderView: View {
             guard !Task.isCancelled else { return }
 
             let nextModel = ReaderViewModel(book: book)
+            nextModel.updateSystemAppearance(isDark: colorScheme == .dark)
             model = nextModel
 
             // Show the loading state before creating the navigator.
             await Task.yield()
             guard !Task.isCancelled else { return }
 
-            nextModel.updateSystemAppearance(isDark: colorScheme == .dark)
             await nextModel.loadIfNeeded()
         }
         .onAppear {

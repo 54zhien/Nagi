@@ -56,13 +56,13 @@ enum ReaderPageTransition: String, CaseIterable, Identifiable, Codable, Sendable
     var systemImage: String {
         switch self {
         case .slide:
-            return "arrow.left.page.on.rectangle"
+            return "wind.snow"
         case .pageCurl:
-            return "book.pages"
+            return "tornado"
         case .fade:
-            return "rectangle.on.rectangle.transition"
+            return "bird"
         case .scroll:
-            return "arrow.up.and.down.text.horizontal"
+            return "cloud.bolt.rain"
         }
     }
 
