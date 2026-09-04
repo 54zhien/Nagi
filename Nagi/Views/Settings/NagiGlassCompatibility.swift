@@ -1,22 +1,5 @@
-
 import SwiftUI
 import UIKit
-
-enum NagiGlassStyle: String, CaseIterable, Identifiable {
-    case liquid
-    case translucent
-
-    var id: String { rawValue }
-
-    var title: String {
-        switch self {
-        case .liquid:
-            return "Liquid Glass"
-        case .translucent:
-            return "半透明兼容"
-        }
-    }
-}
 
 enum NagiAppearanceSettings {
     static let liquidGlassEnabledKey = "appearance.liquidGlass.enabled"
@@ -33,15 +16,7 @@ enum NagiGlassStyleStore {
     }
 
     static var usesNativeLiquidGlass: Bool {
-        guard liquidGlassEnabled else { return false }
-        if #available(iOS 26.0, *) {
-            return true
-        }
-        return false
-    }
-
-    static var effectiveStyle: NagiGlassStyle {
-        usesNativeLiquidGlass ? .liquid : .translucent
+        liquidGlassEnabled
     }
 }
 
@@ -51,23 +26,9 @@ struct NagiWindowCornerInsets {
 }
 
 func nagiWindowCornerInsets(for geometry: GeometryProxy) -> NagiWindowCornerInsets {
-    if #available(iOS 26.0, *) {
-        return NagiWindowCornerInsets(
-            bottomLeading: geometry.containerCornerInsets.bottomLeading,
-            bottomTrailing: geometry.containerCornerInsets.bottomTrailing
-        )
-    }
-
-    let bottom = geometry.safeAreaInsets.bottom
-    return NagiWindowCornerInsets(
-        bottomLeading: CGSize(
-            width: geometry.safeAreaInsets.leading,
-            height: bottom
-        ),
-        bottomTrailing: CGSize(
-            width: geometry.safeAreaInsets.trailing,
-            height: bottom
-        )
+    NagiWindowCornerInsets(
+        bottomLeading: geometry.containerCornerInsets.bottomLeading,
+        bottomTrailing: geometry.containerCornerInsets.bottomTrailing
     )
 }
 
@@ -85,16 +46,19 @@ private struct NagiGlassModifier<GlassShape: Shape>: ViewModifier {
     func body(content: Content) -> some View {
         if !isEnabled {
             content
-        } else if reduceTransparency {
-            fallback(content, opaque: true)
-        } else if #available(iOS 26.0, *), liquidGlassEnabled {
-            content.glassEffect(nativeGlass, in: shape)
+        } else if !liquidGlassEnabled || reduceTransparency {
+            content
+                .background(
+                    shape.fill(Color(uiColor: .secondarySystemBackground))
+                )
+                .overlay {
+                    shape.stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
+                }
         } else {
-            fallback(content, opaque: false)
+            content.glassEffect(nativeGlass, in: shape)
         }
     }
 
-    @available(iOS 26.0, *)
     private var nativeGlass: Glass {
         var effect = Glass.regular
         if let tint {
@@ -104,30 +68,6 @@ private struct NagiGlassModifier<GlassShape: Shape>: ViewModifier {
             effect = effect.interactive()
         }
         return effect
-    }
-
-    @ViewBuilder
-    private func fallback(_ content: Content, opaque: Bool) -> some View {
-        if opaque {
-            content
-                .background(
-                    shape.fill(Color(uiColor: .secondarySystemBackground))
-                )
-                .overlay {
-                    shape.stroke(Color.primary.opacity(0.12), lineWidth: 0.5)
-                }
-        } else {
-            content
-                .background(.ultraThinMaterial, in: shape)
-                .overlay {
-                    if let tint {
-                        shape.fill(tint.opacity(0.16))
-                    }
-                }
-                .overlay {
-                    shape.stroke(Color.white.opacity(0.18), lineWidth: 0.5)
-                }
-        }
     }
 }
 
@@ -148,7 +88,7 @@ struct NagiGlassEffectContainer<Content: View>: View {
 
     @ViewBuilder
     var body: some View {
-        if #available(iOS 26.0, *), liquidGlassEnabled {
+        if liquidGlassEnabled {
             GlassEffectContainer(spacing: spacing) {
                 content
             }
@@ -169,7 +109,7 @@ private struct NagiSafeAreaBarModifier<BarContent: View>: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), liquidGlassEnabled {
+        if liquidGlassEnabled {
             content.safeAreaBar(
                 edge: edge,
                 alignment: alignment,
@@ -193,7 +133,7 @@ private struct NagiScrollEdgeEffectModifier: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26.0, *), liquidGlassEnabled {
+        if liquidGlassEnabled {
             content.scrollEdgeEffectStyle(.soft, for: .top)
         } else {
             content
@@ -237,13 +177,12 @@ extension View {
     func nagiScrollEdgeEffectStyle() -> some View {
         modifier(NagiScrollEdgeEffectModifier())
     }
-
 }
 
 extension ToolbarContent {
     @ToolbarContentBuilder
     func nagiSharedBackgroundVisibilityHidden() -> some ToolbarContent {
-        if #available(iOS 26.0, *), NagiGlassStyleStore.usesNativeLiquidGlass {
+        if NagiGlassStyleStore.usesNativeLiquidGlass {
             self.sharedBackgroundVisibility(.hidden)
         } else {
             self

@@ -1,35 +1,30 @@
-
 import UIKit
 
 @MainActor
 final class GlassSurfaceView: UIView {
-    private(set) var effectView: UIVisualEffectView
-    private let renderer: any GlassRenderer
+    private let glassEffect: UIGlassEffect
+    let effectView: UIVisualEffectView
     private var currentState: GlassState?
+    private var currentLiquidGlassEnabled: Bool?
 
-    init(backend: GlassBackend? = nil) {
-        let resolvedBackend = backend ?? GlassBackendConfiguration.surfaceBackend
-        let resolvedRenderer: any GlassRenderer
-        switch resolvedBackend {
-        case .native:
-            if #available(iOS 26.0, *), NagiGlassStyleStore.usesNativeLiquidGlass {
-                resolvedRenderer = NativeGlassRenderer()
-            } else {
-                resolvedRenderer = BackdropGlassRenderer()
-            }
-        case .backdrop, .hybrid:
-            resolvedRenderer = BackdropGlassRenderer()
-        }
-        let resolvedEffectView = resolvedRenderer.makeEffectView()
-        renderer = resolvedRenderer
-        effectView = resolvedEffectView
-        super.init(frame: .zero)
+    override init(frame: CGRect) {
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.isInteractive = true
+        self.glassEffect = glassEffect
+        effectView = UIVisualEffectView(effect: glassEffect)
+        super.init(frame: frame)
 
         isOpaque = false
+        backgroundColor = .clear
         effectView.isUserInteractionEnabled = false
         effectView.clipsToBounds = true
+        effectView.layer.cornerCurve = .continuous
         effectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         addSubview(effectView)
+    }
+
+    convenience init() {
+        self.init(frame: .zero)
     }
 
     @available(*, unavailable)
@@ -38,15 +33,24 @@ final class GlassSurfaceView: UIView {
     }
 
     func update(_ newState: GlassState) {
-        guard newState != currentState else { return }
+        let liquidGlassEnabled = NagiGlassStyleStore.liquidGlassEnabled
+        guard newState != currentState
+            || liquidGlassEnabled != currentLiquidGlassEnabled else {
+            return
+        }
 
-        renderer.update(
-            state: newState,
-            previousState: currentState,
-            effectView: effectView
-        )
-        currentState = newState
+        glassEffect.tintColor = newState.tint?.uiColor
+        glassEffect.isInteractive = newState.isInteractive
+        effectView.overrideUserInterfaceStyle = traitCollection.userInterfaceStyle
+            == .dark ? .dark : .light
+        effectView.effect = liquidGlassEnabled ? glassEffect : nil
+        effectView.backgroundColor = liquidGlassEnabled
+            ? .clear
+            : .secondarySystemBackground
         effectView.layer.cornerRadius = newState.cornerRadius
+
+        currentState = newState
+        currentLiquidGlassEnabled = liquidGlassEnabled
     }
 
     func setCornerRadius(_ radius: CGFloat) {

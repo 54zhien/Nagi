@@ -1,4 +1,3 @@
-
 import ObjectiveC.runtime
 import QuartzCore
 import UIKit
@@ -59,9 +58,6 @@ enum NagiGlassEffectRuntime {
 
     static func installIfNeeded() {
         guard !isInstalled else { return }
-        guard #available(iOS 26.0, *) else {
-            return
-        }
 
         let className =
             "_TtC5UIKitP33_ACD4A08F4BE9D00246F2A9C24A80CA8817UISDFBackdropView"
@@ -142,7 +138,7 @@ final class NagiGlassBackgroundView: UIView {
 
     private let effectView: UIVisualEffectView
     private let nativeParamsView: NagiEffectSettingsContainerView
-    private let fallbackView: UIView
+    private let opaqueView: UIView
     private var previousParams: NagiGlassParams?
     private var currentEffectKey: String?
     private var currentTintColor: UIColor?
@@ -151,29 +147,30 @@ final class NagiGlassBackgroundView: UIView {
     private var pendingEffect: UIVisualEffect?
 
     override init(frame: CGRect) {
-        let effectView = UIVisualEffectView(
-            effect: UIBlurEffect(style: .systemMaterial)
-        )
-        let nativeParamsView = NagiEffectSettingsContainerView(frame: .zero)
-        let fallbackView = UIView(frame: .zero)
-
-        self.effectView = effectView
-        self.nativeParamsView = nativeParamsView
-        self.fallbackView = fallbackView
+        effectView = UIVisualEffectView(effect: nil)
+        nativeParamsView = NagiEffectSettingsContainerView(frame: .zero)
+        opaqueView = UIView(frame: .zero)
         super.init(frame: frame)
 
+        backgroundColor = .clear
+        isOpaque = false
         clipsToBounds = false
         layer.cornerCurve = .continuous
 
-        fallbackView.backgroundColor = .secondarySystemBackground
-        fallbackView.isHidden = true
-        fallbackView.isUserInteractionEnabled = false
-        fallbackView.layer.cornerCurve = .continuous
+        opaqueView.backgroundColor = .secondarySystemBackground
+        opaqueView.isUserInteractionEnabled = false
+        opaqueView.clipsToBounds = true
+        opaqueView.layer.cornerCurve = .continuous
 
+        effectView.backgroundColor = .clear
+        effectView.isOpaque = false
+        effectView.clipsToBounds = true
         effectView.layer.cornerCurve = .continuous
-        nativeParamsView.addSubview(effectView)
+        effectView.contentView.backgroundColor = .clear
+        effectView.contentView.isOpaque = false
 
-        addSubview(fallbackView)
+        nativeParamsView.addSubview(effectView)
+        addSubview(opaqueView)
         addSubview(nativeParamsView)
     }
 
@@ -188,10 +185,22 @@ final class NagiGlassBackgroundView: UIView {
             return nil
         }
 
-        return effectView.hitTest(
-            convert(point, to: effectView),
+        for view in contentView.subviews.reversed() {
+            if let result = view.hitTest(
+                convert(point, to: view),
+                with: event
+            ), result.isUserInteractionEnabled {
+                return result
+            }
+        }
+
+        guard let result = contentView.hitTest(
+            convert(point, to: contentView),
             with: event
-        )
+        ), result !== contentView else {
+            return nil
+        }
+        return result
     }
 
     @discardableResult
@@ -205,40 +214,23 @@ final class NagiGlassBackgroundView: UIView {
         previousParams = params
         currentUsesNativeLiquidGlass = usesNativeLiquidGlass
 
-        let effectName = usesNativeLiquidGlass ? "native" : "backdrop"
-        let effectKey = "\(effectName)|\(params.isDark)|\(params.isInteractive)"
-        let useOpaqueFallback = params.reduceTransparency
-        let shouldRebuildEffect =
-            (
-                !useOpaqueFallback &&
-                (
-                    currentEffectKey != effectKey ||
-                    !NagiGlassParams.colorsEqual(
-                        currentTintColor,
-                        params.tintColor
-                    ) ||
-                    effectView.effect == nil
-                )
-            ) ||
-            (
-                useOpaqueFallback && effectView.effect != nil
-            )
+        let effectKey = "\(usesNativeLiquidGlass)|\(params.reduceTransparency)|\(params.isDark)|\(params.isInteractive)|\(params.isVisible)"
+        let tintChanged = !NagiGlassParams.colorsEqual(
+            currentTintColor,
+            params.tintColor
+        )
+        let shouldRebuildEffect = currentEffectKey != effectKey
+            || tintChanged
 
         if shouldRebuildEffect {
             let effect: UIVisualEffect?
-            if useOpaqueFallback {
-                effect = nil
-            } else if usesNativeLiquidGlass {
-                if #available(iOS 26.0, *) {
-                    let glassEffect = UIGlassEffect(style: .regular)
-                    glassEffect.tintColor = params.tintColor
-                    glassEffect.isInteractive = params.isInteractive
-                    effect = glassEffect
-                } else {
-                    effect = UIBlurEffect(style: .systemMaterial)
-                }
+            if usesNativeLiquidGlass && !params.reduceTransparency && params.isVisible {
+                let glassEffect = UIGlassEffect(style: .regular)
+                glassEffect.tintColor = params.tintColor
+                glassEffect.isInteractive = params.isInteractive
+                effect = glassEffect
             } else {
-                effect = UIBlurEffect(style: .systemMaterial)
+                effect = nil
             }
             pendingEffect = effect
             hasPendingEffect = true
@@ -247,26 +239,25 @@ final class NagiGlassBackgroundView: UIView {
         }
 
         effectView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
+        opaqueView.overrideUserInterfaceStyle = params.isDark ? .dark : .light
 
-        if usesNativeLiquidGlass && !useOpaqueFallback && params.isDark {
-            nativeParamsView.lumaMin = 0.0
-            nativeParamsView.lumaMax = 0.15
-        } else if usesNativeLiquidGlass && !useOpaqueFallback {
-            nativeParamsView.lumaMin = 0.8
-            nativeParamsView.lumaMax = 0.801
+        if usesNativeLiquidGlass && !params.reduceTransparency && params.isVisible {
+            if params.isDark {
+                nativeParamsView.lumaMin = 0.0
+                nativeParamsView.lumaMax = 0.15
+            } else {
+                nativeParamsView.lumaMin = 0.8
+                nativeParamsView.lumaMax = 0.801
+            }
         } else {
             nativeParamsView.lumaMin = 0
             nativeParamsView.lumaMax = 1
         }
 
-        fallbackView.isHidden = !useOpaqueFallback
-        effectView.contentView.backgroundColor = useOpaqueFallback
-            ? .clear
-            : usesNativeLiquidGlass
-                ? .clear
-                : params.tintColor?.withAlphaComponent(
-                    params.isDark ? 0.14 : 0.12
-                )
+        opaqueView.isHidden = usesNativeLiquidGlass
+            && !params.reduceTransparency
+            && params.isVisible
+        effectView.contentView.backgroundColor = .clear
 
         return true
     }
@@ -278,7 +269,7 @@ final class NagiGlassBackgroundView: UIView {
     ) {
         let targetFrame = CGRect(origin: .zero, size: params.size)
 
-        transition.setFrame(view: fallbackView, frame: targetFrame)
+        transition.setFrame(view: opaqueView, frame: targetFrame)
         transition.setFrame(view: nativeParamsView, frame: targetFrame)
         if effectView.frame != targetFrame {
             transition.animateView {
@@ -296,7 +287,7 @@ final class NagiGlassBackgroundView: UIView {
         }
 
         transition.setCornerRadius(
-            view: fallbackView,
+            view: opaqueView,
             radius: params.cornerRadius
         )
         transition.setCornerRadius(

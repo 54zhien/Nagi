@@ -74,8 +74,6 @@
 		4A0000000000000000000085 /* ReaderChromeAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000085 /* ReaderChromeAnimator.swift */; };
 		4A0000000000000000000086 /* ReaderChromeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000086 /* ReaderChromeView.swift */; };
 		4A0000000000000000000087 /* GlassState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000087 /* GlassState.swift */; };
-		4A0000000000000000000088 /* GlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000088 /* GlassRenderer.swift */; };
-		4A0000000000000000000089 /* NativeGlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000089 /* NativeGlassRenderer.swift */; };
 		4A000000000000000000008A /* GlassSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008A /* GlassSurfaceView.swift */; };
 		4A000000000000000000008B /* GlassTouchDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008B /* GlassTouchDriver.swift */; };
 		4A000000000000000000008C /* GlassControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008C /* GlassControlView.swift */; };
@@ -84,8 +82,6 @@
 		4A000000000000000000008F /* GlassControlGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008F /* GlassControlGroup.swift */; };
 		4A0000000000000000000090 /* ReaderSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000090 /* ReaderSettingsViewController.swift */; };
 		4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000091 /* ReaderMutationScheduler.swift */; };
-		4A0000000000000000000092 /* BackdropGlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000092 /* BackdropGlassRenderer.swift */; };
-		4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000093 /* GlassBackendConfiguration.swift */; };
 		4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */; };
 		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
 		4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */; };
@@ -171,8 +167,6 @@
 		3A0000000000000000000085 /* ReaderChromeAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChromeAnimator.swift; sourceTree = "<group>"; };
 		3A0000000000000000000086 /* ReaderChromeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChromeView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000087 /* GlassState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassState.swift; sourceTree = "<group>"; };
-		3A0000000000000000000088 /* GlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassRenderer.swift; sourceTree = "<group>"; };
-		3A0000000000000000000089 /* NativeGlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGlassRenderer.swift; sourceTree = "<group>"; };
 		3A000000000000000000008A /* GlassSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurfaceView.swift; sourceTree = "<group>"; };
 		3A000000000000000000008B /* GlassTouchDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassTouchDriver.swift; sourceTree = "<group>"; };
 		3A000000000000000000008C /* GlassControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlView.swift; sourceTree = "<group>"; };
@@ -181,8 +175,6 @@
 		3A000000000000000000008F /* GlassControlGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlGroup.swift; sourceTree = "<group>"; };
 		3A0000000000000000000090 /* ReaderSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsViewController.swift; sourceTree = "<group>"; };
 		3A0000000000000000000091 /* ReaderMutationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderMutationScheduler.swift; sourceTree = "<group>"; };
-		3A0000000000000000000092 /* BackdropGlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackdropGlassRenderer.swift; sourceTree = "<group>"; };
-		3A0000000000000000000093 /* GlassBackendConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBackendConfiguration.swift; sourceTree = "<group>"; };
 		3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceSignposts.swift; sourceTree = "<group>"; };
 		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
 		3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFontSizeStepperControl.swift; sourceTree = "<group>"; };
@@ -475,9 +467,7 @@
 			isa = PBXGroup;
 			children = (
 				2A0000000000000000000019 /* Core */,
-				2A000000000000000000001A /* Renderer */,
 				2A000000000000000000001B /* Animation */,
-				2A000000000000000000001E /* Configuration */,
 			);
 			path = Glass;
 			sourceTree = "<group>";
@@ -494,30 +484,12 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
-		2A000000000000000000001A /* Renderer */ = {
-			isa = PBXGroup;
-			children = (
-				3A0000000000000000000088 /* GlassRenderer.swift */,
-				3A0000000000000000000089 /* NativeGlassRenderer.swift */,
-				3A0000000000000000000092 /* BackdropGlassRenderer.swift */,
-			);
-			path = Renderer;
-			sourceTree = "<group>";
-		};
 		2A000000000000000000001B /* Animation */ = {
 			isa = PBXGroup;
 			children = (
 				3A000000000000000000008B /* GlassTouchDriver.swift */,
 			);
 			path = Animation;
-			sourceTree = "<group>";
-		};
-		2A000000000000000000001E /* Configuration */ = {
-			isa = PBXGroup;
-			children = (
-				3A0000000000000000000093 /* GlassBackendConfiguration.swift */,
-			);
-			path = Configuration;
 			sourceTree = "<group>";
 		};
 		2A000000000000000000001C /* Settings */ = {
@@ -767,8 +739,6 @@
 				4A0000000000000000000085 /* ReaderChromeAnimator.swift in Sources */,
 				4A0000000000000000000086 /* ReaderChromeView.swift in Sources */,
 				4A0000000000000000000087 /* GlassState.swift in Sources */,
-				4A0000000000000000000088 /* GlassRenderer.swift in Sources */,
-				4A0000000000000000000089 /* NativeGlassRenderer.swift in Sources */,
 				4A000000000000000000008A /* GlassSurfaceView.swift in Sources */,
 				4A000000000000000000008B /* GlassTouchDriver.swift in Sources */,
 				4A000000000000000000008C /* GlassControlView.swift in Sources */,
@@ -777,8 +747,6 @@
 				4A000000000000000000008F /* GlassControlGroup.swift in Sources */,
 				4A0000000000000000000090 /* ReaderSettingsViewController.swift in Sources */,
 				4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */,
-				4A0000000000000000000092 /* BackdropGlassRenderer.swift in Sources */,
-				4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */,
 				4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */,
 				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
 				4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */,
@@ -835,7 +803,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -872,7 +840,7 @@
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;

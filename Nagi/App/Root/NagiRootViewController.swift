@@ -1,23 +1,6 @@
 
-import QuartzCore
 import SwiftUI
 import UIKit
-
-private final class NagiPageScaleAnimationDelegate: NSObject, CAAnimationDelegate {
-    private var didComplete = false
-    private let completion: (Bool) -> Void
-
-    init(completion: @escaping (Bool) -> Void) {
-        self.completion = completion
-        super.init()
-    }
-
-    func animationDidStop(_ anim: CAAnimation, finished flag: Bool) {
-        guard !didComplete else { return }
-        didComplete = true
-        completion(flag)
-    }
-}
 
 @MainActor
 final class NagiRootViewController: UIViewController {
@@ -384,45 +367,14 @@ final class NagiRootViewController: UIViewController {
         removeOnCompletion: Bool,
         completion: ((Bool) -> Void)? = nil
     ) {
-        let animation = CABasicAnimation(keyPath: "transform.scale")
-        animation.fromValue = from as NSNumber
-        animation.toValue = to as NSNumber
-        animation.duration = duration
-        animation.timingFunction = CAMediaTimingFunction(
-            controlPoints: 0.380,
-            0.700,
-            0.125,
-            1.000
+        NagiTabTransition.spring(duration: duration).animateScale(
+            layer: layer,
+            from: from,
+            to: to,
+            delay: delay,
+            removeOnCompletion: removeOnCompletion,
+            completion: completion
         )
-        animation.isRemovedOnCompletion = removeOnCompletion
-        animation.fillMode = .forwards
-
-        if delay > 0 {
-            animation.beginTime = layer.convertTime(
-                CACurrentMediaTime(),
-                from: nil
-            ) + delay
-            animation.fillMode = .both
-        }
-
-        if #available(iOS 15.0, *) {
-            let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
-            if maximumFPS > 61.0 {
-                animation.preferredFrameRateRange = CAFrameRateRange(
-                    minimum: 30.0,
-                    maximum: maximumFPS,
-                    preferred: maximumFPS
-                )
-            }
-        }
-
-        if let completion {
-            animation.delegate = NagiPageScaleAnimationDelegate(
-                completion: completion
-            )
-        }
-
-        layer.add(animation, forKey: "transform.scale")
     }
 
     private func presentSearchOverlay() {

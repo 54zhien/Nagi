@@ -74,10 +74,8 @@ final class NagiTabBarView: UIView {
         clipsToBounds = false
         isUserInteractionEnabled = true
 
-        if #available(iOS 17.0, *) {
-            traitOverrides.verticalSizeClass = .compact
-            traitOverrides.horizontalSizeClass = .compact
-        }
+        traitOverrides.verticalSizeClass = .compact
+        traitOverrides.horizontalSizeClass = .compact
 
         addSubview(glassContainer)
 
@@ -383,7 +381,7 @@ final class NagiTabBarView: UIView {
             )
             transition.setFrame(
                 view: liquidLensView,
-                frame: CGRect(origin: .zero, size: tabsSize)
+                frame: CGRect(origin: .zero, size: lensSize)
             )
 
             for index in itemViews.indices {
@@ -602,10 +600,11 @@ final class NagiTabBarView: UIView {
             let selectedItemView = selectedItemViews[index]
 
             itemView.update(
-                isSelected: isSelected,
+                isSelected: isSelected && !liquidLensView.usesPrivateLens,
                 usesPrivateLens: liquidLensView.usesPrivateLens,
                 isCompact: isSearchActive,
                 showsTitle: showItemTitles,
+                availableSize: itemView.bounds.size,
                 transition: blurTransition
             )
             selectedItemView.update(
@@ -613,6 +612,7 @@ final class NagiTabBarView: UIView {
                 usesPrivateLens: liquidLensView.usesPrivateLens,
                 isCompact: isSearchActive,
                 showsTitle: showItemTitles,
+                availableSize: itemView.bounds.size,
                 transition: blurTransition
             )
 

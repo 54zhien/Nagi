@@ -1,4 +1,3 @@
-
 import UIKit
 
 final class NagiGlassContainerView: UIView {
@@ -12,9 +11,7 @@ final class NagiGlassContainerView: UIView {
     }
 
     init(spacing: CGFloat = 7) {
-        let effectView = UIVisualEffectView(
-            effect: UIBlurEffect(style: .systemMaterial)
-        )
+        let effectView = UIVisualEffectView(effect: nil)
         let nativeParamsView = NagiEffectSettingsContainerView(frame: .zero)
 
         self.effectView = effectView
@@ -24,6 +21,15 @@ final class NagiGlassContainerView: UIView {
 
         isUserInteractionEnabled = true
         clipsToBounds = false
+        backgroundColor = .clear
+        isOpaque = false
+        layer.cornerCurve = .continuous
+
+        effectView.backgroundColor = .clear
+        effectView.isOpaque = false
+        effectView.clipsToBounds = false
+        effectView.contentView.backgroundColor = .clear
+        effectView.contentView.isOpaque = false
 
         nativeParamsView.addSubview(effectView)
         addSubview(nativeParamsView)
@@ -66,17 +72,13 @@ final class NagiGlassContainerView: UIView {
         let usesNativeLiquidGlass = NagiGlassStyleStore.usesNativeLiquidGlass
         if usesNativeLiquidGlass != currentUsesNativeLiquidGlass {
             currentUsesNativeLiquidGlass = usesNativeLiquidGlass
-            let effect: UIVisualEffect
+            let effect: UIVisualEffect?
             if usesNativeLiquidGlass {
-                if #available(iOS 26.0, *) {
-                    let containerEffect = UIGlassContainerEffect()
-                    containerEffect.spacing = spacing
-                    effect = containerEffect
-                } else {
-                    effect = UIBlurEffect(style: .systemMaterial)
-                }
+                let containerEffect = UIGlassContainerEffect()
+                containerEffect.spacing = spacing
+                effect = containerEffect
             } else {
-                effect = UIBlurEffect(style: .systemMaterial)
+                effect = nil
             }
             transition.animateView {
                 self.effectView.effect = effect
@@ -84,20 +86,19 @@ final class NagiGlassContainerView: UIView {
         }
 
         effectView.overrideUserInterfaceStyle = isDark ? .dark : .light
-
-        if usesNativeLiquidGlass && isDark {
-            nativeParamsView.lumaMin = 0.0
-            nativeParamsView.lumaMax = 0.15
-        } else if usesNativeLiquidGlass {
-            nativeParamsView.lumaMin = 0.8
-            nativeParamsView.lumaMax = 0.801
-        } else {
-            nativeParamsView.lumaMin = 0
-            nativeParamsView.lumaMax = 1
-        }
+        overrideUserInterfaceStyle = isDark ? .dark : .light
+        backgroundColor = usesNativeLiquidGlass
+            ? .clear
+            : .secondarySystemBackground
+        nativeParamsView.lumaMin = isDark ? 0.0 : 0.8
+        nativeParamsView.lumaMax = isDark ? 0.15 : 0.801
 
         let frame = CGRect(origin: .zero, size: size)
         transition.setFrame(view: nativeParamsView, frame: frame)
+        transition.setCornerRadius(
+            view: self,
+            radius: size.height * 0.5
+        )
         transition.animateView {
             self.effectView.frame = frame
         }

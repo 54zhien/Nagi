@@ -51,9 +51,3 @@ struct GlassState: Equatable {
         self.cornerRadius = cornerRadius
     }
 }
-
-enum GlassBackend: String, CaseIterable, Equatable {
-    case native
-    case backdrop
-    case hybrid
-}

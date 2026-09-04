@@ -96,27 +96,32 @@ final class NagiTabBarItemView: UIView {
         usesPrivateLens: Bool,
         isCompact: Bool = false,
         showsTitle: Bool = true,
+        availableSize: CGSize? = nil,
         transition: NagiTabTransition = .immediate
     ) {
         self.isCompact = isCompact
         self.showsTitle = showsTitle
         button.frame = bounds
 
+        let layoutBounds = CGRect(
+            origin: .zero,
+            size: availableSize ?? bounds.size
+        )
         let iconSize = iconView.image?.size ?? CGSize(width: 22, height: 22)
         let titleVisible = showsTitle && !isCompact
         let iconFrame = CGRect(
-            x: floor((bounds.width - iconSize.width) * 0.5),
+            x: floor((layoutBounds.width - iconSize.width) * 0.5),
             y: titleVisible
                 ? 3
-                : floor((bounds.height - iconSize.height) * 0.5),
+                : floor((layoutBounds.height - iconSize.height) * 0.5),
             width: iconSize.width,
             height: iconSize.height
         )
         let titleHeight = ceil(titleLabel.font.lineHeight)
         let titleFrame = CGRect(
             x: 0,
-            y: bounds.height - 8 - titleHeight,
-            width: bounds.width,
+            y: layoutBounds.height - 8 - titleHeight,
+            width: layoutBounds.width,
             height: titleHeight
         )
 

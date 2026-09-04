@@ -104,7 +104,6 @@ final class NagiLiquidLensView: UIView {
     let dedicatedMainGlassContainer: UIView
     private let backgroundView: NagiGlassBackgroundView
     private let liftedContainerView: UIView
-    private let fallbackSelectionView: NagiGlassBackgroundView
     let contentView: UIView
     private let restingBackgroundView: NagiLensRestingBackgroundView
     private let nativeLensView: UIView?
@@ -127,7 +126,6 @@ final class NagiLiquidLensView: UIView {
     }
 
     static var supportsNativeLiquidLens: Bool {
-        guard #available(iOS 26.0, *) else { return false }
         return makePrivateLensView() != nil
     }
 
@@ -136,7 +134,6 @@ final class NagiLiquidLensView: UIView {
         dedicatedMainGlassContainer = UIView(frame: .zero)
         backgroundView = NagiGlassBackgroundView(frame: .zero)
         liftedContainerView = UIView(frame: .zero)
-        fallbackSelectionView = NagiGlassBackgroundView(frame: .zero)
         contentView = UIView(frame: .zero)
         restingBackgroundView = NagiLensRestingBackgroundView()
         nativeLensView = Self.makePrivateLensView()
@@ -167,17 +164,12 @@ final class NagiLiquidLensView: UIView {
         liftedContainerView.clipsToBounds = false
         liftedContainerView.layer.cornerCurve = .continuous
 
-        fallbackSelectionView.isUserInteractionEnabled = false
-        fallbackSelectionView.contentView.isUserInteractionEnabled = false
-        fallbackSelectionView.layer.cornerCurve = .continuous
-
         if let nativeLensView {
             dedicatedMainGlassContainer.layer.zPosition = 1
             nativeLensView.layer.zPosition = 10
             nativeLensView.isUserInteractionEnabled = false
 
             liftedContainerView.addSubview(restingBackgroundView)
-            liftedContainerView.addSubview(fallbackSelectionView)
             containerView.addSubview(liftedContainerView)
             containerView.addSubview(nativeLensView)
             containerView.addSubview(contentView)
@@ -204,8 +196,9 @@ final class NagiLiquidLensView: UIView {
                 UIColor(white: 0.0, alpha: 0.1),
                 forKey: "restingBackgroundColor"
             )
-        } else {
-            liftedContainerView.addSubview(fallbackSelectionView)
+        }
+
+        if nativeLensView == nil {
             containerView.addSubview(liftedContainerView)
             containerView.addSubview(contentView)
         }
@@ -256,7 +249,7 @@ final class NagiLiquidLensView: UIView {
         previousUsesNativeLiquidGlass = usesNativeLiquidGlass
 
         nativeLensView?.isHidden = !usesNativeLens
-        fallbackSelectionView.isHidden = usesNativeLens
+        liftedContainerView.isHidden = !usesNativeLens
 
         let contentOrigin = params.containerOrigin
         let contentFrame = CGRect(origin: contentOrigin, size: params.size)
@@ -283,25 +276,6 @@ final class NagiLiquidLensView: UIView {
                 reduceTransparency: params.reduceTransparency
             ),
             transition: effectiveTransition
-        )
-
-        fallbackSelectionView.update(
-            params: NagiGlassParams(
-                size: params.selectionSize,
-                cornerRadius: params.selectionSize.height * 0.5,
-                isDark: params.isDark,
-                tintColor: params.isDark
-                    ? UIColor.white.withAlphaComponent(0.025)
-                    : UIColor.white.withAlphaComponent(0.1),
-                isInteractive: false,
-                isVisible: true,
-                reduceTransparency: params.reduceTransparency
-            ),
-            transition: effectiveTransition
-        )
-        effectiveTransition.setFrame(
-            view: fallbackSelectionView,
-            frame: CGRect(origin: params.selectionOrigin, size: params.selectionSize)
         )
 
         if contentView.bounds.size != params.size {
@@ -528,15 +502,13 @@ final class NagiLiquidLensView: UIView {
                 target: self,
                 selector: #selector(onLiftedDisplayLink(_:))
             )
-            if #available(iOS 15.0, *) {
-                let maxFPS = Float(UIScreen.main.maximumFramesPerSecond)
-                if maxFPS > 61 {
-                    link.preferredFrameRateRange = CAFrameRateRange(
-                        minimum: maxFPS,
-                        maximum: maxFPS,
-                        preferred: maxFPS
-                    )
-                }
+            let maxFPS = Float(UIScreen.main.maximumFramesPerSecond)
+            if maxFPS > 61 {
+                link.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: maxFPS,
+                    maximum: maxFPS,
+                    preferred: maxFPS
+                )
             }
             link.add(to: .main, forMode: .common)
             liftedDisplayLink = link
@@ -551,8 +523,7 @@ final class NagiLiquidLensView: UIView {
     }
 
     private static func makePrivateLensView() -> UIView? {
-        guard #available(iOS 26.0, *),
-              let viewClass = NSClassFromString("_UILiquidLensView") as AnyObject? as? NSObjectProtocol else {
+        guard let viewClass = NSClassFromString("_UILiquidLensView") as AnyObject? as? NSObjectProtocol else {
             return nil
         }
         let allocSelector = NSSelectorFromString("alloc")

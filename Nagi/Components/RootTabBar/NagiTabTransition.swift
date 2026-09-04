@@ -128,8 +128,7 @@ private extension CALayer {
         if NagiLayerSpringOverride.isActive,
            let sourceAnimation = animation as? CASpringAnimation {
             let keepNativeSpring: Bool
-            if #available(iOS 26.0, *),
-               abs(sourceAnimation.duration - 0.3832) <= 0.0001 {
+            if abs(sourceAnimation.duration - 0.3832) <= 0.0001 {
                 keepNativeSpring = true
             } else if abs(sourceAnimation.duration - 0.5) <= 0.0001 {
                 keepNativeSpring = true
@@ -165,9 +164,7 @@ private extension CALayer {
                 }
                 replacement.speed = speed * sourceAnimation.speed
 
-                if #available(iOS 15.0, *) {
-                    replacement.preferredFrameRateRange = sourceAnimation.preferredFrameRateRange
-                }
+                replacement.preferredFrameRateRange = sourceAnimation.preferredFrameRateRange
                 updatedAnimation = replacement
             }
         }
@@ -432,6 +429,34 @@ enum NagiTabTransition {
         )
     }
 
+    func animateScale(
+        layer: CALayer,
+        from: CGFloat,
+        to: CGFloat,
+        delay: TimeInterval = 0,
+        removeOnCompletion: Bool = true,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        guard !isImmediate else {
+            completion?(true)
+            return
+        }
+
+        let animation = makeAnimation(
+            keyPath: nagiTransformScaleAnimationKey,
+            fromValue: from,
+            toValue: to
+        )
+        animation.isRemovedOnCompletion = removeOnCompletion
+        addAnimation(
+            animation,
+            to: layer,
+            forKey: nagiTransformScaleAnimationKey,
+            delay: delay,
+            completion: completion
+        )
+    }
+
     func setAlpha(
         view: UIView,
         alpha: CGFloat,
@@ -474,13 +499,33 @@ enum NagiTabTransition {
         view: UIView,
         scale: CGFloat,
         delay: TimeInterval = 0,
+        beginWithCurrentState: Bool = false,
         completion: ((Bool) -> Void)? = nil
     ) {
         let layer = view.layer
         let targetTransform = CATransform3DMakeScale(scale, scale, 1.0)
-        if CATransform3DEqualToTransform(layer.transform, targetTransform) {
-            completion?(true)
-            return
+        let hasScaleAnimation = layer.animation(forKey: "transform") != nil
+            || layer.animation(forKey: nagiTransformScaleAnimationKey) != nil
+        let currentTransform = beginWithCurrentState && hasScaleAnimation
+            ? layer.presentation()?.transform ?? layer.transform
+            : layer.transform
+        let currentScale = scaleValue(of: currentTransform)
+        if currentScale == scale {
+            if let animation = layer.animation(
+                forKey: nagiTransformScaleAnimationKey
+            ) as? CABasicAnimation,
+               let toValue = animation.toValue as? NSNumber {
+                if CGFloat(toValue.doubleValue) == scale {
+                    completion?(true)
+                    return
+                }
+            } else if !hasScaleAnimation {
+                completion?(true)
+                return
+            } else {
+                completion?(true)
+                return
+            }
         }
 
         if isImmediate {
@@ -490,19 +535,11 @@ enum NagiTabTransition {
             return
         }
 
-        let previousScale: CGFloat
-        if layer.animation(forKey: nagiTransformScaleAnimationKey) != nil,
-           let presentation = layer.presentation() {
-            previousScale = scaleValue(of: presentation.transform)
-        } else {
-            previousScale = scaleValue(of: layer.transform)
-        }
-
         layer.transform = targetTransform
         addAnimation(
             makeAnimation(
                 keyPath: nagiTransformScaleAnimationKey,
-                fromValue: previousScale,
+                fromValue: currentScale,
                 toValue: scale
             ),
             to: layer,
@@ -661,42 +698,23 @@ enum NagiTabTransition {
     ) -> CAAnimation {
         switch self {
         case let .spring(duration):
-            let usesModernSpring: Bool
-            if #available(iOS 26.0, *) {
-                usesModernSpring = abs(duration - 0.3832) <= 0.0001
-            } else {
-                usesModernSpring = false
-            }
+            let usesModernSpring = abs(duration - 0.3832) <= 0.0001
             if usesModernSpring || duration == 0.5 {
                 let animation = CASpringAnimation(keyPath: keyPath)
                 animation.fromValue = fromValue
                 animation.toValue = toValue
-
-                if #available(iOS 26.0, *) {
-                    animation.mass = 1.0
-                    animation.stiffness = 555.027
-                    animation.damping = 47.118
-                    animation.duration = duration
-                    animation.timingFunction = CAMediaTimingFunction(name: .linear)
-                    if #available(iOS 17.0, *) {
-                        animation.allowsOverdamping = false
-                    }
-                    if #available(iOS 15.0, *) {
-                        animation.setValue(NSNumber(value: 1048619), forKey: "highFrameRateReason")
-                        animation.preferredFrameRateRange = CAFrameRateRange(
-                            minimum: 80.0,
-                            maximum: 120.0,
-                            preferred: 120.0
-                        )
-                    }
-                } else {
-                    animation.mass = 3.0
-                    animation.stiffness = 1000.0
-                    animation.damping = 500.0
-                    animation.duration = 0.5
-                    animation.timingFunction = CAMediaTimingFunction(name: .linear)
-                }
-
+                animation.mass = 1.0
+                animation.stiffness = 555.027
+                animation.damping = 47.118
+                animation.duration = duration
+                animation.timingFunction = CAMediaTimingFunction(name: .linear)
+                animation.allowsOverdamping = false
+                animation.setValue(NSNumber(value: 1048619), forKey: "highFrameRateReason")
+                animation.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 80.0,
+                    maximum: 120.0,
+                    preferred: 120.0
+                )
                 animation.isRemovedOnCompletion = true
                 animation.fillMode = .forwards
                 animation.speed = animationSpeed(
@@ -776,7 +794,6 @@ enum NagiTabTransition {
     }
 
     private func adjustFrameRate(animation: CAAnimation, keyPath: String) {
-        guard #available(iOS 15.0, *) else { return }
         let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
         guard maximumFPS > 61.0 else { return }
 

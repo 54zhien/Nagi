@@ -89,8 +89,9 @@ private struct AppearanceView: View {
                 } label: {
                     Label("组件选项", systemImage: "slider.horizontal.3")
                 }
+                .disabled(!liquidGlassEnabled)
 
-                Text("开启时，iOS 26 使用原生 Liquid Glass；关闭时使用半透明模拟玻璃。iOS 18–25 会自动使用兼容样式。")
+                Text("开启时使用原生 Liquid Glass；关闭时使用系统背景。")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }

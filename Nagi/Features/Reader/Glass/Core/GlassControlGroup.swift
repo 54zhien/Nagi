@@ -56,8 +56,8 @@ final class GlassControlGroup<ID: Hashable>: UIView {
     private var itemFrames: [ID: CGRect] = [:]
     private var cachedContainerFrame = CGRect.null
 
-    init(spacing: CGFloat = 0, backend: GlassBackend? = nil) {
-        containerView = GlassContainerView(spacing: spacing, backend: backend)
+    init(spacing: CGFloat = 0) {
+        containerView = GlassContainerView(spacing: spacing)
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -76,6 +76,7 @@ final class GlassControlGroup<ID: Hashable>: UIView {
     }
 
     func update(items: [Item]) {
+        containerView.updateGlassState()
         let incomingIDs = Set(items.map(\.id))
         for id in orderedIDs where !incomingIDs.contains(id) {
             if let control = controls.removeValue(forKey: id) {

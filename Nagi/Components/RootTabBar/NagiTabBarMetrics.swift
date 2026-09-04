@@ -25,8 +25,6 @@ enum NagiTabBarMetrics {
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
 
-    static let homeIndicatorOpticalBottomInset: CGFloat = 23
-
     static func calculateLayout(
         bounds: CGRect,
         safeAreaInsets: UIEdgeInsets,
@@ -63,16 +61,7 @@ enum NagiTabBarMetrics {
             systemPanelsBottomInset = max(safeAreaInsets.bottom, 8)
         }
 
-        let normalVisualBottomInset: CGFloat
-        if safeAreaInsets.bottom >= 30 {
-            normalVisualBottomInset = homeIndicatorOpticalBottomInset
-        } else if safeAreaInsets.bottom > 0 {
-            normalVisualBottomInset = max(8, safeAreaInsets.bottom - 8)
-        } else {
-            normalVisualBottomInset = 8
-        }
-
-        var tabBarBottomInset = normalVisualBottomInset
+        var tabBarBottomInset = systemPanelsBottomInset
         if searchState.isActive, inputHeight > 0 {
             tabBarBottomInset = max(tabBarBottomInset, inputHeight + 8)
         }
@@ -119,9 +108,9 @@ enum NagiTabBarMetrics {
         let itemFrames = (0..<mainItemCount).map { index in
             CGRect(
                 x: floorToScreenPixels(
-                    mainFrame.minX + innerInset + CGFloat(index) * itemWidth
+                    innerInset + CGFloat(index) * itemWidth
                 ),
-                y: floorToScreenPixels(mainFrame.minY + innerInset),
+                y: floorToScreenPixels(innerInset),
                 width: itemWidth,
                 height: itemHeight
             )
@@ -184,37 +173,20 @@ enum NagiTabBarMetrics {
             width: searchCloseDiameter,
             height: searchCloseDiameter
         )
-        let normalLocalItemFrames = itemFrames.map { frame in
-            CGRect(
-                x: frame.minX - mainFrame.minX,
-                y: frame.minY - mainFrame.minY,
-                width: frame.width,
-                height: frame.height
-            )
-        }
-        var activeLocalItemFrames = normalLocalItemFrames
+        var activeLocalItemFrames = itemFrames
         if activeLocalItemFrames.indices.contains(selectedIndex) {
             activeLocalItemFrames[selectedIndex].origin.x = floorToScreenPixels(
                 (collapsedLensDiameter -
                     activeLocalItemFrames[selectedIndex].width) * 0.5
             )
         }
-        let activeItemFrames = activeLocalItemFrames.map { localFrame in
-            CGRect(
-                x: collapsedFrame.minX + localFrame.minX,
-                y: collapsedFrame.minY + localFrame.minY,
-                width: localFrame.width,
-                height: localFrame.height
-            )
-        }
-
         return NagiTabBarLayout(
             tabBarFrame: barFrame,
             mainTabsFrame: collapsedFrame,
             searchContainerFrame: activeSearchContainerFrame,
             searchBackgroundFrame: activeSearchBackgroundFrame,
             searchCloseFrame: activeSearchCloseFrame,
-            itemFrames: activeItemFrames,
+            itemFrames: activeLocalItemFrames,
             lensSelectionFrame: collapsedFrame,
             lensContainerFrame: collapsedFrame,
             isSearchActive: true,

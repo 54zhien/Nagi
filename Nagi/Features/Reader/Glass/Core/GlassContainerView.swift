@@ -1,30 +1,13 @@
-
 import UIKit
 
 @MainActor
 final class GlassContainerView: UIView {
     private let effectView: GlassContainerEffectView
+    private let spacing: CGFloat
 
-    init(spacing: CGFloat = 0, backend: GlassBackend? = nil) {
-        let resolvedBackend = backend ?? GlassBackendConfiguration.containerBackend
-        let useNativeEffect = resolvedBackend != .backdrop
-            && NagiGlassStyleStore.usesNativeLiquidGlass
-        switch resolvedBackend {
-        case .native, .hybrid:
-            if #available(iOS 26.0, *), useNativeEffect {
-                let containerEffect = UIGlassContainerEffect()
-                containerEffect.spacing = spacing
-                effectView = GlassContainerEffectView(effect: containerEffect)
-            } else {
-                effectView = GlassContainerEffectView(
-                    effect: UIBlurEffect(style: .systemMaterial)
-                )
-            }
-        case .backdrop:
-            effectView = GlassContainerEffectView(
-                effect: UIBlurEffect(style: .systemMaterial)
-            )
-        }
+    init(spacing: CGFloat = 0) {
+        effectView = GlassContainerEffectView(effect: nil)
+        self.spacing = spacing
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -36,11 +19,24 @@ final class GlassContainerView: UIView {
         effectView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         effectView.clipsToBounds = false
         addSubview(effectView)
+        updateGlassState()
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    func updateGlassState() {
+        if NagiGlassStyleStore.liquidGlassEnabled {
+            let containerEffect = UIGlassContainerEffect()
+            containerEffect.spacing = spacing
+            effectView.effect = containerEffect
+            effectView.backgroundColor = .clear
+        } else {
+            effectView.effect = nil
+            effectView.backgroundColor = .secondarySystemBackground
+        }
     }
 
     func addItemView(_ view: UIView) {
