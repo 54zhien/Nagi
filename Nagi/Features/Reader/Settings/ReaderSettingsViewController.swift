@@ -1,12 +1,3 @@
-//
-//  ReaderSettingsViewController.swift
-//  Nagi
-//
-//  UIKit implementation of the reader's medium settings surface.  SwiftUI
-//  continues to own sheet presentation and the custom editor; this controller
-//  owns the persistent controls and the fixed medium-sheet layout.
-//
-
 import SwiftUI
 import UIKit
 
@@ -569,8 +560,7 @@ final class ReaderSettingsViewController: UIViewController {
         guard deferredMutationTask == nil else { return }
 
         deferredMutationTask = Task { @MainActor [weak self] in
-            // Let GlassControlView finish the touch-release transaction and
-            // commit the first spring frame before snapshot/layout work starts.
+            // Let the touch-release animation commit its first frame first.
             await Task.yield()
             guard let self, !Task.isCancelled else { return }
 

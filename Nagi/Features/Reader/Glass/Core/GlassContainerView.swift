@@ -1,31 +1,13 @@
-//
-//  GlassContainerView.swift
-//  Nagi
-//
-//  A persistent host for adjacent UIKit Liquid Glass elements.  UIKit's
-//  UIGlassContainerEffect combines descendant UIGlassEffect views into one
-//  compositor group while leaving the controls themselves independently
-//  interactive.
-//
-
 import UIKit
 
 @MainActor
 final class GlassContainerView: UIView {
     private let effectView: GlassContainerEffectView
 
-    init(spacing: CGFloat = 0, backend: GlassBackend? = nil) {
-        let resolvedBackend = backend ?? GlassBackendConfiguration.containerBackend
-        switch resolvedBackend {
-        case .native, .hybrid:
-            let containerEffect = UIGlassContainerEffect()
-            containerEffect.spacing = spacing
-            effectView = GlassContainerEffectView(effect: containerEffect)
-        case .backdrop:
-            effectView = GlassContainerEffectView(
-                effect: UIBlurEffect(style: .systemMaterial)
-            )
-        }
+    init(spacing: CGFloat = 0) {
+        let containerEffect = UIGlassContainerEffect()
+        containerEffect.spacing = spacing
+        effectView = GlassContainerEffectView(effect: containerEffect)
         super.init(frame: .zero)
 
         backgroundColor = .clear
@@ -67,8 +49,7 @@ final class GlassContainerView: UIView {
     }
 }
 
-/// The container material is not a touch target.  Its content controls still
-/// receive events through the UIVisualEffectView's contentView.
+/// Keeps the material transparent to hit testing while controls receive events.
 @MainActor
 private final class GlassContainerEffectView: UIVisualEffectView {
     override func hitTest(_ point: CGPoint, with event: UIEvent?) -> UIView? {

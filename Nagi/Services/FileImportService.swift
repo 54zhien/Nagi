@@ -1,10 +1,3 @@
-//
-//  FileImportService.swift
-//  Nagi
-//
-//  文件导入服务：把用户从「文件」App 选择的 EPUB/TXT 复制到 App 沙盒，返回沙盒内路径。
-//
-
 import Foundation
 
 struct FileImportService {
@@ -46,7 +39,7 @@ struct FileImportService {
             defer {
                 if accessing { url.stopAccessingSecurityScopedResource() }
             }
-            // 注意：asCopy:true 返回的 URL 已在 app 沙盒内，startAccessing 会返回 false（属正常，无需 security-scoped 权限），仍可直接复制。
+            // asCopy 返回的 URL 已在沙盒内，无法获取 security-scoped 权限也正常。
 
             let destination = importsDirectory.appendingPathComponent(url.lastPathComponent)
             let temporary = importsDirectory.appendingPathComponent(

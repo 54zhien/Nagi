@@ -1,62 +1,13 @@
-//
-//  ReaderArchitecture.swift
-//  Nagi
-//
-//  阅读层的共同契约：导入结果与阅读会话分离，阅读编排层不依赖具体文件格式。
-//
-
 import Foundation
 import Observation
 import SwiftUI
 import UIKit
-
-/// Keeps newer SF Symbols requests usable on devices whose installed symbol
-/// catalog is older than the app's design reference.
-enum ReaderSystemSymbol {
-    static func name(_ preferred: String, fallback: String) -> String {
-        UIImage(systemName: preferred) == nil ? fallback : preferred
-    }
-}
-
-// MARK: - Reading document
 
 struct ReaderChapter: Identifiable, Hashable, Sendable {
     let id: String
     let title: String
     let index: Int
     let depth: Int
-}
-
-struct ReaderDocument: Identifiable, Sendable {
-    let id: UUID
-    let title: String
-    let author: String?
-    let chapters: [ReaderChapter]
-}
-
-struct ReaderBookDescriptor: Sendable, Equatable {
-    let id: UUID
-    let title: String
-    let author: String?
-    let format: BookFormat
-    let sourceURL: URL
-    let progressPercent: Double
-    let readerLocatorJSON: String?
-    let txtReadingLocationJSON: String?
-    let currentChapterIndex: Int
-
-    @MainActor
-    init(book: Book) {
-        id = book.id
-        title = book.title
-        author = book.author
-        format = book.format
-        sourceURL = URL(fileURLWithPath: book.sourceURL)
-        progressPercent = book.progressPercent
-        readerLocatorJSON = book.readerLocatorJSON
-        txtReadingLocationJSON = book.txtReadingLocationJSON
-        currentChapterIndex = book.currentChapterIndex
-    }
 }
 
 // MARK: - Unified preferences
@@ -105,13 +56,23 @@ enum ReaderPageTransition: String, CaseIterable, Identifiable, Codable, Sendable
     var systemImage: String {
         switch self {
         case .slide:
-            return "wind.snow"
+            return "arrow.left.page.on.rectangle"
         case .pageCurl:
-            return "tornado"
+            return "book.pages"
         case .fade:
-            return "bird"
+            return "rectangle.on.rectangle.transition"
         case .scroll:
-            return "cloud.bolt.rain"
+            return "arrow.up.and.down.text.horizontal"
+        }
+    }
+
+    init?(rawValue: String) {
+        switch rawValue {
+        case "slide": self = .slide
+        case "pageCurl", "cover": self = .pageCurl
+        case "fade": self = .fade
+        case "scroll": self = .scroll
+        default: return nil
         }
     }
 }
@@ -166,15 +127,8 @@ enum ReaderFontSize {
     static let maximumScale = maximum / defaultValue
 }
 
-/// The typography values that are shared by the TXT and EPUB renderers.
-///
-/// Keep the physical page clearance here instead of letting each renderer
-/// invent its own interpretation. `pageMargins` is the horizontal inset, in
-/// points, applied to both sides of the reading content.
 enum ReaderLayoutMetrics {
-    // The page header's actual occupied height. Vertical reading clearance is
-    // resolved from the system safe area and the active reader chrome rather
-    // than from a fixed app-wide margin.
+    // ReaderChrome reserves this height above the content.
     static let pageHeaderHeight = 48.0
     static let fixedParagraphIndent = 2.0
 
@@ -189,14 +143,7 @@ enum ReaderLayoutMetrics {
     static let defaultCharacterSpacing = 0.0
     static let defaultWordSpacing = 0.0
 
-    /// Character and word spacing remain percentage controls based on a fixed
-    /// reference point size, independent of the reader font size.
     static let spacingReferencePointSize = 24.0
-
-    /// Readium CSS expresses these two values in `rem`.  Its public
-    /// `letterSpacing` value is divided by two before it becomes CSS, so the
-    /// conversion is kept here to make the EPUB and TextKit paths agree.
-    static let readiumRootPointSize = 16.0
 
     static func clampPageMargins(_ value: Double) -> Double {
         min(max(value, pageMarginsRange.lowerBound), pageMarginsRange.upperBound)
@@ -218,9 +165,6 @@ enum ReaderLayoutMetrics {
         CGFloat(clampPageMargins(pageMargin))
     }
 
-    /// Readium expresses page margins as a factor relative to its default
-    /// page margin. Keep the user-facing value in points and convert only at
-    /// the renderer boundary.
     static func pageMarginFactor(for pageMargin: Double) -> Double {
         clampPageMargins(pageMargin) / pageMarginBase
     }
@@ -229,24 +173,13 @@ enum ReaderLayoutMetrics {
         CGFloat(spacingReferencePointSize * percentage / 100)
     }
 
-    static func readiumLetterSpacing(for percentage: Double) -> Double {
-        Double(spacingPoints(for: clampCharacterSpacing(percentage)))
-            / readiumRootPointSize * 2
-    }
-
-    static func readiumWordSpacing(for percentage: Double) -> Double {
-        Double(spacingPoints(for: clampWordSpacing(percentage))) / readiumRootPointSize
-    }
-
-    /// Values written by the original settings screen were factors in the
-    /// 0.5...2.0 range. Convert them to the new absolute-point value.
+    /// Converts the original multiplier-based setting to points.
     static func migrateLegacyPageMargins(_ value: Double?) -> Double {
         guard let value else { return defaultPageMargins }
         return clampPageMargins(pageMarginBase * value)
     }
 
-    /// Values written by the intermediate settings screen were signed
-    /// percentages around the 24 pt base. Convert them to points.
+    /// Converts the intermediate percentage-based setting to points.
     static func migrateLegacyPageMarginAdjustment(_ value: Double?) -> Double {
         guard let value else { return defaultPageMargins }
         return clampPageMargins(pageMarginBase * (1 + value / 100))
@@ -258,19 +191,17 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var fontFamily: ReaderFontFamily
     var boldText: Bool
     var lineHeight: Double
+    /// Reserved for the detailed reader settings sheet.
     var paragraphSpacing: Double
     /// Absolute horizontal page blank in points, applied to both sides.
     var pageMargins: Double
-    /// Kept in the model for compatibility, but fixed by ReaderLayoutMetrics.
+    /// Reserved for the detailed reader settings sheet.
     var paragraphIndent: Double
     var characterSpacing: Double
     var wordSpacing: Double
     var publisherStyles: Bool
     var themePreset: ReaderThemePreset
     var appearanceMode: ReaderAppearanceMode
-    /// Kept for decoding older saved preferences. Reader brightness is now
-    /// controlled by the device, so renderers normalize this value to 1.
-    var brightness: Double
     var pageTransition: ReaderPageTransition
     var showBookTitleInPageHeader: Bool
 
@@ -287,11 +218,9 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         publisherStyles: Bool = false,
         themePreset: ReaderThemePreset = .original,
         appearanceMode: ReaderAppearanceMode = .system,
-        brightness: Double = 1,
         pageTransition: ReaderPageTransition = .slide,
         showBookTitleInPageHeader: Bool = false
     ) {
-        _ = paragraphIndent
         self.fontSize = fontSize
         self.fontFamily = fontFamily
         self.boldText = boldText
@@ -304,7 +233,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         self.publisherStyles = publisherStyles
         self.themePreset = themePreset
         self.appearanceMode = appearanceMode
-        self.brightness = brightness
         self.pageTransition = pageTransition
         self.showBookTitleInPageHeader = showBookTitleInPageHeader
     }
@@ -323,7 +251,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case publisherStyles
         case themePreset
         case appearanceMode
-        case brightness
         case pageTransition
         case showBookTitleInPageHeader
     }
@@ -358,7 +285,6 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
             publisherStyles: try container.decodeIfPresent(Bool.self, forKey: .publisherStyles) ?? false,
             themePreset: try container.decodeIfPresent(ReaderThemePreset.self, forKey: .themePreset) ?? .original,
             appearanceMode: try container.decodeIfPresent(ReaderAppearanceMode.self, forKey: .appearanceMode) ?? .system,
-            brightness: try container.decodeIfPresent(Double.self, forKey: .brightness) ?? 1,
             pageTransition: try container.decodeIfPresent(ReaderPageTransition.self, forKey: .pageTransition) ?? .slide,
             showBookTitleInPageHeader: try container.decodeIfPresent(Bool.self, forKey: .showBookTitleInPageHeader) ?? false
         )
@@ -379,16 +305,11 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         try container.encode(publisherStyles, forKey: .publisherStyles)
         try container.encode(themePreset, forKey: .themePreset)
         try container.encode(appearanceMode, forKey: .appearanceMode)
-        try container.encode(brightness, forKey: .brightness)
         try container.encode(pageTransition, forKey: .pageTransition)
         try container.encode(showBookTitleInPageHeader, forKey: .showBookTitleInPageHeader)
     }
 }
 
-/// Resolves the distance from the physical screen edge to the readable text.
-///
-/// The user-facing inset is a total distance, so it must not be added to the
-/// system safe area. Whichever is larger is the effective clearance.
 enum ReaderContentInsetResolver {
     static func resolve(
         safeAreaInsets: UIEdgeInsets,
@@ -434,50 +355,8 @@ struct ReaderCustomizationDraft: Equatable, Sendable {
     var publisherStyles: Bool
 }
 
-enum ReaderChromeLayout: Sendable {
-    case legacyOverlay
-    case cornerAligned
-}
-
-// MARK: - Stable reading position
-
-struct TextReadingPosition: Codable, Hashable, Sendable {
-    let chapterID: String
-    let utf16Offset: Int
-    let prefix: String
-    let suffix: String
-}
-
-struct EPUBReadingPosition: Codable, Hashable, Sendable {
+struct ReadingPosition: Sendable {
     let locatorJSON: String
-    let href: String?
-    let progression: Double?
-}
-
-enum ReadingPositionPayload: Codable, Hashable, Sendable {
-    case text(TextReadingPosition)
-    case epub(EPUBReadingPosition)
-}
-
-struct ReadingPosition: Codable, Hashable, Sendable {
-    let version: Int
-    let bookID: UUID
-    let chapterID: String?
-    let progression: Double?
-    let payload: ReadingPositionPayload
-
-    init(
-        bookID: UUID,
-        chapterID: String?,
-        progression: Double?,
-        payload: ReadingPositionPayload
-    ) {
-        version = 1
-        self.bookID = bookID
-        self.chapterID = chapterID
-        self.progression = progression
-        self.payload = payload
-    }
 }
 
 // MARK: - Renderer contract
@@ -487,11 +366,7 @@ enum ReaderPreferenceCommitBehavior: Sendable, Equatable {
     case immediate
 }
 
-/// Describes which part of the reader surface is expected to settle after a
-/// preference mutation.  Keeping this separate from the preference payload
-/// prevents a line-spacing change from waiting on unrelated theme or font
-/// signals (and lets the transition layer choose a cover only when a repaint
-/// actually needs one).
+/// Identifies the part of the reader that must settle after a preference change.
 enum ReaderVisualMutationKind: Sendable, Equatable {
     case theme
     case typography
@@ -500,15 +375,13 @@ enum ReaderVisualMutationKind: Sendable, Equatable {
     case full
 
     func merged(with other: Self) -> Self {
-        guard self != other else { return self }
-        if self == .full || other == .full { return .full }
-        return .full
+        self == other ? self : .full
     }
 }
 
 @MainActor
 protocol ReaderRenderer: AnyObject {
-    var document: ReaderDocument? { get }
+    var isContentReady: Bool { get }
     var title: String { get }
     var isLoading: Bool { get }
     var errorMessage: String? { get }
@@ -522,10 +395,6 @@ protocol ReaderRenderer: AnyObject {
     var backgroundColor: UIColor { get }
     var contentColor: UIColor { get }
     var headerColor: UIColor { get }
-    var chromeLayout: ReaderChromeLayout { get }
-    var handlesContentTap: Bool { get }
-    var canGoNext: Bool { get }
-    var canGoPrevious: Bool { get }
     var onStateChange: (() -> Void)? { get set }
 
     func load() async
@@ -544,9 +413,6 @@ protocol ReaderRenderer: AnyObject {
     func updateSystemAppearance(isDark: Bool)
     func selectPreset(_ preset: ReaderThemePreset)
     func tearDown()
-    func clearError()
-    func goForward()
-    func goBackward()
     func selectChapter(at index: Int)
     func saveProgress()
     func readingPosition() -> ReadingPosition?
@@ -557,15 +423,9 @@ protocol ReaderRenderer: AnyObject {
 @MainActor
 final class ReaderRepository {
     let book: Book
-    let descriptor: ReaderBookDescriptor
 
     init(book: Book) {
         self.book = book
-        descriptor = ReaderBookDescriptor(book: book)
-    }
-
-    func makeRenderer() -> any ReaderRenderer {
-        ReaderRendererFactory.make(book: book)
     }
 
     func persist(position: ReadingPosition?, progress: Double) {
@@ -573,15 +433,7 @@ final class ReaderRepository {
         book.lastReadAt = .now
 
         guard let position else { return }
-        switch position.payload {
-        case .text(let textPosition):
-            if let data = try? JSONEncoder().encode(textPosition),
-               let json = String(data: data, encoding: .utf8) {
-                book.txtReadingLocationJSON = json
-            }
-        case .epub(let epubPosition):
-            book.readerLocatorJSON = epubPosition.locatorJSON
-        }
+        book.readerLocatorJSON = position.locatorJSON
     }
 }
 
@@ -593,19 +445,15 @@ final class ReaderEngine {
     let repository: ReaderRepository
     let renderer: any ReaderRenderer
 
-    private(set) var document: ReaderDocument?
     private(set) var preferences: ReaderPreferences
     var onStateChange: (() -> Void)?
 
     init(book: Book) {
         let repository = ReaderRepository(book: book)
-        let renderer = repository.makeRenderer()
+        let renderer = ReadiumRenderer(book: book)
         self.repository = repository
         self.renderer = renderer
-        var initialPreferences = ReaderPreferencesStore.load() ?? renderer.preferences
-        // Migrate the retired reader-only brightness value. The medium sheet
-        // now owns a live UIScreen brightness session instead.
-        initialPreferences.brightness = 1
+        let initialPreferences = ReaderPreferencesStore.load() ?? renderer.preferences
         preferences = initialPreferences
         renderer.apply(
             preferences: preferences,
@@ -659,10 +507,8 @@ final class ReaderEngine {
         preferences: ReaderPreferences,
         commitBehavior: ReaderPreferenceCommitBehavior = .coalesced
     ) {
-        var normalizedPreferences = preferences
-        normalizedPreferences.brightness = 1
         renderer.apply(
-            preferences: normalizedPreferences,
+            preferences: preferences,
             commitBehavior: commitBehavior
         )
         synchronizeFromRenderer()
@@ -682,19 +528,6 @@ final class ReaderEngine {
         renderer.tearDown()
     }
 
-    func clearError() {
-        renderer.clearError()
-        synchronizeFromRenderer()
-    }
-
-    func goForward() {
-        renderer.goForward()
-    }
-
-    func goBackward() {
-        renderer.goBackward()
-    }
-
     func selectChapter(at index: Int) {
         renderer.selectChapter(at: index)
     }
@@ -706,7 +539,6 @@ final class ReaderEngine {
     }
 
     private func synchronizeFromRenderer() {
-        document = renderer.document
         preferences = renderer.preferences
         ReaderPreferencesStore.save(preferences)
     }
@@ -718,7 +550,6 @@ final class ReaderViewModel {
     let book: Book
     let engine: ReaderEngine
 
-    private(set) var document: ReaderDocument?
     private(set) var title: String
     private(set) var isLoading = false
     private(set) var errorMessage: String?
@@ -744,10 +575,7 @@ final class ReaderViewModel {
     var backgroundColor: UIColor { engine.renderer.backgroundColor }
     var contentColor: UIColor { engine.renderer.contentColor }
     var headerColor: UIColor { engine.renderer.headerColor }
-    var chromeLayout: ReaderChromeLayout { engine.renderer.chromeLayout }
-    var handlesContentTap: Bool { engine.renderer.handlesContentTap }
-    var canGoNext: Bool { engine.renderer.canGoNext }
-    var canGoPrevious: Bool { engine.renderer.canGoPrevious }
+    var isContentReady: Bool { engine.renderer.isContentReady }
 
     func loadIfNeeded() async {
         await engine.loadIfNeeded()
@@ -895,16 +723,6 @@ final class ReaderViewModel {
         )
     }
 
-    func goForward() {
-        engine.goForward()
-        synchronize()
-    }
-
-    func goBackward() {
-        engine.goBackward()
-        synchronize()
-    }
-
     func selectChapter(at index: Int) {
         engine.selectChapter(at: index)
         synchronize()
@@ -915,14 +733,8 @@ final class ReaderViewModel {
         synchronize()
     }
 
-    func clearError() {
-        engine.clearError()
-        synchronize()
-    }
-
     private func synchronize() {
         let renderer = engine.renderer
-        document = engine.document ?? renderer.document
         title = renderer.title
         isLoading = renderer.isLoading
         errorMessage = renderer.errorMessage

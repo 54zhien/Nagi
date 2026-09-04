@@ -1,10 +1,3 @@
-//
-//  TXTParser.swift
-//  Nagi
-//
-//  TXT 解析：编码检测 + 章节识别。
-//
-
 import Foundation
 
 struct ParsedBook: Sendable {
@@ -171,11 +164,6 @@ struct TXTParser: Sendable {
             return .utf32BigEndian
         }
         return nil
-    }
-
-    /// 识别章节标题（如「第一章」「第1章」「Chapter 1」等），返回章节数。
-    static func detectChapterCount(_ text: String) -> Int {
-        splitIntoChapters(text, fallbackTitle: "正文").count
     }
 
     /// 按章节标题切分 TXT。没有识别到标题时保留为一个完整章节，避免目录为空。

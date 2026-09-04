@@ -1,11 +1,3 @@
-//
-//  NagiNavigationSearchView.swift
-//  Nagi
-//
-//  持久化的搜索 surface。外部 frame 由 NagiTabBarView 统一拥有，
-//  本 view 只管理两个 Glass surface 内部的内容和控件 geometry。
-//
-
 import UIKit
 
 struct NagiSearchParams: Equatable {
@@ -13,7 +5,6 @@ struct NagiSearchParams: Equatable {
     var backgroundFrame: CGRect
     var closeFrame: CGRect
     var isActive: Bool
-    var isExpandedStandaloneBar: Bool
     var isDark: Bool
     var reduceTransparency: Bool
 }
@@ -31,7 +22,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
     private let backgroundView: NagiGlassBackgroundView
     private let iconView: UIImageView
-    private let placeholderLabel: UILabel
     private var close: (background: NagiGlassBackgroundView, iconView: UIImageView)?
     private var closingClose: (background: NagiGlassBackgroundView, iconView: UIImageView)?
     private var activeInput: ActiveInput?
@@ -55,7 +45,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 withConfiguration: Self.searchSymbolConfiguration
             )
         )
-        self.placeholderLabel = UILabel(frame: .zero)
         self.close = nil
         self.closingClose = nil
         self.activeInput = nil
@@ -73,13 +62,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
         iconView.contentMode = .scaleToFill
         iconView.isUserInteractionEnabled = false
         backgroundView.contentView.addSubview(iconView)
-
-        placeholderLabel.text = "搜索书名"
-        placeholderLabel.textColor = .secondaryLabel
-        placeholderLabel.font = .preferredFont(forTextStyle: .body)
-        placeholderLabel.adjustsFontForContentSizeCategory = true
-        placeholderLabel.isUserInteractionEnabled = false
-        backgroundView.contentView.addSubview(placeholderLabel)
 
         let recognizer = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
         recognizer.cancelsTouchesInView = false
@@ -167,8 +149,7 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
 
         if let close {
             if !params.isActive {
-                // Detach the logical surface now so a rapid re-entry can
-                // create a fresh Close Glass while this one fades out.
+                // Allow a new close surface while the old one fades out.
                 self.close = nil
                 closingClose = close
             }
@@ -263,11 +244,8 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
             reduceTransparency: params.reduceTransparency
         )
 
-        // Fully initialize the native Glass before the surface is inserted
-        // into the active search hierarchy. This gives the first animated
-        // frame a real 48pt effect view, content view, corner radius and luma
-        // range instead of starting from the zero-sized initializer state.
-        _ = background.prepare(params: closeGlassParams)
+        // Initialize the glass at its first real size before insertion.
+        background.prepare(params: closeGlassParams)
         background.applyGeometry(
             params: closeGlassParams,
             transition: .immediate,
@@ -440,22 +418,6 @@ final class NagiNavigationSearchView: UIView, UITextFieldDelegate, UIGestureReco
                 : .secondaryLabel
         )
         transition.setAlpha(view: iconView, alpha: 1)
-
-        let placeholderLeading: CGFloat = params.isExpandedStandaloneBar && !active ? 40 : 0
-        let placeholderFrame = CGRect(
-            x: placeholderLeading,
-            y: 0,
-            width: max(0, backgroundBounds.width - placeholderLeading),
-            height: backgroundBounds.height
-        )
-        transition.setFrame(view: placeholderLabel, frame: placeholderFrame)
-        let placeholderAlphaTransition: NagiTabTransition = transition.isImmediate
-            ? .immediate
-            : .easeInOut(duration: 0.25)
-        placeholderAlphaTransition.setAlpha(
-            view: placeholderLabel,
-            alpha: !active && params.isExpandedStandaloneBar ? 1 : 0
-        )
 
         if active, let input = activeInput {
             transition.setFrame(

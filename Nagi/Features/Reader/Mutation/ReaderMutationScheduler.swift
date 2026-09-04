@@ -1,12 +1,3 @@
-//
-//  ReaderMutationScheduler.swift
-//  Nagi
-//
-//  Coalesces reader mutations without coupling them to the touch animation
-//  pipeline.  Values are captured by the caller before enqueueing, so a
-//  delayed commit never reads a later mutable model state by accident.
-//
-
 import Foundation
 
 @MainActor
@@ -34,13 +25,7 @@ final class ReaderMutationScheduler<Value> {
         self.commit = commit
     }
 
-    var hasPendingValue: Bool {
-        pendingValue != nil
-    }
-
-    /// Waits for the value currently pending at the call site to reach the
-    /// commit closure.  A later enqueue supersedes that value, so the waiter
-    /// is resumed by the later generation instead of observing stale state.
+    /// Waits until the pending value reaches the commit closure.
     func waitForPendingCommit() async -> UInt64 {
         let targetGeneration = pendingValue == nil
             ? committedGeneration
@@ -103,7 +88,6 @@ final class ReaderMutationScheduler<Value> {
         self.pendingValue = nil
         commitTask = nil
         commit(pendingValue, generation)
-        ReaderPerformanceSignposts.readerMutationCommitted()
         committedGeneration = generation
         resumeWaiters(with: generation)
     }

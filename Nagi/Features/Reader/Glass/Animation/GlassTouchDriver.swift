@@ -1,10 +1,3 @@
-//
-//  GlassTouchDriver.swift
-//  Nagi
-//
-//  Allocation-light touch tracking for a single persistent GlassControlView.
-//
-
 import QuartzCore
 import UIKit
 
@@ -24,7 +17,6 @@ final class GlassTouchDriver {
         guard let control, control.isEnabled else { return }
         startPoint = point
         isTracking = true
-        ReaderPerformanceSignposts.glassTouchBegan()
         control.applyTouchBegan(at: point, reduceMotion: reduceMotion)
     }
 
@@ -60,16 +52,12 @@ final class GlassTouchDriver {
         control.applyTouchTransform(transform, at: point)
     }
 
-    func end(at point: CGPoint, cancelled: Bool) {
+    func end() {
         guard isTracking, let control else { return }
         isTracking = false
-        ReaderPerformanceSignposts.glassTouchEnded()
-
         let currentTransform = control.layer.presentation()?.transform ?? control.layer.transform
         control.applyTouchEnded(
             from: currentTransform,
-            at: point,
-            cancelled: cancelled,
             reduceMotion: reduceMotion
         )
     }

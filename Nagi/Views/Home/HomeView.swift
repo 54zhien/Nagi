@@ -1,10 +1,3 @@
-//
-//  HomeView.swift
-//  Nagi
-//
-//  主页：继续阅读入口
-//
-
 import SwiftUI
 import SwiftData
 
@@ -46,7 +39,7 @@ struct HomeView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .modifier(
                                     BookCardSurfaceModifier(
-                                        isLiquidGlassEnabled: bookCardsUseLiquidGlass
+                                        usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 )
                                 .contentShape(.interaction, BookCardMetrics.cardShape)

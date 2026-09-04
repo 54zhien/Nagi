@@ -1,11 +1,3 @@
-//
-//  ReaderChromeView.swift
-//  Nagi
-//
-//  Persistent UIKit Reader Chrome.  Its controls are created once per reader
-//  session and only their state/layer properties change afterwards.
-//
-
 import UIKit
 
 @MainActor
@@ -285,7 +277,7 @@ final class ReaderChromeView: UIView {
 
         let controlDiameter = ReaderChromeMetrics.diameter
         let topY = min(
-            max(0, currentSafeAreaInsets.top + ReaderChromeMetrics.exitTopInset),
+            max(0, currentSafeAreaInsets.top),
             max(0, currentBounds.height - controlDiameter)
         )
         let exitFrame = CGRect(
@@ -438,7 +430,6 @@ private enum ReaderChromeMetrics {
     static let diameter: CGFloat = 48
     static let iconPointSize: CGFloat = 20
     static let headerHorizontalInset: CGFloat = 72
-    static let exitTopInset: CGFloat = 0
     static let exitTrailingInset: CGFloat = 24
     static let autoHideNanoseconds: UInt64 = 7_000_000_000
 }

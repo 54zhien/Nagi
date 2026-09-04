@@ -1,11 +1,3 @@
-//
-//  TXTReaderAssetService.swift
-//  Nagi
-//
-//  把 TXT 转成阅读期使用的派生 EPUB，使 TXT / EPUB 走同一套 Readium Navigator。
-//  派生文件只服务于阅读，原始 TXT 路径仍保留在 Book.sourceURL 中。
-//
-
 import Foundation
 
 enum TXTReaderAssetError: LocalizedError {

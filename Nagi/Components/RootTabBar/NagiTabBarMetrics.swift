@@ -1,12 +1,3 @@
-//
-//  NagiTabBarMetrics.swift
-//  Nagi
-//
-//  Root 底栏的唯一几何计算入口。布局参数按 Nagram
-//  TabBarControllerNode.updateImpl 的 inset、standalone slot 和 collapse
-//  规则计算，Search 只是当前 Tab 上方的状态。
-//
-
 import UIKit
 
 struct NagiTabBarLayout: Equatable {
@@ -33,11 +24,7 @@ enum NagiTabBarMetrics {
     static let mainItemCount = 3
     static let activeSearchHeight: CGFloat = 48
 
-    // Preserve Nagi's original optical baseline on Home Indicator devices.
-    // UIKit's raw safe-area bottom (commonly 34pt) includes the full indicator
-    // region and places this floating bar visibly too high. The original Nagi
-    // layout used 23pt here, while keyboard motion still tracks the actual
-    // keyboard top with the Nagram-compatible 8pt gap.
+    // Keep the original optical baseline on Home Indicator devices.
     static let homeIndicatorOpticalBottomInset: CGFloat = 23
 
     static func calculateLayout(
@@ -69,10 +56,7 @@ enum NagiTabBarMetrics {
             inputHeight = 0
         }
 
-        // Keep the raw/minimum system inset as the reference for Nagram's
-        // horizontal side-inset rule. Vertical placement intentionally uses
-        // Nagi's optical inset below, so restoring the old Y position cannot
-        // unexpectedly make the bar narrower or wider.
+        // Use the raw system inset for width and the optical inset for height.
         let systemPanelsBottomInset: CGFloat
         if safeAreaInsets.bottom == 0 {
             systemPanelsBottomInset = 8

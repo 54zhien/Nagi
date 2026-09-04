@@ -1,10 +1,3 @@
-//
-//  GlassState.swift
-//  Nagi
-//
-//  Small, value-typed state snapshots for the UIKit reader glass layer.
-//
-
 import UIKit
 
 struct GlassColor: Equatable {
@@ -41,25 +34,16 @@ struct GlassColor: Equatable {
 
 struct GlassState: Equatable {
     let tint: GlassColor?
-    let isEnabled: Bool
     let isInteractive: Bool
     let cornerRadius: CGFloat
 
     init(
         tint: GlassColor? = nil,
-        isEnabled: Bool = true,
         isInteractive: Bool = true,
         cornerRadius: CGFloat = 24
     ) {
         self.tint = tint
-        self.isEnabled = isEnabled
         self.isInteractive = isInteractive
         self.cornerRadius = cornerRadius
     }
-}
-
-enum GlassBackend: String, CaseIterable, Equatable {
-    case native
-    case backdrop
-    case hybrid
 }

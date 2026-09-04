@@ -1,10 +1,3 @@
-//
-//  ReadiumNavigatorView.swift
-//  Nagi
-//
-//  将 Readium 的 UIKit Navigator 嵌入 SwiftUI。
-//
-
 import ReadiumNavigator
 import SwiftUI
 import UIKit

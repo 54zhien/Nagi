@@ -1,10 +1,3 @@
-//
-//  ReadiumService.swift
-//  Nagi
-//
-//  Readium EPUB 入口：检索本地资源并构建 Publication。
-//
-
 import Foundation
 import ReadiumShared
 import ReadiumStreamer
@@ -46,7 +39,7 @@ final class ReadiumService {
         )
     }
 
-    func openEPUB(at url: URL, sender: Any? = nil) async throws -> Publication {
+    func openEPUB(at url: URL) async throws -> Publication {
         guard let fileURL = FileURL(url: url) else {
             throw ReadiumServiceError.invalidFileURL
         }
@@ -58,7 +51,7 @@ final class ReadiumService {
         let publication = try await publicationOpener.open(
             asset: asset,
             allowUserInteraction: true,
-            sender: sender
+            sender: nil
         ).get()
 
         guard publication.conforms(to: .epub) else {

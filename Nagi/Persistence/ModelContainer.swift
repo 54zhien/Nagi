@@ -1,10 +1,3 @@
-//
-//  ModelContainer.swift
-//  Nagi
-//
-//  SwiftData 容器配置。
-//
-
 import SwiftData
 
 enum Persistence {

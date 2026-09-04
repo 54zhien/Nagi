@@ -1,29 +1,17 @@
-//
-//  GlassSurfaceView.swift
-//  Nagi
-//
-
 import UIKit
 
 @MainActor
 final class GlassSurfaceView: UIView {
-    private(set) var effectView: UIVisualEffectView
-    private let renderer: any GlassRenderer
+    private let effectView: UIVisualEffectView
+    private let glassEffect: UIGlassEffect
     private var currentState: GlassState?
 
-    init(backend: GlassBackend? = nil) {
-        let resolvedBackend = backend ?? GlassBackendConfiguration.surfaceBackend
-        let resolvedRenderer: any GlassRenderer
-        switch resolvedBackend {
-        case .native:
-            resolvedRenderer = NativeGlassRenderer()
-        case .backdrop, .hybrid:
-            resolvedRenderer = BackdropGlassRenderer()
-        }
-        let resolvedEffectView = resolvedRenderer.makeEffectView()
-        renderer = resolvedRenderer
-        effectView = resolvedEffectView
-        super.init(frame: .zero)
+    override init(frame: CGRect) {
+        let glassEffect = UIGlassEffect(style: .regular)
+        glassEffect.isInteractive = true
+        self.glassEffect = glassEffect
+        effectView = UIVisualEffectView(effect: glassEffect)
+        super.init(frame: frame)
 
         isOpaque = false
         effectView.isUserInteractionEnabled = false
@@ -40,11 +28,19 @@ final class GlassSurfaceView: UIView {
     func update(_ newState: GlassState) {
         guard newState != currentState else { return }
 
-        renderer.update(
-            state: newState,
-            previousState: currentState,
-            effectView: effectView
-        )
+        let tintColor = newState.tint?.uiColor
+        if currentState != nil, currentState?.tint != newState.tint {
+            UIView.animate(
+                withDuration: 0.18,
+                delay: 0,
+                options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut]
+            ) {
+                self.glassEffect.tintColor = tintColor
+            }
+        } else {
+            glassEffect.tintColor = tintColor
+        }
+        glassEffect.isInteractive = newState.isInteractive
         currentState = newState
         effectView.layer.cornerRadius = newState.cornerRadius
     }

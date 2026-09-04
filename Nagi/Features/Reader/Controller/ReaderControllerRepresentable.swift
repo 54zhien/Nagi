@@ -1,10 +1,3 @@
-//
-//  ReaderControllerRepresentable.swift
-//  Nagi
-//
-//  Stable SwiftUI-to-UIKit bridge for the high-frequency Reader surface.
-//
-
 import SwiftUI
 import UIKit
 
@@ -27,9 +20,6 @@ struct ReaderControllerRepresentable: UIViewControllerRepresentable {
     let onTableOfContents: () -> Void
     let onSettings: () -> Void
     let transitionCoordinator: ReaderTransitionCoordinator
-
-    typealias UIViewControllerType = ReaderViewController
-    typealias Coordinator = Void
 
     func makeUIViewController(context: Context) -> ReaderViewController {
         ReaderViewController(

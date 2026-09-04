@@ -1,14 +1,4 @@
-//
-//  ReaderPerformanceController.swift
-//  Nagi
-//
-//  Internal quality policy for the reader's real-time glass layer.  The
-//  policy only removes nonessential visual work under system pressure; it
-//  never disables or delays touch tracking.
-//
-
 import Foundation
-import UIKit
 
 @MainActor
 final class ReaderPerformanceController {
@@ -20,7 +10,6 @@ final class ReaderPerformanceController {
 
     private(set) var thermalState: ProcessInfo.ThermalState
     private(set) var isLowPowerModeEnabled: Bool
-    let supportsHighRefreshRate: Bool
 
     var shouldReduceNonessentialEffects: Bool {
         if isLowPowerModeEnabled {
@@ -42,7 +31,6 @@ final class ReaderPerformanceController {
         // change notification.
         thermalState = processInfo.thermalState
         isLowPowerModeEnabled = processInfo.isLowPowerModeEnabled
-        supportsHighRefreshRate = UIScreen.main.maximumFramesPerSecond >= 120
 
         observerTokens.append(
             notificationCenter.addObserver(

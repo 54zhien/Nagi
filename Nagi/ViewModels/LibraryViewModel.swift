@@ -1,11 +1,3 @@
-//
-//  LibraryViewModel.swift
-//  Nagi
-//
-//  书库视图模型：导入 → 解析 → 生成 Book 存入 SwiftData。
-//  复制文件同步做（security-scoped 权限有效期内）；解析在后台返回纯值，主线程创建 Book 存库。
-//
-
 import Foundation
 import SwiftData
 import Observation

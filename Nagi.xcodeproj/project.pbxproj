@@ -42,12 +42,7 @@
 		4A0000000000000000000021 /* FileManager+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000021 /* FileManager+ZIP.swift */; };
 		4A0000000000000000000022 /* FileManager+ZIPDeprecated.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000022 /* FileManager+ZIPDeprecated.swift */; };
 		4A0000000000000000000023 /* URL+ZIP.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000023 /* URL+ZIP.swift */; };
-		4A0000000000000000000024 /* Chapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000024 /* Chapter.swift */; };
 		4A0000000000000000000025 /* ReaderSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000025 /* ReaderSettings.swift */; };
-		4A0000000000000000000026 /* TextPaginator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000026 /* TextPaginator.swift */; };
-		4A0000000000000000000027 /* TXTReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000027 /* TXTReaderModel.swift */; };
-		4A0000000000000000000028 /* PageTextView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000028 /* PageTextView.swift */; };
-		4A0000000000000000000029 /* PageViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000029 /* PageViewController.swift */; };
 		4A000000000000000000002A /* ReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002A /* ReaderView.swift */; };
 		4A000000000000000000002B /* DocumentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002B /* DocumentPicker.swift */; };
 		4A000000000000000000002C /* ShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000002C /* ShareSheet.swift */; };
@@ -56,12 +51,10 @@
 		4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000071 /* EPUBReaderModel.swift */; };
 		4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000072 /* ReadiumNavigatorView.swift */; };
 		4A0000000000000000000077 /* ReaderChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000077 /* ReaderChrome.swift */; };
-		4A0000000000000000000078 /* TXTReaderView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000078 /* TXTReaderView.swift */; };
 		4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000079 /* ReaderArchitecture.swift */; };
 		4A000000000000000000007A /* ReaderRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007A /* ReaderRenderer.swift */; };
 		4A000000000000000000007B /* ReaderSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007B /* ReaderSettingsView.swift */; };
 		4A000000000000000000007C /* BookImportParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007C /* BookImportParser.swift */; };
-		4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007D /* EPUBReadingContentProvider.swift */; };
 		4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000007E /* TXTReaderAssetService.swift */; };
 		4A0000000000000000000080 /* EPUBFontResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000080 /* EPUBFontResources.swift */; };
 		4A0000000000000000000074 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
@@ -74,8 +67,6 @@
 		4A0000000000000000000085 /* ReaderChromeAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000085 /* ReaderChromeAnimator.swift */; };
 		4A0000000000000000000086 /* ReaderChromeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000086 /* ReaderChromeView.swift */; };
 		4A0000000000000000000087 /* GlassState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000087 /* GlassState.swift */; };
-		4A0000000000000000000088 /* GlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000088 /* GlassRenderer.swift */; };
-		4A0000000000000000000089 /* NativeGlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000089 /* NativeGlassRenderer.swift */; };
 		4A000000000000000000008A /* GlassSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008A /* GlassSurfaceView.swift */; };
 		4A000000000000000000008B /* GlassTouchDriver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008B /* GlassTouchDriver.swift */; };
 		4A000000000000000000008C /* GlassControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008C /* GlassControlView.swift */; };
@@ -84,16 +75,12 @@
 		4A000000000000000000008F /* GlassControlGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000008F /* GlassControlGroup.swift */; };
 		4A0000000000000000000090 /* ReaderSettingsViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000090 /* ReaderSettingsViewController.swift */; };
 		4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000091 /* ReaderMutationScheduler.swift */; };
-		4A0000000000000000000092 /* BackdropGlassRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000092 /* BackdropGlassRenderer.swift */; };
-		4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000093 /* GlassBackendConfiguration.swift */; };
-		4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */; };
 		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
 		4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */; };
 		4A00000000000000000000A0 /* NagiRootViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A0 /* NagiRootViewController.swift */; };
 		4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A1 /* NagiRootRepresentable.swift */; };
 		4A00000000000000000000A2 /* NagiRootState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A2 /* NagiRootState.swift */; };
 		4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */; };
-		4A00000000000000000000A4 /* SystemRootTabReferenceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */; };
 		4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A5 /* NagiTabBarView.swift */; };
 		4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A6 /* NagiTabBarItemView.swift */; };
 		4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A7 /* NagiNavigationSearchView.swift */; };
@@ -142,12 +129,7 @@
 		3A0000000000000000000021 /* FileManager+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+ZIP.swift"; sourceTree = "<group>"; };
 		3A0000000000000000000022 /* FileManager+ZIPDeprecated.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "FileManager+ZIPDeprecated.swift"; sourceTree = "<group>"; };
 		3A0000000000000000000023 /* URL+ZIP.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "URL+ZIP.swift"; sourceTree = "<group>"; };
-		3A0000000000000000000024 /* Chapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Chapter.swift; sourceTree = "<group>"; };
 		3A0000000000000000000025 /* ReaderSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettings.swift; sourceTree = "<group>"; };
-		3A0000000000000000000026 /* TextPaginator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TextPaginator.swift; sourceTree = "<group>"; };
-		3A0000000000000000000027 /* TXTReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderModel.swift; sourceTree = "<group>"; };
-		3A0000000000000000000028 /* PageTextView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTextView.swift; sourceTree = "<group>"; };
-		3A0000000000000000000029 /* PageViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageViewController.swift; sourceTree = "<group>"; };
 		3A000000000000000000002A /* ReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderView.swift; sourceTree = "<group>"; };
 		3A000000000000000000002B /* DocumentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentPicker.swift; sourceTree = "<group>"; };
 		3A000000000000000000002C /* ShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareSheet.swift; sourceTree = "<group>"; };
@@ -155,12 +137,10 @@
 		3A0000000000000000000071 /* EPUBReaderModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReaderModel.swift; sourceTree = "<group>"; };
 		3A0000000000000000000072 /* ReadiumNavigatorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000077 /* ReaderChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChrome.swift; sourceTree = "<group>"; };
-		3A0000000000000000000078 /* TXTReaderView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000079 /* ReaderArchitecture.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderArchitecture.swift; sourceTree = "<group>"; };
 		3A000000000000000000007A /* ReaderRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderRenderer.swift; sourceTree = "<group>"; };
 		3A000000000000000000007B /* ReaderSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsView.swift; sourceTree = "<group>"; };
 		3A000000000000000000007C /* BookImportParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookImportParser.swift; sourceTree = "<group>"; };
-		3A000000000000000000007D /* EPUBReadingContentProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBReadingContentProvider.swift; sourceTree = "<group>"; };
 		3A000000000000000000007E /* TXTReaderAssetService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderAssetService.swift; sourceTree = "<group>"; };
 		3A0000000000000000000080 /* EPUBFontResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBFontResources.swift; sourceTree = "<group>"; };
 		3A0000000000000000000081 /* NagiSong-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = NagiSong-Regular.ttf; sourceTree = "<group>"; };
@@ -170,8 +150,6 @@
 		3A0000000000000000000085 /* ReaderChromeAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChromeAnimator.swift; sourceTree = "<group>"; };
 		3A0000000000000000000086 /* ReaderChromeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderChromeView.swift; sourceTree = "<group>"; };
 		3A0000000000000000000087 /* GlassState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassState.swift; sourceTree = "<group>"; };
-		3A0000000000000000000088 /* GlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassRenderer.swift; sourceTree = "<group>"; };
-		3A0000000000000000000089 /* NativeGlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeGlassRenderer.swift; sourceTree = "<group>"; };
 		3A000000000000000000008A /* GlassSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassSurfaceView.swift; sourceTree = "<group>"; };
 		3A000000000000000000008B /* GlassTouchDriver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassTouchDriver.swift; sourceTree = "<group>"; };
 		3A000000000000000000008C /* GlassControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlView.swift; sourceTree = "<group>"; };
@@ -180,16 +158,12 @@
 		3A000000000000000000008F /* GlassControlGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassControlGroup.swift; sourceTree = "<group>"; };
 		3A0000000000000000000090 /* ReaderSettingsViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSettingsViewController.swift; sourceTree = "<group>"; };
 		3A0000000000000000000091 /* ReaderMutationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderMutationScheduler.swift; sourceTree = "<group>"; };
-		3A0000000000000000000092 /* BackdropGlassRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackdropGlassRenderer.swift; sourceTree = "<group>"; };
-		3A0000000000000000000093 /* GlassBackendConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassBackendConfiguration.swift; sourceTree = "<group>"; };
-		3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceSignposts.swift; sourceTree = "<group>"; };
 		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
 		3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFontSizeStepperControl.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A0 /* NagiRootViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootViewController.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A1 /* NagiRootRepresentable.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootRepresentable.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A2 /* NagiRootState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiRootState.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiKeyboardLayoutCoordinator.swift; sourceTree = "<group>"; };
-		3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemRootTabReferenceView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A5 /* NagiTabBarView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A6 /* NagiTabBarItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiTabBarItemView.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A7 /* NagiNavigationSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiNavigationSearchView.swift; sourceTree = "<group>"; };
@@ -260,7 +234,6 @@
 				3A00000000000000000000A1 /* NagiRootRepresentable.swift */,
 				3A00000000000000000000A2 /* NagiRootState.swift */,
 				3A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift */,
-				3A00000000000000000000A4 /* SystemRootTabReferenceView.swift */,
 			);
 			path = Root;
 			sourceTree = "<group>";
@@ -359,7 +332,6 @@
 				3A000000000000000000000C /* TXTParser.swift */,
 				3A000000000000000000000D /* EPUBParser.swift */,
 				3A000000000000000000007C /* BookImportParser.swift */,
-				3A000000000000000000007D /* EPUBReadingContentProvider.swift */,
 				3A000000000000000000007E /* TXTReaderAssetService.swift */,
 				3A0000000000000000000070 /* ReadiumService.swift */,
 				3A0000000000000000000080 /* EPUBFontResources.swift */,
@@ -371,7 +343,6 @@
 			isa = PBXGroup;
 			children = (
 				3A000000000000000000000A /* Book.swift */,
-				3A0000000000000000000024 /* Chapter.swift */,
 				3A0000000000000000000025 /* ReaderSettings.swift */,
 			);
 			path = Models;
@@ -422,7 +393,6 @@
 			children = (
 				3A0000000000000000000079 /* ReaderArchitecture.swift */,
 				3A000000000000000000007A /* ReaderRenderer.swift */,
-				3A0000000000000000000026 /* TextPaginator.swift */,
 			);
 			path = Engine;
 			sourceTree = "<group>";
@@ -430,7 +400,6 @@
 		2A0000000000000000000012 /* ViewModel */ = {
 			isa = PBXGroup;
 			children = (
-				3A0000000000000000000027 /* TXTReaderModel.swift */,
 				3A0000000000000000000071 /* EPUBReaderModel.swift */,
 			);
 			path = ViewModel;
@@ -439,11 +408,8 @@
 		2A0000000000000000000013 /* View */ = {
 			isa = PBXGroup;
 			children = (
-				3A0000000000000000000028 /* PageTextView.swift */,
-				3A0000000000000000000029 /* PageViewController.swift */,
 				3A000000000000000000002A /* ReaderView.swift */,
 				3A0000000000000000000077 /* ReaderChrome.swift */,
-				3A0000000000000000000078 /* TXTReaderView.swift */,
 				3A000000000000000000007B /* ReaderSettingsView.swift */,
 				3A0000000000000000000072 /* ReadiumNavigatorView.swift */,
 			);
@@ -472,9 +438,7 @@
 			isa = PBXGroup;
 			children = (
 				2A0000000000000000000019 /* Core */,
-				2A000000000000000000001A /* Renderer */,
 				2A000000000000000000001B /* Animation */,
-				2A000000000000000000001E /* Configuration */,
 			);
 			path = Glass;
 			sourceTree = "<group>";
@@ -491,30 +455,12 @@
 			path = Core;
 			sourceTree = "<group>";
 		};
-		2A000000000000000000001A /* Renderer */ = {
-			isa = PBXGroup;
-			children = (
-				3A0000000000000000000088 /* GlassRenderer.swift */,
-				3A0000000000000000000089 /* NativeGlassRenderer.swift */,
-				3A0000000000000000000092 /* BackdropGlassRenderer.swift */,
-			);
-			path = Renderer;
-			sourceTree = "<group>";
-		};
 		2A000000000000000000001B /* Animation */ = {
 			isa = PBXGroup;
 			children = (
 				3A000000000000000000008B /* GlassTouchDriver.swift */,
 			);
 			path = Animation;
-			sourceTree = "<group>";
-		};
-		2A000000000000000000001E /* Configuration */ = {
-			isa = PBXGroup;
-			children = (
-				3A0000000000000000000093 /* GlassBackendConfiguration.swift */,
-			);
-			path = Configuration;
 			sourceTree = "<group>";
 		};
 		2A000000000000000000001C /* Settings */ = {
@@ -537,7 +483,6 @@
 		2A000000000000000000001F /* Performance */ = {
 			isa = PBXGroup;
 			children = (
-				3A0000000000000000000094 /* ReaderPerformanceSignposts.swift */,
 				3A0000000000000000000095 /* ReaderPerformanceController.swift */,
 			);
 			path = Performance;
@@ -739,12 +684,7 @@
 				4A0000000000000000000021 /* FileManager+ZIP.swift in Sources */,
 				4A0000000000000000000022 /* FileManager+ZIPDeprecated.swift in Sources */,
 				4A0000000000000000000023 /* URL+ZIP.swift in Sources */,
-				4A0000000000000000000024 /* Chapter.swift in Sources */,
 				4A0000000000000000000025 /* ReaderSettings.swift in Sources */,
-				4A0000000000000000000026 /* TextPaginator.swift in Sources */,
-				4A0000000000000000000027 /* TXTReaderModel.swift in Sources */,
-				4A0000000000000000000028 /* PageTextView.swift in Sources */,
-				4A0000000000000000000029 /* PageViewController.swift in Sources */,
 				4A000000000000000000002A /* ReaderView.swift in Sources */,
 				4A000000000000000000002B /* DocumentPicker.swift in Sources */,
 				4A000000000000000000002C /* ShareSheet.swift in Sources */,
@@ -752,20 +692,16 @@
 				4A0000000000000000000071 /* EPUBReaderModel.swift in Sources */,
 				4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */,
 				4A0000000000000000000077 /* ReaderChrome.swift in Sources */,
-				4A0000000000000000000078 /* TXTReaderView.swift in Sources */,
 				4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */,
 				4A000000000000000000007A /* ReaderRenderer.swift in Sources */,
 				4A000000000000000000007B /* ReaderSettingsView.swift in Sources */,
 				4A000000000000000000007C /* BookImportParser.swift in Sources */,
-				4A000000000000000000007D /* EPUBReadingContentProvider.swift in Sources */,
 				4A000000000000000000007E /* TXTReaderAssetService.swift in Sources */,
 				4A0000000000000000000080 /* EPUBFontResources.swift in Sources */,
 				4A0000000000000000000084 /* ReaderControllerRepresentable.swift in Sources */,
 				4A0000000000000000000085 /* ReaderChromeAnimator.swift in Sources */,
 				4A0000000000000000000086 /* ReaderChromeView.swift in Sources */,
 				4A0000000000000000000087 /* GlassState.swift in Sources */,
-				4A0000000000000000000088 /* GlassRenderer.swift in Sources */,
-				4A0000000000000000000089 /* NativeGlassRenderer.swift in Sources */,
 				4A000000000000000000008A /* GlassSurfaceView.swift in Sources */,
 				4A000000000000000000008B /* GlassTouchDriver.swift in Sources */,
 				4A000000000000000000008C /* GlassControlView.swift in Sources */,
@@ -774,16 +710,12 @@
 				4A000000000000000000008F /* GlassControlGroup.swift in Sources */,
 				4A0000000000000000000090 /* ReaderSettingsViewController.swift in Sources */,
 				4A0000000000000000000091 /* ReaderMutationScheduler.swift in Sources */,
-				4A0000000000000000000092 /* BackdropGlassRenderer.swift in Sources */,
-				4A0000000000000000000093 /* GlassBackendConfiguration.swift in Sources */,
-				4A0000000000000000000094 /* ReaderPerformanceSignposts.swift in Sources */,
 				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
 				4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */,
 				4A00000000000000000000A0 /* NagiRootViewController.swift in Sources */,
 				4A00000000000000000000A1 /* NagiRootRepresentable.swift in Sources */,
 				4A00000000000000000000A2 /* NagiRootState.swift in Sources */,
 				4A00000000000000000000A3 /* NagiKeyboardLayoutCoordinator.swift in Sources */,
-				4A00000000000000000000A4 /* SystemRootTabReferenceView.swift in Sources */,
 				4A00000000000000000000A5 /* NagiTabBarView.swift in Sources */,
 				4A00000000000000000000A6 /* NagiTabBarItemView.swift in Sources */,
 				4A00000000000000000000A7 /* NagiNavigationSearchView.swift in Sources */,
@@ -886,7 +818,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 126;
+			CURRENT_PROJECT_VERSION = 127;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -895,7 +827,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.36.7;
+			MARKETING_VERSION = 0.36.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -912,7 +844,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-			CURRENT_PROJECT_VERSION = 126;
+			CURRENT_PROJECT_VERSION = 127;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -921,7 +853,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-			MARKETING_VERSION = 0.36.7;
+			MARKETING_VERSION = 0.36.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;

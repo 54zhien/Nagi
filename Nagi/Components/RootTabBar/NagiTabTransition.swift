@@ -1,13 +1,3 @@
-//
-//  NagiTabTransition.swift
-//  Nagi
-//
-//  Root、TabBar、搜索和键盘共用的 property-based transition。
-//  普通属性动画语义按 Nagram ComponentTransition / CAAnimationUtils 对齐：
-//  model 已经等于目标时不重启动画；动画中的反向更新从 presentation 起步；
-//  scale、tint、cornerRadius、blur 使用与 Nagram 相同的 property key。
-//
-
 import ObjectiveC
 import QuartzCore
 import UIKit
@@ -17,7 +7,6 @@ private let nagiBoundsAnimationKey = "bounds"
 private let nagiBoundsOriginAnimationKey = "bounds.origin"
 private let nagiBoundsSizeAnimationKey = "bounds.size"
 private let nagiOpacityAnimationKey = "opacity"
-private let nagiTransformAnimationKey = "transform"
 private let nagiTransformScaleAnimationKey = "transform.scale"
 private let nagiCornerRadiusAnimationKey = "cornerRadius"
 private let nagiTintAnimationKey = "contentsMultiplyColor"
@@ -58,10 +47,7 @@ private final class NagiTransitionCompletionContext: NSObject {
     }
 }
 
-// CAAnimation retains its delegate, exactly as Nagram's CAAnimationUtils does.
-// Keeping completion ownership on the animation itself avoids the previous
-// layer-key dictionary collision when a rapid reverse replaces an animation
-// under the same property key.
+// Keep completion ownership on each animation so reversals do not collide.
 private final class NagiTransitionAnimationDelegate: NSObject, CAAnimationDelegate {
     private var didNotify = false
     private let context: NagiTransitionCompletionContext?
@@ -137,8 +123,7 @@ private extension CALayer {
            let sourceAnimation = animation as? CASpringAnimation {
             var keepNativeSpring = false
 
-            if #available(iOS 26.0, *),
-               abs(sourceAnimation.duration - 0.3832) <= 0.0001 {
+            if abs(sourceAnimation.duration - 0.3832) <= 0.0001 {
                 keepNativeSpring = true
             }
 
@@ -168,16 +153,13 @@ private extension CALayer {
                 replacement.autoreverses = sourceAnimation.autoreverses
                 replacement.delegate = sourceAnimation.delegate
 
-                if #available(iOS 15.0, *) {
-                    replacement.preferredFrameRateRange = sourceAnimation.preferredFrameRateRange
-                }
+                replacement.preferredFrameRateRange = sourceAnimation.preferredFrameRateRange
 
                 updatedAnimation = replacement
             }
         }
 
-        // After method_exchangeImplementations(), this selector points to
-        // CALayer's original add(_:forKey:) implementation.
+        // The exchanged selector now calls CALayer's original implementation.
         nagi_addAnimation(updatedAnimation, forKey: key)
     }
 }
@@ -306,8 +288,7 @@ enum NagiTabTransition {
     // MARK: - ComponentTransition-compatible property setters
 
     func setFrame(view: UIView, frame: CGRect) {
-        // Nagram does not restart an in-flight animation when its model value
-        // already points at the same final frame.
+        // Do not restart an animation when the model already has the target.
         guard view.frame != frame else { return }
 
         let layer = view.layer
@@ -714,36 +695,21 @@ enum NagiTabTransition {
                 animation.fromValue = fromValue
                 animation.toValue = toValue
 
-                if #available(iOS 26.0, *) {
-                    animation.mass = 1.0
-                    animation.stiffness = 555.027
-                    animation.damping = 47.118
-                    animation.duration = duration
-                    animation.timingFunction = CAMediaTimingFunction(name: .linear)
-
-                    if #available(iOS 17.0, *) {
-                        animation.allowsOverdamping = false
-                    }
-
-                    animation.setValue(
-                        NSNumber(value: 1048619),
-                        forKey: "highFrameRateReason"
-                    )
-
-                    if #available(iOS 15.0, *) {
-                        animation.preferredFrameRateRange = CAFrameRateRange(
-                            minimum: 80.0,
-                            maximum: 120.0,
-                            preferred: 120.0
-                        )
-                    }
-                } else {
-                    animation.mass = 3.0
-                    animation.stiffness = 1000.0
-                    animation.damping = 500.0
-                    animation.duration = 0.5
-                    animation.timingFunction = CAMediaTimingFunction(name: .linear)
-                }
+                animation.mass = 1.0
+                animation.stiffness = 555.027
+                animation.damping = 47.118
+                animation.duration = duration
+                animation.timingFunction = CAMediaTimingFunction(name: .linear)
+                animation.allowsOverdamping = false
+                animation.setValue(
+                    NSNumber(value: 1048619),
+                    forKey: "highFrameRateReason"
+                )
+                animation.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 80.0,
+                    maximum: 120.0,
+                    preferred: 120.0
+                )
 
                 animation.isRemovedOnCompletion = true
                 animation.fillMode = .forwards
@@ -780,20 +746,17 @@ enum NagiTabTransition {
     }
 
     private func adjustFrameRate(animation: CAAnimation, keyPath: String) {
-        if #available(iOS 15.0, *) {
-            let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
-            guard maximumFPS > 61.0 else { return }
+        let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
+        guard maximumFPS > 61.0 else { return }
 
-            // Nagram intentionally leaves opacity at its existing frame-rate
-            // preference (the iOS 26 0.5 spring already carries 80/120/120).
-            guard keyPath != nagiOpacityAnimationKey else { return }
+        // Opacity keeps the native spring's frame-rate preference.
+        guard keyPath != nagiOpacityAnimationKey else { return }
 
-            animation.preferredFrameRateRange = CAFrameRateRange(
-                minimum: 30.0,
-                maximum: maximumFPS,
-                preferred: maximumFPS
-            )
-        }
+        animation.preferredFrameRateRange = CAFrameRateRange(
+            minimum: 30.0,
+            maximum: maximumFPS,
+            preferred: maximumFPS
+        )
     }
 
     private var timingFunction: CAMediaTimingFunction {

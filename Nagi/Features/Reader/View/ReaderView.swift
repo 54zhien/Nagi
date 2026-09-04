@@ -1,11 +1,3 @@
-//
-//  ReaderView.swift
-//  Nagi
-//
-//  阅读器入口。阅读编排层负责生命周期、统一设置和 chrome，
-//  TXT / EPUB 的正文渲染交给各自的 renderer。
-//
-
 import SwiftData
 import SwiftUI
 import UIKit
@@ -33,18 +25,14 @@ struct ReaderView: View {
             }
             guard model == nil else { return }
 
-            // Let the full-screen presentation render its first frame before
-            // constructing the main-actor reader graph.  This keeps the
-            // presenting library responsive during the modal transition.
+            // Let the presentation reach its first frame before opening Readium.
             await Task.yield()
             guard !Task.isCancelled else { return }
 
             let nextModel = ReaderViewModel(book: book)
             model = nextModel
 
-            // The session initially renders its loading state. Yield again so
-            // that state can reach the screen before Readium starts opening
-            // the publication and creating its UIKit navigator.
+            // Show the loading state before creating the navigator.
             await Task.yield()
             guard !Task.isCancelled else { return }
 

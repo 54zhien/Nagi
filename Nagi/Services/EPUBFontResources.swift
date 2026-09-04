@@ -1,10 +1,3 @@
-//
-//  EPUBFontResources.swift
-//  Nagi
-//
-//  App-owned font resources exposed to Readium's EPUB navigator.
-//
-
 import Foundation
 import ReadiumNavigator
 import ReadiumShared

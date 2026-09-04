@@ -1,10 +1,3 @@
-//
-//  SearchView.swift
-//  Nagi
-//
-//  搜索：按书名关键词实时过滤书库，并进入阅读页。
-//
-
 import SwiftUI
 import SwiftData
 

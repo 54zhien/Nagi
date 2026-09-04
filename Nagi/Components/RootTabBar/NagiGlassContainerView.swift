@@ -1,11 +1,3 @@
-//
-//  NagiGlassContainerView.swift
-//  Nagi
-//
-//  RootTabBar 内唯一的 UIGlassContainerEffect。Main surface 和搜索 surface
-//  作为同一容器中的兄弟关系参与 Glass 合成。
-//
-
 import UIKit
 
 final class NagiGlassContainerView: UIView {

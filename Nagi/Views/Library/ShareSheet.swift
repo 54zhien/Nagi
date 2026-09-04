@@ -1,11 +1,3 @@
-//
-//  SharePresenter.swift
-//  Nagi
-//
-//  用 UIKit 的 rootViewController 直接 present UIActivityViewController（系统原生分享面板），
-//  绕开 SwiftUI .sheet 双重 modal 嵌套导致的空白问题。
-//
-
 import UIKit
 
 enum SharePresenter {

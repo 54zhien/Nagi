@@ -1,11 +1,3 @@
-//
-//  NagiLiquidLensView.swift
-//  Nagi
-//
-//  持久化的选中态 Lens。Main Glass、normal/selected content、resting
-//  background 和 private _UILiquidLensView 都由这里统一管理。
-//
-
 import QuartzCore
 import UIKit
 
@@ -32,9 +24,7 @@ private final class NagiLensRestingBackgroundView: UIVisualEffectView {
         clipsToBounds = true
         layer.cornerCurve = .continuous
 
-        // Match Nagram's resting lens: the visual-effect subview is hidden and
-        // the surface is recolored by a CA color-matrix filter instead of a
-        // synthetic blue overlay.
+        // Recolor the resting surface instead of adding an overlay.
         for subview in subviews {
             if subview.description.contains("VisualEffectSubview") {
                 subview.isHidden = true
@@ -125,8 +115,7 @@ final class NagiLiquidLensView: UIView {
     private let lensContentContainer: UIView
     private let restingBackgroundView: NagiLensRestingBackgroundView
     private let nativeLensView: UIView?
-    // currentParams is the latest requested state. The private Lens can lag
-    // behind it while setLifted waits for its alongside callback.
+    // The private lens can lag while setLifted waits for its callback.
     private var currentParams: NagiLensParams?
     private var appliedLensParams: NagiLensParams?
     private var isApplyingParams = false
@@ -135,13 +124,6 @@ final class NagiLiquidLensView: UIView {
 
     var usesPrivateLens: Bool {
         nativeLensView != nil
-    }
-
-    static var supportsNativeLiquidLens: Bool {
-        guard #available(iOS 26.0, *) else {
-            return false
-        }
-        return makePrivateLensView() != nil
     }
 
     override init(frame: CGRect) {
@@ -207,12 +189,6 @@ final class NagiLiquidLensView: UIView {
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
-    }
-
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        // The parent update owns presentation geometry. This callback only
-        // participates in UIKit's normal bounds propagation for the view.
     }
 
     func configure(
@@ -296,10 +272,7 @@ final class NagiLiquidLensView: UIView {
         }
 
         isApplyingParams = true
-        // Keep the params that are currently being handed to UIKit in the
-        // same pending slot as Nagram. A touch update arriving while
-        // setLifted defers its alongside callback replaces this value with
-        // the newest params instead of starting another nested lift.
+        // Keep the newest touch state until UIKit invokes alongsideAnimations.
         pendingParams = params
         effectiveTransition.perform(applyAnimations)
 
@@ -392,12 +365,7 @@ final class NagiLiquidLensView: UIView {
                 nativeLensView.bounds = targetBounds
             }
 
-            // Intentionally mirror Nagram LiquidLensView's workaround.
-            //
-            // Do not remove or "clean up" these two lines.
-            // Nagram starts the UIKit bounds animation, immediately removes
-            // the resulting layer animations, then forces the model bounds to
-            // the final value before applying position compensation.
+            // Commit final bounds before applying the position compensation.
             nativeLensView.layer.removeAllAnimations()
             nativeLensView.bounds = targetBounds
 
@@ -417,10 +385,7 @@ final class NagiLiquidLensView: UIView {
             )
         }
 
-        // During a private lift, bounds and center are both completed by the
-        // Nagram setLifted path. The center is animated after its alongside
-        // callback in invokeLifted(...), rather than being moved ahead of the
-        // private Lens transaction.
+        // setLifted completes the bounds; the center moves in its callback.
         transition.setAlpha(view: nativeLensView, alpha: 1)
     }
 
@@ -454,18 +419,14 @@ final class NagiLiquidLensView: UIView {
                 target: self,
                 selector: #selector(updateLiftedLensPresentation(_:))
             )
-            if #available(iOS 15.0, *) {
-                let maximumFPS =
-                    Float(UIScreen.main.maximumFramesPerSecond)
+            let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
 
-                if maximumFPS > 61.0 {
-                    displayLink.preferredFrameRateRange =
-                        CAFrameRateRange(
-                            minimum: 30.0,
-                            maximum: 120.0,
-                            preferred: 120.0
-                        )
-                }
+            if maximumFPS > 61.0 {
+                displayLink.preferredFrameRateRange = CAFrameRateRange(
+                    minimum: 30.0,
+                    maximum: 120.0,
+                    preferred: 120.0
+                )
             }
             displayLink.add(to: .main, forMode: .common)
             interactiveDisplayLink = displayLink
@@ -609,7 +570,7 @@ final class NagiLiquidLensView: UIView {
     }
 
     private static func makePrivateLensView() -> UIView? {
-        guard #available(iOS 26.0, *), NSClassFromString("_UILiquidLensView") != nil else {
+        guard NSClassFromString("_UILiquidLensView") != nil else {
             return nil
         }
         guard let viewClass = NSClassFromString("_UILiquidLensView") as AnyObject as? NSObjectProtocol else {

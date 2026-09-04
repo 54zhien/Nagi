@@ -1,10 +1,3 @@
-//
-//  LibraryView.swift
-//  Nagi
-//
-//  书库：书架列表 + 导入入口（右上角 + 导入 EPUB/TXT）
-//
-
 import SwiftUI
 import SwiftData
 import UIKit
@@ -192,7 +185,7 @@ struct LibraryView: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .modifier(
                                     BookCardSurfaceModifier(
-                                        isLiquidGlassEnabled: bookCardsUseLiquidGlass
+                                        usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 )
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
@@ -414,10 +407,10 @@ enum BookCardMetrics {
 }
 
 struct BookCardSurfaceModifier: ViewModifier {
-    let isLiquidGlassEnabled: Bool
+    let usesLiquidGlass: Bool
 
     func body(content: Content) -> some View {
-        if isLiquidGlassEnabled {
+        if usesLiquidGlass {
             content.glassEffect(
                 .regular.interactive(),
                 in: BookCardMetrics.cardShape

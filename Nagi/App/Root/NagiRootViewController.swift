@@ -1,12 +1,3 @@
-//
-//  NagiRootViewController.swift
-//  Nagi
-//
-//  Nagi 的正式 App Root。三个 SwiftUI 页面在这里一次性创建并完成
-//  UIKit containment，Search 作为独立 overlay 持久存在，之后只做
-//  alpha/frame/state 更新。
-//
-
 import QuartzCore
 import SwiftUI
 import UIKit
@@ -240,9 +231,7 @@ final class NagiRootViewController: UIViewController {
         state.tabBarSearchState = NagiTabBarSearchState(isActive: true)
         searchOverlayDismissTapGesture.isEnabled = true
 
-        // Build the active Search surface first. becomeFirstResponder then
-        // produces the system keyboard transition, whose frame update retargets
-        // this same in-flight property animation from its presentation values.
+        // Build the search surface before starting the keyboard transition.
         reconcileLayout(
             transition: effectiveTransition(.spring(duration: 0.5))
         )
@@ -401,15 +390,13 @@ final class NagiRootViewController: UIViewController {
             animation.fillMode = .both
         }
 
-        if #available(iOS 15.0, *) {
-            let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
-            if maximumFPS > 61.0 {
-                animation.preferredFrameRateRange = CAFrameRateRange(
-                    minimum: 30.0,
-                    maximum: maximumFPS,
-                    preferred: maximumFPS
-                )
-            }
+        let maximumFPS = Float(UIScreen.main.maximumFramesPerSecond)
+        if maximumFPS > 61.0 {
+            animation.preferredFrameRateRange = CAFrameRateRange(
+                minimum: 30.0,
+                maximum: maximumFPS,
+                preferred: maximumFPS
+            )
         }
 
         if let completion {
@@ -544,11 +531,7 @@ final class NagiRootViewController: UIViewController {
         let resolvedTransition = effectiveTransition(transition)
         currentLayoutState = nextState
 
-        // Parent RootTabBar geometry and all child Search/Main/Lens geometry
-        // are submitted before this transaction commits. This is the same
-        // topology as Nagram's containerLayoutUpdated -> TabBarComponent.update
-        // path and prevents a child from animating in an already-retargeted
-        // parent coordinate system.
+        // Submit parent and child geometry in one transaction.
         resolvedTransition.perform { [weak self] in
             guard let self else { return }
 

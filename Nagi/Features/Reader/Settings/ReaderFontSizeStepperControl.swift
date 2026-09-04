@@ -1,23 +1,14 @@
-//
-//  ReaderFontSizeStepperControl.swift
-//  Nagi
-//
-//  A persistent two-sided font-size stepper for the Reader medium sheet.
-//
-
 import UIKit
 
 @MainActor
 final class ReaderFontSizeStepperControl: UIControl {
-    private let surfaceView = GlassSurfaceView()
+    private let surfaceView = GlassSurfaceView(frame: .zero)
     private let smallerButton = UIButton(type: .system)
     private let largerButton = UIButton(type: .system)
     private let centerDivider = UIView()
 
     private var smallerIsEnabled = true
     private var largerIsEnabled = true
-    private var currentState: GlassState?
-
     var onDecrease: (() -> Void)?
     var onIncrease: (() -> Void)?
 
@@ -94,14 +85,10 @@ final class ReaderFontSizeStepperControl: UIControl {
 
         let state = GlassState(
             tint: nil,
-            isEnabled: true,
             isInteractive: true,
             cornerRadius: 22
         )
-        if currentState != state {
-            surfaceView.update(state)
-            currentState = state
-        }
+        surfaceView.update(state)
         setNeedsLayout()
     }
 

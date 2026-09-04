@@ -1,12 +1,3 @@
-//
-//  GlassControlGroup.swift
-//  Nagi
-//
-//  Persistent cache for adjacent GlassControlView instances.  The item
-//  identity is independent from the reader's observable state, so changing a
-//  label, tint, or enabled state does not recreate the control tree.
-//
-
 import UIKit
 
 @MainActor
@@ -61,8 +52,8 @@ final class GlassControlGroup<ID: Hashable>: UIView {
     private var itemFrames: [ID: CGRect] = [:]
     private var cachedContainerFrame = CGRect.null
 
-    init(spacing: CGFloat = 0, backend: GlassBackend? = nil) {
-        containerView = GlassContainerView(spacing: spacing, backend: backend)
+    init(spacing: CGFloat = 0) {
+        containerView = GlassContainerView(spacing: spacing)
         super.init(frame: .zero)
 
         backgroundColor = .clear

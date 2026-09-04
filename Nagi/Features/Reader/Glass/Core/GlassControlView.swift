@@ -1,10 +1,3 @@
-//
-//  GlassControlView.swift
-//  Nagi
-//
-//  Persistent UIKit control used by the Reader Chrome.
-//
-
 import QuartzCore
 import UIKit
 
@@ -19,17 +12,15 @@ final class GlassControlView: UIControl {
     private let selectedStrokeLayer = CALayer()
     private let touchDriver = GlassTouchDriver()
 
-    private var currentState: GlassState?
     private var currentReduceMotion = false
     private var preferredCornerRadius: CGFloat?
     private var suppressTouchHighlight = false
 
     override init(frame: CGRect) {
-        surfaceView = GlassSurfaceView()
+        surfaceView = GlassSurfaceView(frame: .zero)
         super.init(frame: frame)
 
-        // Warm the process/thermal observer while the persistent control is
-        // being created, rather than paying that setup cost on touch-down.
+        // Initialize the performance observer before the first interaction.
         _ = ReaderPerformanceController.shared
 
         touchDriver.control = self
@@ -140,14 +131,10 @@ final class GlassControlView: UIControl {
         let radius = resolvedCornerRadius
         let state = GlassState(
             tint: tintColor.map(GlassColor.init),
-            isEnabled: isEnabled,
             isInteractive: isEnabled,
             cornerRadius: radius > 0 ? radius : 24
         )
-        if currentState != state {
-            surfaceView.update(state)
-            currentState = state
-        }
+        surfaceView.update(state)
 
         selectedStrokeLayer.borderColor = (contentColor ?? tintColor ?? .label)
             .withAlphaComponent(0.84)
@@ -156,8 +143,7 @@ final class GlassControlView: UIControl {
         setNeedsLayout()
     }
 
-    /// Uses UIButton's public UIMenu support while keeping this view's
-    /// existing persistent GlassControlView surface and accessibility label.
+    /// Adds a menu without replacing the persistent glass surface.
     func setPrimaryMenu(_ menu: UIMenu?) {
         menuButton.menu = menu
         menuButton.showsMenuAsPrimaryAction = menu != nil
@@ -190,14 +176,13 @@ final class GlassControlView: UIControl {
 
     override func endTracking(_ touch: UITouch?, with event: UIEvent?) {
         guard let touch else {
-            touchDriver.end(at: startPointForCancelledTouch, cancelled: true)
+            touchDriver.end()
             super.endTracking(touch, with: event)
             return
         }
 
-        let point = touch.location(in: self)
-        let endedInside = bounds.contains(point)
-        touchDriver.end(at: point, cancelled: false)
+        let endedInside = bounds.contains(touch.location(in: self))
+        touchDriver.end()
         super.endTracking(touch, with: event)
         if endedInside, isEnabled {
             sendActions(for: .primaryActionTriggered)
@@ -205,7 +190,7 @@ final class GlassControlView: UIControl {
     }
 
     override func cancelTracking(with event: UIEvent?) {
-        touchDriver.end(at: startPointForCancelledTouch, cancelled: true)
+        touchDriver.end()
         super.cancelTracking(with: event)
     }
 
@@ -254,12 +239,8 @@ final class GlassControlView: UIControl {
 
     func applyTouchEnded(
         from transform: CATransform3D,
-        at point: CGPoint,
-        cancelled: Bool,
         reduceMotion: Bool
     ) {
-        _ = point
-        _ = cancelled
         layer.removeAnimation(forKey: "glassTouchPress")
         highlightLayer.opacity = 0
         suppressTouchHighlight = false
@@ -290,10 +271,6 @@ final class GlassControlView: UIControl {
             y: max(0, min(1, point.y / height))
         )
         highlightLayer.opacity = opacity
-    }
-
-    private var startPointForCancelledTouch: CGPoint {
-        CGPoint(x: bounds.midX, y: bounds.midY)
     }
 
     override func layoutSubviews() {

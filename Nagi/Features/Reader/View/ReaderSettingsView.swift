@@ -1,10 +1,3 @@
-//
-//  ReaderSettingsView.swift
-//  Nagi
-//
-//  TXT / EPUB 共用的主题与排版设置。即时设置直接应用，详细排版设置使用草稿。
-//
-
 import SwiftUI
 import UIKit
 
@@ -43,14 +36,12 @@ struct MediumReaderSettingsView: View {
                 brightnessControl
                 presetCards
                 customButton
-
             }
             .padding(.horizontal, 18)
             .padding(.top, 8)
             .padding(.bottom, 22)
         }
         .scrollIndicators(.hidden)
-
     }
 
     private var topControls: some View {
@@ -344,7 +335,6 @@ struct MediumReaderSettingsView: View {
                     : preset.contentColor(isDarkAppearance: isDarkAppearance)
             )
             .padding(.vertical, 7)
-            // 三列卡片继续沿用原三列两行预设网格的比例，并向下延伸一些。
             .frame(maxWidth: .infinity, minHeight: ReaderControlValues.presetGridHeight)
             .background(cardColor, in: cardShape)
             .overlay {
@@ -427,25 +417,13 @@ struct CustomReaderSettingsSheet: View {
     }
 
     private enum LayoutSymbol {
-        static let lineSpacing = ReaderSystemSymbol.name(
-            "arrow.up.and.down.text.horizontal",
-            fallback: "arrow.up.and.down"
-        )
-        static let characterSpacing = ReaderSystemSymbol.name(
-            "textformat.abc",
-            fallback: "character"
-        )
-        static let wordSpacing = ReaderSystemSymbol.name(
-            "text.word.spacing",
-            fallback: "text.alignleft"
-        )
-        static let pageMargins = ReaderSystemSymbol.name(
-            "rectangle.portrait.inset.filled",
-            fallback: "rectangle.portrait"
-        )
+        static let lineSpacing = "arrow.up.and.down.text.horizontal"
+        static let characterSpacing = "textformat.abc"
+        static let wordSpacing = "text.word.spacing"
+        static let pageMargins = "rectangle.portrait.inset.filled"
     }
 
-    // 朱自清《春》（1933）中的短段落，用于展示字体、行距和页边空白。
+    // Sample text for the typography preview.
     private static let previewSampleText = """
     一切都像刚睡醒的样子，欣欣然张开了眼。山朗润起来了，水涨起来了，太阳的脸红起来了。
 
@@ -489,8 +467,7 @@ struct CustomReaderSettingsSheet: View {
                 ScrollView {
                     settingsContent
                         .padding(.horizontal, 16)
-                        // Reserve the initial preview space, then let the cards
-                        // scroll beneath the fixed preview overlay.
+                        // Keep the preview fixed while the settings scroll.
                         .padding(.top, Layout.previewHeight + 18)
                         .padding(.bottom, 28)
                 }
@@ -516,8 +493,7 @@ struct CustomReaderSettingsSheet: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("自定义主题")
             .navigationBarTitleDisplayMode(.inline)
-            // Keep the system navigation-bar surface continuous with the
-            // fixed preview surface below it.
+            // Keep the navigation bar continuous with the preview surface.
             .toolbarBackground(Color(uiColor: previewBackgroundColor), for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
             .toolbarColorScheme(previewColorScheme, for: .navigationBar)

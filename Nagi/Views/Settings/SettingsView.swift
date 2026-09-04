@@ -1,10 +1,3 @@
-//
-//  SettingsView.swift
-//  Nagi
-//
-//  设置与关于
-//
-
 import SwiftUI
 import UIKit
 
@@ -79,19 +72,12 @@ private struct AppearanceView: View {
     private var bookCardsUseLiquidGlass = true
     @AppStorage(NagiAppearanceSettings.readerSettingsUseLiquidGlassKey)
     private var readerSettingsUseLiquidGlass = true
-    @State private var isLiquidGlassExpanded = false
 
     var body: some View {
         List {
-            Section {
-                DisclosureGroup(
-                    isExpanded: $isLiquidGlassExpanded
-                ) {
-                    Toggle("书籍卡片", isOn: $bookCardsUseLiquidGlass)
-                    Toggle("阅读设置项", isOn: $readerSettingsUseLiquidGlass)
-                } label: {
-                    Label("Liquid Glass 控件", systemImage: "rectangle.on.rectangle")
-                }
+            Section("Liquid Glass") {
+                Toggle("书籍卡片", isOn: $bookCardsUseLiquidGlass)
+                Toggle("阅读设置项", isOn: $readerSettingsUseLiquidGlass)
             }
         }
         .navigationTitle("外观")

@@ -1,11 +1,3 @@
-//
-//  NagiTabBarView.swift
-//  Nagi
-//
-//  RootTabBar 的持久化 UIKit 实现。Root 只提供整体 frame；本 view
-//  负责 Main/Search/Lens 的一次性状态提交，所有 surface 都复用。
-//
-
 import UIKit
 
 struct NagiTabBarParams: Equatable {
@@ -29,10 +21,7 @@ private struct NagiSelectionGestureState: Equatable {
 final class NagiTabBarView: UIView {
     private let glassContainer: NagiGlassContainerView
 
-    // Nagram moves a plain context container while LiquidLens changes its own
-    // size inside that moving coordinate space. Keeping those two motions on
-    // separate layers is important: the native Glass should morph in size,
-    // not be asked to translate and morph on the same effect layer.
+    // Translation belongs to this container; the lens only changes its size.
     private let mainTabsMotionContainer: UIView
 
     private let itemViews: [NagiTabBarItemView]
@@ -47,7 +36,6 @@ final class NagiTabBarView: UIView {
     private var currentSearchState = NagiTabBarSearchState.inactive
     private var selectionGestureState: NagiSelectionGestureState?
     private var overrideSelectedIndex: Int?
-    private let isLiftedStateEnabled = true
     private var lastTraitStyle: UIUserInterfaceStyle
 
     var onTabSelected: ((AppTab) -> Void)?
@@ -81,8 +69,8 @@ final class NagiTabBarView: UIView {
         super.init(frame: .zero)
 
         registerForTraitChanges([UITraitUserInterfaceStyle.self]) {
-            (view: NagiTabBarView, previousTraitCollection) in
-            view.handleTraitCollectionChange(previousTraitCollection)
+            (view: NagiTabBarView, _) in
+            view.handleTraitCollectionChange()
         }
 
         clipsToBounds = false
@@ -97,8 +85,7 @@ final class NagiTabBarView: UIView {
         glassContainer.contentView.addSubview(mainTabsMotionContainer)
         mainTabsMotionContainer.addSubview(liquidLensView)
 
-        // Search is a sibling of the moving Main container, exactly like
-        // Nagram's NavigationSearchView inside GlassBackgroundContainer.
+        // Search stays outside the moving main-tab container.
         glassContainer.contentView.addSubview(searchView)
 
         tabSelectionRecognizer.addTarget(
@@ -108,9 +95,7 @@ final class NagiTabBarView: UIView {
         tabSelectionRecognizer.shouldBeginAtLocation = { [weak self] location in
             self?.shouldBeginTabSelectionGesture(at: location) ?? false
         }
-        // Keep the recognizer on the RootTabBar host so the collapsed 48pt
-        // Main surface remains reachable even while its visual container is
-        // translated outside the normal component bounds.
+        // Keep the recognizer on the host so the collapsed bar remains reachable.
         addGestureRecognizer(tabSelectionRecognizer)
 
         for itemView in itemViews {
@@ -161,15 +146,11 @@ final class NagiTabBarView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
-        // Only the Glass host follows RootTabBar bounds here. Main/Search/Lens
-        // geometry belongs exclusively to update(... transition:) so UIKit
-        // layout callbacks cannot overwrite an in-flight morph.
+        // Transition code owns child geometry during a morph.
         glassContainer.frame = bounds
     }
 
-    private func handleTraitCollectionChange(
-        _ previousTraitCollection: UITraitCollection
-    ) {
+    private func handleTraitCollectionChange() {
         let style = traitCollection.userInterfaceStyle
         guard style != lastTraitStyle else { return }
         lastTraitStyle = style
@@ -261,7 +242,6 @@ final class NagiTabBarView: UIView {
                 in: layout.searchContainerFrame
             ),
             isActive: searchState.isActive,
-            isExpandedStandaloneBar: false,
             isDark: isDark,
             reduceTransparency: reduceTransparency
         )
@@ -274,10 +254,7 @@ final class NagiTabBarView: UIView {
         transition.perform { [weak self] in
             guard let self else { return }
 
-            // Nagram's contextGestureContainerView owns translation into the
-            // collapsed Search state. LiquidLens remains at origin inside it,
-            // so the Glass only morphs its bounds instead of translating and
-            // morphing on the same native effect surface.
+            // Move the main container; keep the lens at local zero.
             transition.setFrame(
                 view: self.mainTabsMotionContainer,
                 frame: localMainTabsFrame
@@ -319,20 +296,14 @@ final class NagiTabBarView: UIView {
                 params: self.makeLensParams(
                     layout: layout,
                     displayedIndex: displayedIndex,
-                    isLifted:
-                        self.selectionGestureState != nil &&
-                        self.isLiftedStateEnabled,
+                    isLifted: self.selectionGestureState != nil,
                     isDark: isDark,
                     reduceTransparency: reduceTransparency
                 ),
                 transition: transition
             )
 
-            // This order is intentional and matches NavigationSearchView in
-            // Nagram: update the persistent Search surface internally first,
-            // then move/resize the outer Search view. Reversing the order makes
-            // the icon animate in a parent coordinate system that has already
-            // jumped to its target geometry and causes the transient offset.
+            // Update search internals before moving the outer search view.
             if searchParamsChanged || oldParams == nil {
                 self.searchView.applyInternalGeometry(
                     params: searchParams,
@@ -346,9 +317,7 @@ final class NagiTabBarView: UIView {
                 )
             }
 
-            // Nagram updates its GlassBackgroundContainer after the child
-            // surfaces have received their target geometry with the same
-            // ComponentTransition.
+            // Update the shared glass container after its children.
             self.glassContainer.update(
                 size: layout.tabBarFrame.size,
                 isDark: isDark,
@@ -470,7 +439,7 @@ final class NagiTabBarView: UIView {
             return
         }
 
-        let translation = recognizer.translation(in: liquidLensView)
+        let translation = recognizer.translation()
         let currentSelectionX =
             gestureState.startSelectionX + translation.x
         let hoveredIndex = mainIndex(
@@ -547,10 +516,7 @@ final class NagiTabBarView: UIView {
     ) {
         let resolvedBlurTransition = blurTransition ?? transition
         let resolvedScaleTransition = scaleTransition ?? transition
-        let selectedContentScale: CGFloat =
-            selectionGestureState != nil && isLiftedStateEnabled
-            ? 1.15
-            : 1.0
+        let selectedContentScale: CGFloat = selectionGestureState != nil ? 1.15 : 1.0
 
         for (itemView, selectedItemView) in zip(
             itemViews,
@@ -675,8 +641,7 @@ final class NagiTabBarView: UIView {
 
         return NagiLensParams(
             size: layout.lensContainerFrame.size,
-            // Main translation is owned by mainTabsMotionContainer. Keeping
-            // the native Glass at local zero is the key Nagram hierarchy rule.
+            // The parent owns translation; the native glass stays at local zero.
             containerOrigin: .zero,
             selectionOrigin: selection.origin,
             selectionSize: selection.size,

@@ -1,12 +1,4 @@
-//
-//  DocumentPicker.swift
-//  Nagi
-//
-//  用 UIKit 的 rootViewController.present 直接弹出 UIDocumentPickerViewController，
-//  绕开 SwiftUI .sheet 与 UIKit picker 的双重 modal 嵌套（后者会导致 delegate 回调不触发）。
-//
-
-import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 final class DocumentPickerCoordinator: NSObject, UIDocumentPickerDelegate {

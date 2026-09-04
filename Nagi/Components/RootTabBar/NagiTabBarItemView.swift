@@ -1,11 +1,3 @@
-//
-//  NagiTabBarItemView.swift
-//  Nagi
-//
-//  持久化的主 Tab 视觉内容。它不创建独立的 Glass，也不处理触控；
-//  选中状态由 RootTabBar 的单一 Liquid Lens 表达。
-//
-
 import UIKit
 
 final class NagiTabBarItemView: UIView {
@@ -39,8 +31,7 @@ final class NagiTabBarItemView: UIView {
 
         isAccessibilityElement = false
         addSubview(button)
-        // RootTab selection is owned exclusively by NagiTabSelectionRecognizer.
-        // Keep this UIKit button only as a visual host; it never receives input.
+        // Selection is handled by NagiTabSelectionRecognizer.
         button.isUserInteractionEnabled = false
         button.isAccessibilityElement = isInteractive
         button.accessibilityTraits = isInteractive ? [.button] : []
@@ -55,8 +46,6 @@ final class NagiTabBarItemView: UIView {
         switch tab {
         case .home:
             button.accessibilityLabel = "主页"
-            // Keep Home in the same SF Symbols family as the other tabs and
-            // use a symbol present on the deployment target.
             iconView.image = UIImage(systemName: "book.closed")
         case .library:
             button.accessibilityLabel = "书库"

@@ -1,10 +1,3 @@
-//
-//  EPUBParser.swift
-//  Nagi
-//
-//  EPUB 解析：用 ZIPFoundation 解压 → 定位 OPF → 提取元数据 + 章节列表 + 章节正文。
-//
-
 import Foundation
 import CoreGraphics
 import ImageIO
@@ -18,7 +11,7 @@ struct EPUBParser: Sendable {
 
         let title = extractTag(opfXml, tag: "title") ?? url.deletingPathExtension().lastPathComponent
         let author = extractTag(opfXml, tag: "creator")
-        let chapters = try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
+        let chapterCount = try chapterCount(from: archive, opfXml: opfXml, opfDir: opfDir)
         let coverData: Data?
         do {
             coverData = try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
@@ -31,25 +24,17 @@ struct EPUBParser: Sendable {
         return ParsedBook(
             title: title,
             author: author,
-            chapterCount: chapters.count,
+            chapterCount: chapterCount,
             content: "",
             coverData: coverData
         )
     }
 
-    /// Loads and downsamples an EPUB cover for books imported before the
-    /// cover was stored in SwiftData.
+    /// Loads a downsampled cover for existing library records.
     func loadCoverData(url: URL) throws -> Data? {
         let archive = try openArchive(url)
         let (opfXml, opfDir) = try opfDocument(archive)
         return try extractCoverData(from: archive, opfXml: opfXml, opfDir: opfDir)
-    }
-
-    /// 章节列表（spine 阅读顺序）。
-    func loadChapters(url: URL) throws -> [BookChapter] {
-        let archive = try openArchive(url)
-        let (opfXml, opfDir) = try opfDocument(archive)
-        return try chapters(from: archive, opfXml: opfXml, opfDir: opfDir)
     }
 
     /// 加载某章正文（XHTML → 纯文本）。
@@ -89,31 +74,25 @@ struct EPUBParser: Sendable {
         return (opfXml, opfDir)
     }
 
-    /// 从 OPF 提取章节列表（manifest + spine）。
-    private func chapters(from archive: Archive, opfXml: String, opfDir: String) throws -> [BookChapter] {
-        let manifest = parseManifest(opfXml)      // id -> href
-        let spine = parseSpine(opfXml)            // [idref]
+    /// Counts valid spine items.
+    private func chapterCount(from archive: Archive, opfXml: String, opfDir: String) throws -> Int {
+        let manifest = parseManifest(opfXml)
+        let spine = parseSpine(opfXml)
         guard !spine.isEmpty else {
             throw ParseError.invalidArchive
         }
 
-        var chapters: [BookChapter] = []
+        var count = 0
         for idref in spine {
             guard let href = manifest[idref] else { continue }
             let fullPath = resolve(href: href, relativeTo: opfDir)
             guard entry(in: archive, path: fullPath) != nil else { continue }
-            let index = chapters.count
-            chapters.append(BookChapter(
-                id: fullPath,
-                title: "第 \(index + 1) 章",
-                href: fullPath,
-                index: index
-            ))
+            count += 1
         }
-        guard !chapters.isEmpty else {
+        guard count > 0 else {
             throw ParseError.invalidArchive
         }
-        return chapters
+        return count
     }
 
     private struct ManifestItem {
@@ -389,13 +368,12 @@ struct EPUBParser: Sendable {
     static func htmlToText(_ html: String) -> String {
         guard let doc = try? SwiftSoup.parse(html),
               let body = try? doc.body() else {
-            return Self.legacyHtmlToText(html)
+            return Self.regexHtmlToText(html)
         }
 
-        // 提取块级文本元素，保留段落结构
         let selector = "p, li, h1, h2, h3, h4, h5, h6, blockquote, pre, td, th"
         guard let elements = try? body.select(selector) else {
-            return Self.legacyHtmlToText(html)
+            return Self.regexHtmlToText(html)
         }
 
         var paragraphs: [String] = []
@@ -412,8 +390,8 @@ struct EPUBParser: Sendable {
         return paragraphs.joined(separator: "\n\n")
     }
 
-    /// 正则 fallback（SwiftSoup 不可用时）。
-    static func legacyHtmlToText(_ html: String) -> String {
+    /// Regex fallback when HTML parsing fails.
+    static func regexHtmlToText(_ html: String) -> String {
         var text = html
         text = text.replacingOccurrences(of: #"<style[^>]*>.*?</style>"#, with: "", options: [.regularExpression, .caseInsensitive])
         text = text.replacingOccurrences(of: #"<script[^>]*>.*?</script>"#, with: "", options: [.regularExpression, .caseInsensitive])

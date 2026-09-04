@@ -1,12 +1,3 @@
-//
-//  NagiGlassBackgroundView.swift
-//  Nagi
-//
-//  单个持久化 native Glass surface。Effect settings 通过与 Nagram 相同的
-//  iOS 26 backdrop luma runtime hook 生效，surface 和 native effect 的
-//  geometry 由调用方传入的同一个 NagiTabTransition 驱动。
-//
-
 import ObjectiveC.runtime
 import QuartzCore
 import UIKit
@@ -67,9 +58,6 @@ enum NagiGlassEffectRuntime {
 
     static func installIfNeeded() {
         guard !isInstalled else { return }
-        guard #available(iOS 26.0, *) else {
-            return
-        }
 
         let className =
             "_TtC5UIKitP33_ACD4A08F4BE9D00246F2A9C24A80CA8817UISDFBackdropView"
@@ -302,7 +290,7 @@ final class NagiGlassBackgroundView: UIView {
         params: NagiGlassParams,
         transition: NagiTabTransition
     ) {
-        _ = prepare(params: params)
+        prepare(params: params)
         applyGeometry(params: params, transition: transition)
     }
 }

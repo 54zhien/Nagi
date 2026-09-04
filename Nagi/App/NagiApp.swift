@@ -1,10 +1,3 @@
-//
-//  NagiApp.swift
-//  Nagi
-//
-//  App 入口。正式 Root 由持久化 UIKit 容器承载。
-//
-
 import SwiftUI
 import SwiftData
 
