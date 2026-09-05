@@ -16,7 +16,7 @@ struct HomeView: View {
                 if readingBooks.isEmpty {
                     ContentUnavailableView(
                         "还没有书",
-                        systemImage: "book"
+                        systemImage: "book.closed"
                     )
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {

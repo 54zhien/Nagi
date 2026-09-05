@@ -3,7 +3,41 @@ import SwiftData
 import UIKit
 
 private enum SearchHeaderMetrics {
-    static let fadeExtension: CGFloat = 72
+    static let fadeExtension: CGFloat = 56
+}
+
+enum SearchHistoryStorage {
+    static let key = "Nagi.search.history"
+    static let maximumCount = 10
+
+    static func record(_ query: String, defaults: UserDefaults = .standard) {
+        let normalized = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalized.isEmpty else { return }
+
+        var entries = history(from: defaults)
+        entries.removeAll { $0.compare(normalized, options: [.caseInsensitive, .widthInsensitive]) == .orderedSame }
+        entries.insert(normalized, at: 0)
+        entries = Array(entries.prefix(maximumCount))
+        defaults.set(encoded(entries), forKey: key)
+    }
+
+    static func history(from defaults: UserDefaults = .standard) -> [String] {
+        guard let value = defaults.string(forKey: key),
+              let data = value.data(using: .utf8),
+              let entries = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return entries
+    }
+
+    static func clear(defaults: UserDefaults = .standard) {
+        defaults.set(encoded([]), forKey: key)
+    }
+
+    private static func encoded(_ entries: [String]) -> String {
+        guard let data = try? JSONEncoder().encode(entries) else { return "[]" }
+        return String(decoding: data, as: UTF8.self)
+    }
 }
 
 struct SearchView: View {
@@ -12,6 +46,7 @@ struct SearchView: View {
     @State private var selectedBook: Book?
     @State private var effectiveQuery = ""
     @State private var queryTask: Task<Void, Never>?
+    @AppStorage(SearchHistoryStorage.key) private var storedSearchHistory = "[]"
 
     var body: some View {
         GeometryReader { geometry in
@@ -43,11 +78,18 @@ struct SearchView: View {
     private func searchContent(topInset: CGFloat) -> some View {
         Group {
             if searchTerms.isEmpty {
-                ContentUnavailableView {
-                    searchUnavailableLabel("搜索书库")
-                }
-                .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader(topInset: topInset)
+                if searchHistory.isEmpty {
+                    ContentUnavailableView {
+                        searchUnavailableLabel("搜索书库")
+                    }
+                    .safeAreaBar(edge: .top, spacing: 0) {
+                        searchHeader(topInset: topInset)
+                    }
+                } else {
+                    searchHistoryView
+                        .safeAreaBar(edge: .top, spacing: 0) {
+                            searchHeader(topInset: topInset)
+                        }
                 }
             } else if matchingBooks.isEmpty {
                 ContentUnavailableView {
@@ -63,6 +105,7 @@ struct SearchView: View {
                     ForEach(matchingBooks) { book in
                         Button {
                             guard book.importState == .ready else { return }
+                            SearchHistoryStorage.record(effectiveQuery)
                             selectedBook = book
                         } label: {
                             BookRow(book: book)
@@ -82,16 +125,66 @@ struct SearchView: View {
         }
     }
 
+    private var searchHistoryView: some View {
+        ScrollView {
+            LazyVStack(spacing: 0) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("最近搜索")
+                        .font(.title2.bold())
+
+                    Spacer()
+
+                    Button("清除") {
+                        SearchHistoryStorage.clear()
+                    }
+                    .font(.body.weight(.medium))
+                    .buttonStyle(.plain)
+                }
+                .padding(.bottom, 10)
+
+                Divider()
+
+                ForEach(searchHistory, id: \.self) { query in
+                    Button {
+                        SearchHistoryStorage.record(query)
+                        searchText = query
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "magnifyingglass")
+                                .font(.body.weight(.medium))
+                                .foregroundStyle(.secondary)
+
+                            Text(query)
+                                .font(.body)
+                                .foregroundStyle(.primary)
+                                .lineLimit(1)
+
+                            Spacer(minLength: 0)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
+                        .contentShape(.rect)
+                    }
+                    .buttonStyle(.plain)
+
+                    Divider()
+                }
+            }
+            .padding(.horizontal, 20)
+            .padding(.top, 28)
+            .padding(.bottom, 24)
+        }
+    }
+
     private func searchHeader(topInset: CGFloat) -> some View {
         NagiPageHeader(title: "搜索")
             .background(alignment: .bottom) {
                 Rectangle()
-                    .fill(.regularMaterial)
+                    .fill(.ultraThinMaterial)
                     .mask {
                         LinearGradient(
                             stops: [
                                 .init(color: .black, location: 0),
-                                .init(color: .black, location: 0.68),
+                                .init(color: .black.opacity(0.42), location: 0.56),
                                 .init(color: .clear, location: 1)
                             ],
                             startPoint: .top,
@@ -123,6 +216,14 @@ struct SearchView: View {
         effectiveQuery
             .split(whereSeparator: \.isWhitespace)
             .map(String.init)
+    }
+
+    private var searchHistory: [String] {
+        guard let data = storedSearchHistory.data(using: .utf8),
+              let entries = try? JSONDecoder().decode([String].self, from: data) else {
+            return []
+        }
+        return entries
     }
 
     private var matchingBooks: [Book] {

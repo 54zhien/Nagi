@@ -10,7 +10,6 @@ enum NagiPageHeaderMetrics {
     static let hideThreshold: CGFloat = 8
     static let revealTolerance: CGFloat = 0.5
     static let transitionDuration: Double = 0.25
-    static let iconBlurRadius: CGFloat = 6
     static let buttonBlurRadius: CGFloat = 8
 
     static var contentHeight: CGFloat {
@@ -75,8 +74,7 @@ struct NagiPageHeader: View {
                     if let action, let actionIcon {
                         Button(action: action) {
                             Image(systemName: actionIcon)
-                                .font(.title2.weight(.medium))
-                                .blur(radius: iconBlurRadius)
+                                .font(.system(size: 24, weight: .medium))
                                 .frame(
                                     width: NagiPageHeaderMetrics.controlSize,
                                     height: NagiPageHeaderMetrics.controlSize
@@ -106,11 +104,6 @@ struct NagiPageHeader: View {
         Double(1 - normalizedProgress)
     }
 
-    private var iconBlurRadius: CGFloat {
-        guard !reduceMotion else { return 0 }
-        return min(normalizedProgress * 2, 1) * NagiPageHeaderMetrics.iconBlurRadius
-    }
-
     private var buttonTransitionProgress: CGFloat {
         min(max((normalizedProgress - 0.5) * 2, 0), 1)
     }
@@ -126,23 +119,27 @@ struct NagiPageHeader: View {
 }
 
 private enum LibrarySortOption: String, CaseIterable, Identifiable, Hashable {
-    case addedAt
     case title
+    case author
+    case addedAt
 
     var id: Self { self }
 
     var title: String {
         switch self {
+        case .title:
+            return "书名"
+        case .author:
+            return "作者"
         case .addedAt:
             return "导入时间"
-        case .title:
-            return "名称"
         }
     }
 }
 
 struct LibraryView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.modelContext) private var modelContext
     @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
     private var bookCardsUseLiquidGlass = true
@@ -188,13 +185,14 @@ struct LibraryView: View {
                                         layout: .library,
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
-                                }
-                                .buttonStyle(
-                                    BookCardContextMenuButtonStyle(
-                                        usesLiquidGlass: bookCardsUseLiquidGlass,
-                                        reduceMotion: reduceMotion
+                                    .modifier(
+                                        BookCardSurfaceModifier(
+                                            usesLiquidGlass: bookCardsUseLiquidGlass,
+                                            isInteractive: false
+                                        )
                                     )
-                                )
+                                }
+                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
@@ -311,35 +309,52 @@ struct LibraryView: View {
     }
 
     private var sortedBooks: [Book] {
-        guard sortOption == .title else { return books }
-
-        return books.sorted { left, right in
-            let titleComparison = left.title.localizedStandardCompare(right.title)
-            if titleComparison != .orderedSame {
-                return titleComparison == .orderedAscending
+        switch sortOption {
+        case .addedAt:
+            return books
+        case .title:
+            return books.sorted { left, right in
+                compareBooks(left, right, primary: left.title, secondary: right.title)
             }
+        case .author:
+            return books.sorted { left, right in
+                let leftAuthor = normalizedAuthor(for: left)
+                let rightAuthor = normalizedAuthor(for: right)
+                let authorComparison = leftAuthor.localizedStandardCompare(rightAuthor)
+                if authorComparison != .orderedSame {
+                    return authorComparison == .orderedAscending
+                }
 
-            if left.addedAt != right.addedAt {
-                return left.addedAt > right.addedAt
+                return compareBooks(left, right, primary: left.title, secondary: right.title)
             }
-
-            return left.id.uuidString < right.id.uuidString
         }
     }
 
     private var librarySortMenu: some View {
         Menu {
-            Section("排序方式") {
+            Section {
                 ForEach(LibrarySortOption.allCases) { option in
                     Button {
                         selectSortOption(option)
                     } label: {
-                        if sortOption == option {
-                            Label(option.title, systemImage: "checkmark")
-                        } else {
+                        Label {
                             Text(option.title)
+                        } icon: {
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 14, weight: sortCheckmarkWeight))
+                                .frame(width: 16, height: 16)
+                                .opacity(sortOption == option ? 1 : 0)
                         }
                     }
+                }
+            } header: {
+                Label {
+                    Text("排序方式")
+                } icon: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: sortCheckmarkWeight))
+                        .frame(width: 16, height: 16)
+                        .opacity(0)
                 }
             }
         } label: {
@@ -355,6 +370,33 @@ struct LibraryView: View {
         .disabled(books.isEmpty)
         .accessibilityLabel("排序方式")
         .accessibilityValue(Text(sortOption.title))
+    }
+
+    private var sortCheckmarkWeight: Font.Weight {
+        legibilityWeight == .bold ? .semibold : .medium
+    }
+
+    private func normalizedAuthor(for book: Book) -> String {
+        let author = book.author?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return author.isEmpty ? "未知作者" : author
+    }
+
+    private func compareBooks(
+        _ left: Book,
+        _ right: Book,
+        primary leftValue: String,
+        secondary rightValue: String
+    ) -> Bool {
+        let comparison = leftValue.localizedStandardCompare(rightValue)
+        if comparison != .orderedSame {
+            return comparison == .orderedAscending
+        }
+
+        if left.addedAt != right.addedAt {
+            return left.addedAt > right.addedAt
+        }
+
+        return left.id.uuidString < right.id.uuidString
     }
 
     private func selectSortOption(_ option: LibrarySortOption) {
@@ -489,31 +531,6 @@ struct BookCardButtonStyle: ButtonStyle {
     }
 }
 
-/// 上下文菜单交互由系统负责，卡片表面保持稳定，仅增加轻量按压覆盖色。
-struct BookCardContextMenuButtonStyle: ButtonStyle {
-    let usesLiquidGlass: Bool
-    let reduceMotion: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .modifier(
-                BookCardSurfaceModifier(
-                    usesLiquidGlass: usesLiquidGlass,
-                    isInteractive: false
-                )
-            )
-            .overlay {
-                BookCardMetrics.cardShape
-                    .fill(.primary.opacity(configuration.isPressed ? 0.045 : 0))
-                    .allowsHitTesting(false)
-            }
-            .animation(
-                reduceMotion ? nil : .easeOut(duration: 0.1),
-                value: configuration.isPressed
-            )
-    }
-}
-
 @MainActor
 private final class BookCoverImageCache {
     static let shared = BookCoverImageCache()
@@ -602,17 +619,17 @@ struct BookCard: View {
 
                         switch layout {
                         case .library:
-                            HStack(spacing: 8) {
-                                Text(authorText)
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
+                            Text(authorText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
 
-                                Label(chapterText, systemImage: "bookmark.fill")
-                                    .lineLimit(1)
-                                    .truncationMode(.tail)
-                            }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            Label(chapterText, systemImage: "bookmark.fill")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                         case .home:
                             Text(authorText)
                                 .font(.subheadline)
@@ -876,7 +893,6 @@ struct BookCardButtonLabel: View {
             minHeight: BookCardMetrics.contentHeight,
             alignment: .leading
         )
-        .contentShape(.interaction, BookCardMetrics.cardShape)
     }
 }
 

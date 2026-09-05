@@ -35,7 +35,7 @@ struct RootTabView: View {
 
     var body: some View {
         TabView(selection: $selection) {
-            Tab("主页", image: "homeIcon", value: .home) {
+            Tab("主页", systemImage: "book", value: .home) {
                 HomeView()
             }
 
@@ -56,6 +56,9 @@ struct RootTabView: View {
             isPresented: $isSearchPresented,
             prompt: "搜索书名"
         )
+        .onSubmit(of: .search) {
+            SearchHistoryStorage.record(searchText)
+        }
         .tabViewStyle(.sidebarAdaptable)
         .tabViewSearchActivation(.automatic)
         .alert("导入", isPresented: Binding(
