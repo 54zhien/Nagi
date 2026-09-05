@@ -52,6 +52,7 @@ final class EPUBReaderModel {
     private(set) var currentLocatorJSON: String?
     var progress = 0.0
     var tableOfContents: [EPUBTOCEntry] = []
+    private(set) var isInitialSurfaceReady = false
 
     var currentTOCEntryID: String? {
         guard let currentReadingHref else { return nil }
@@ -260,6 +261,9 @@ final class EPUBReaderModel {
             self.navigator = navigator
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
+            if !isReflowable {
+                isInitialSurfaceReady = true
+            }
             hasLoaded = true
 
             if currentReadingHref == nil, initialLocation == nil {
@@ -599,6 +603,12 @@ final class EPUBReaderModel {
         )
     }
 
+    func navigatorDidMount() {
+        guard isReflowable, !isInitialSurfaceReady else { return }
+        applyVisibleReaderBaseAppearance()
+        refreshVisibleReaderOverrides()
+    }
+
     /// Updates the visible spread before preloaded pages.
     private func refreshVisibleReaderOverrides(
         generation: UInt64? = nil
@@ -611,6 +621,7 @@ final class EPUBReaderModel {
         latestOverrideRequestGeneration &+= 1
         let requestGeneration = latestOverrideRequestGeneration
         let script = makeReaderOverrideScript(requestGeneration: requestGeneration)
+        let readinessScript = makeVisualReadinessScript(for: .theme)
         readerOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
             guard let self, let navigator else { return }
             guard self.latestOverrideRequestGeneration == requestGeneration else { return }
@@ -646,9 +657,23 @@ final class EPUBReaderModel {
                     guard self.latestPreferenceGeneration == generation else { return }
                 }
 
-                if await navigator.waitForNagiReaderReadiness(script) {
+                if await navigator.waitForNagiReaderReadiness(readinessScript) {
+                    if !self.isInitialSurfaceReady {
+                        self.isInitialSurfaceReady = true
+                        self.onStateChange?()
+                    }
                     break
                 }
+            }
+
+            // Some publisher styles make computed-color validation stricter
+            // than the page actually requires. Never leave the native cover
+            // up indefinitely: every UIKit, WebKit, and document surface has
+            // already been forced to the resolved theme before this point.
+            if !self.isInitialSurfaceReady {
+                self.applyVisibleReaderBaseAppearance()
+                self.isInitialSurfaceReady = true
+                self.onStateChange?()
             }
 
             guard !Task.isCancelled,
@@ -673,6 +698,12 @@ final class EPUBReaderModel {
     }
 
     private func makeReaderOverrideScript(requestGeneration: UInt64) -> String {
+        let backgroundColor = Self.javascriptStringLiteral(
+            Self.cssColorLiteral(readerBackgroundUIColor)
+        )
+        let contentColor = Self.javascriptStringLiteral(
+            Self.cssColorLiteral(readerContentUIColor)
+        )
         let publisherFontFamily = Self.javascriptStringLiteral(
             Self.cssFontFamilyValue(for: fontFamily)
         )
@@ -693,6 +724,8 @@ final class EPUBReaderModel {
             const styleID = "nagi-reader-reader-overrides";
             const styleVersion = "2";
             const requestGeneration = \(overrideGeneration);
+            const readerBackground = \(backgroundColor);
+            const readerContent = \(contentColor);
             const appFontFamily = \(publisherFontFamily);
             const lineHeight = \(lineHeightValue);
             const letterSpacing = \(letterSpacingValue);
@@ -729,6 +762,8 @@ final class EPUBReaderModel {
             root.style.setProperty("--nagi-letter-spacing", letterSpacing);
             root.style.setProperty("--nagi-word-spacing", wordSpacing);
             root.style.setProperty("--nagi-font-family", appFontFamily);
+            root.style.setProperty("--nagi-reader-background", readerBackground);
+            root.style.setProperty("--nagi-reader-content", readerContent);
 
             if (typographyEnabled) {
                 root.setAttribute("data-nagi-reader-typography", "app");
@@ -766,19 +801,26 @@ final class EPUBReaderModel {
                 const appFontSelectors = contentSelectors.map(
                     selector => rootSelector + "[data-nagi-reader-font='app'] " + selector
                 );
+                const appColorSelectors = contentSelectors.map(
+                    selector => rootSelector + " " + selector
+                );
                 const appTypographySelectors = contentSelectors.map(
                     selector => rootSelector + "[data-nagi-reader-typography='app'] " + selector
                 );
 
                 style.textContent = [
                     [rootSelector, bodySelector].join(", ")
-                        + " { background: transparent !important; background-image: none !important; }",
+                        + " { background-color: var(--nagi-reader-background) !important;"
+                        + " background-image: none !important;"
+                        + " color: var(--nagi-reader-content) !important; }",
                     rootSelector + " {"
                         + " --nagi-line-height: 1;"
                         + " --nagi-letter-spacing: 0em;"
                         + " --nagi-word-spacing: 0em;"
                         + " --nagi-font-family: -apple-system, sans-serif;"
                         + " }",
+                    appColorSelectors.join(", ")
+                        + " { color: var(--nagi-reader-content) !important; }",
                     appFontSelectors.join(", ")
                         + " { font-family: var(--nagi-font-family) !important; }",
                     appTypographySelectors.join(", ")
@@ -821,6 +863,9 @@ final class EPUBReaderModel {
         let expectedTextColor = Self.javascriptStringLiteral(
             Self.cssColorLiteral(readerContentUIColor)
         )
+        let expectedBackgroundColor = Self.javascriptStringLiteral(
+            Self.cssColorLiteral(readerBackgroundUIColor)
+        )
         let expectedThemeMarker = Self.javascriptStringLiteral(
             readiumThemeAppearanceMarker ?? "light"
         )
@@ -862,17 +907,13 @@ final class EPUBReaderModel {
             const sampleStyle = getComputedStyle(sample);
             const expectedThemeMarker = \(expectedThemeMarker);
             const expectedTextColor = \(expectedTextColor);
+            const expectedBackgroundColor = \(expectedBackgroundColor);
             const expectedFontFamily = \(expectedFontFamily);
             const expectedLineHeight = \(expectedLineHeight);
             const expectedLetterSpacing = \(expectedLetterSpacing);
             const expectedWordSpacing = \(expectedWordSpacing);
             const typographyEnabled = \(typographyEnabled);
             const mutationKind = "\(mutationKind)";
-
-            const isTransparent = (value) => {
-                const normalized = value.replace(/\\s+/g, "").toLowerCase();
-                return normalized === "transparent" || normalized === "rgba(0,0,0,0)";
-            };
 
             const normalizeColor = (value) => {
                 const probe = document.createElement("span");
@@ -930,9 +971,10 @@ final class EPUBReaderModel {
             );
             const appFontReady = root.getAttribute("data-nagi-reader-font") === "app"
                 && fontReady;
+            const expectedBackground = normalizeColor(expectedBackgroundColor);
             const surfaceReady = root.getAttribute("data-nagi-reader-overrides") === "true"
-                && isTransparent(rootStyle.backgroundColor)
-                && isTransparent(bodyStyle.backgroundColor)
+                && normalizeColor(rootStyle.backgroundColor) === expectedBackground
+                && normalizeColor(bodyStyle.backgroundColor) === expectedBackground
                 && rootStyle.backgroundImage === "none"
                 && bodyStyle.backgroundImage === "none";
 

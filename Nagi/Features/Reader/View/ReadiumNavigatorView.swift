@@ -26,10 +26,9 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
 }
 
 extension EPUBNavigatorViewController {
-    /// The UIKit ReaderViewController owns the full reflowable background.
-    /// Readium's hierarchy must therefore stay transparent, including the
-    /// scroll-view and WKWebView containers created after the navigator is
-    /// initialized.
+    /// Keep every native layer on the resolved reader color. Readium creates
+    /// and replaces WebViews asynchronously, so a transparent hierarchy can
+    /// expose WebKit's white backing store between document paints.
     func applyNagiReaderBaseAppearance(
         isReflowable: Bool,
         fallbackBackground: UIColor
@@ -39,7 +38,7 @@ extension EPUBNavigatorViewController {
             return
         }
 
-        makeNagiReaderHierarchyTransparent(view)
+        applyNagiReaderBackground(fallbackBackground, to: view)
     }
 
     /// Applies an app-owned document override to the visible spread only.
@@ -172,20 +171,22 @@ private func evaluateNagiReaderJavaScript(_ script: String, in webView: WKWebVie
     }
 }
 
-private func makeNagiReaderHierarchyTransparent(_ view: UIView) {
-    view.backgroundColor = .clear
-    view.isOpaque = false
+private func applyNagiReaderBackground(_ background: UIColor, to view: UIView) {
+    view.backgroundColor = background
+    view.isOpaque = true
 
     if let webView = view as? WKWebView {
-        webView.underPageBackgroundColor = .clear
+        webView.backgroundColor = background
+        webView.underPageBackgroundColor = background
+        webView.scrollView.backgroundColor = background
     }
 
     if let scrollView = view as? UIScrollView {
-        scrollView.backgroundColor = .clear
+        scrollView.backgroundColor = background
     }
 
     for subview in view.subviews {
-        makeNagiReaderHierarchyTransparent(subview)
+        applyNagiReaderBackground(background, to: subview)
     }
 }
 
