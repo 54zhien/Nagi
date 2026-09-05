@@ -179,7 +179,7 @@ struct SearchView: View {
         NagiPageHeader(title: "搜索")
             .background(alignment: .bottom) {
                 Rectangle()
-                    .fill(.thinMaterial)
+                    .fill(.regularMaterial)
                     .mask {
                         LinearGradient(
                             stops: [

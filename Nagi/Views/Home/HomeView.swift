@@ -26,21 +26,25 @@ struct HomeView: View {
                                 .font(.title2.weight(.semibold))
 
                             ForEach(readingBooks) { book in
-                                Button {
-                                    guard book.importState == .ready else { return }
-                                    selectedBook = book
-                                } label: {
-                                    BookCardButtonLabel(
-                                        book: book,
-                                        layout: .home,
-                                        usesLiquidGlass: bookCardsUseLiquidGlass
-                                    )
+                                BookCardButtonLabel(
+                                    book: book,
+                                    layout: .home,
+                                    usesLiquidGlass: bookCardsUseLiquidGlass
+                                )
+                                .overlay {
+                                    Button {
+                                        guard book.importState == .ready else { return }
+                                        selectedBook = book
+                                    } label: {
+                                        Color.clear
+                                            .contentShape(BookCardMetrics.cardShape)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(book.title)
+                                    .accessibilityHint("打开阅读")
                                 }
-                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
-                                .accessibilityLabel(book.title)
-                                .accessibilityHint("打开阅读")
                             }
                         }
                         .padding(.horizontal, 16)

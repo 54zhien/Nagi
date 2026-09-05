@@ -169,29 +169,33 @@ struct LibraryView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 16) {
                             ForEach(sortedBooks) { book in
-                                Button {
-                                    switch book.importState {
-                                    case .ready:
-                                        selectedBook = book
-                                    case .importing:
-                                        break
-                                    case .failed:
-                                        viewModel.errorMessage = book.importErrorMessage
-                                            ?? "导入失败，请重新导入这本书"
+                                BookCardButtonLabel(
+                                    book: book,
+                                    layout: .library,
+                                    usesLiquidGlass: bookCardsUseLiquidGlass
+                                )
+                                .overlay {
+                                    Button {
+                                        switch book.importState {
+                                        case .ready:
+                                            selectedBook = book
+                                        case .importing:
+                                            break
+                                        case .failed:
+                                            viewModel.errorMessage = book.importErrorMessage
+                                                ?? "导入失败，请重新导入这本书"
+                                        }
+                                    } label: {
+                                        Color.clear
+                                            .contentShape(BookCardMetrics.cardShape)
                                     }
-                                } label: {
-                                    BookCardButtonLabel(
-                                        book: book,
-                                        layout: .library,
-                                        usesLiquidGlass: bookCardsUseLiquidGlass
-                                    )
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel(book.title)
+                                    .accessibilityHint(accessibilityHint(for: book))
                                 }
-                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
-                                .accessibilityLabel(book.title)
-                                .accessibilityHint(accessibilityHint(for: book))
                                 .contextMenu {
                                     if book.importState == .failed {
                                         Button {
@@ -563,23 +567,21 @@ struct BookCard: View {
                             .truncationMode(.tail)
 
                         switch layout {
-                        case .library:
+                        case .library, .home:
                             Text(authorText)
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary.opacity(0.68))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
 
-                            Label(chapterText, systemImage: "bookmark.fill")
+                            HStack(spacing: 0) {
+                                Image(systemName: "bookmark.fill")
+                                Text(chapterText)
+                            }
                                 .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(.primary.opacity(0.68))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
-                        case .home:
-                            Text(authorText)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
                         case .list:
                             EmptyView()
                         }
@@ -588,15 +590,6 @@ struct BookCard: View {
                     Spacer(minLength: 6)
 
                     importStatusIndicator
-                }
-
-                if case .home = layout {
-                    Label(chapterText, systemImage: "bookmark.fill")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                        .truncationMode(.tail)
-                        .padding(.top, 10)
                 }
 
                 Spacer(minLength: 0)
@@ -833,6 +826,7 @@ struct BookCardButtonLabel: View {
             layout: layout,
             usesLiquidGlass: usesLiquidGlass
         )
+        .accessibilityHidden(true)
         .frame(
             maxWidth: .infinity,
             minHeight: BookCardMetrics.contentHeight,
