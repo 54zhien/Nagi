@@ -1,10 +1,5 @@
 import SwiftUI
 import SwiftData
-import UIKit
-
-private enum SearchHeaderMetrics {
-    static let fadeExtension: CGFloat = 56
-}
 
 enum SearchHistoryStorage {
     static let key = "Nagi.search.history"
@@ -49,11 +44,9 @@ struct SearchView: View {
     @AppStorage(SearchHistoryStorage.key) private var storedSearchHistory = "[]"
 
     var body: some View {
-        GeometryReader { geometry in
-            NavigationStack {
-                searchContent(topInset: geometry.safeAreaInsets.top)
-                    .toolbar(.hidden, for: .navigationBar)
-            }
+        NavigationStack {
+            searchContent
+                .toolbar(.hidden, for: .navigationBar)
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -75,7 +68,7 @@ struct SearchView: View {
     }
 
     @ViewBuilder
-    private func searchContent(topInset: CGFloat) -> some View {
+    private var searchContent: some View {
         Group {
             if searchTerms.isEmpty {
                 if searchHistory.isEmpty {
@@ -83,12 +76,12 @@ struct SearchView: View {
                         searchUnavailableLabel("搜索书库")
                     }
                     .safeAreaBar(edge: .top, spacing: 0) {
-                        searchHeader(topInset: topInset)
+                        searchHeader
                     }
                 } else {
                     searchHistoryView
                         .safeAreaBar(edge: .top, spacing: 0) {
-                            searchHeader(topInset: topInset)
+                            searchHeader
                         }
                 }
             } else if matchingBooks.isEmpty {
@@ -98,7 +91,7 @@ struct SearchView: View {
                     Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader(topInset: topInset)
+                    searchHeader
                 }
             } else {
                 List {
@@ -114,12 +107,12 @@ struct SearchView: View {
                     }
                 }
                 .listStyle(.plain)
+                .scrollEdgeEffectStyle(.soft, for: .top)
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader(topInset: topInset)
+                    searchHeader
                 }
             }
         }
-        .scrollEdgeEffectHidden(true, for: .top)
         .transaction { transaction in
             transaction.animation = nil
         }
@@ -173,34 +166,12 @@ struct SearchView: View {
             .padding(.top, 28)
             .padding(.bottom, 24)
         }
+        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
-    private func searchHeader(topInset: CGFloat) -> some View {
+    private var searchHeader: some View {
         NagiPageHeader(title: "搜索")
-            .background(alignment: .bottom) {
-                Rectangle()
-                    .fill(.thickMaterial)
-                    .mask {
-                        LinearGradient(
-                            stops: [
-                                .init(color: .black, location: 0),
-                                .init(color: .black.opacity(0.82), location: 0.4),
-                                .init(color: .black.opacity(0.28), location: 0.78),
-                                .init(color: .clear, location: 1)
-                            ],
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    }
-                    .frame(
-                        height: topInset
-                            + NagiPageHeaderMetrics.contentHeight
-                            + SearchHeaderMetrics.fadeExtension
-                    )
-                    .offset(y: SearchHeaderMetrics.fadeExtension)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
+            .padding(.bottom, 24)
     }
 
     @ViewBuilder

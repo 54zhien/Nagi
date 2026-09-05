@@ -484,7 +484,10 @@ struct BookCardSurfaceModifier: ViewModifier {
                 in: BookCardMetrics.cardShape
             )
         } else {
-            content
+            content.background(
+                Color(uiColor: .secondarySystemBackground),
+                in: BookCardMetrics.cardShape
+            )
         }
     }
 }
@@ -720,7 +723,7 @@ struct BookCard: View {
 
 private enum BookCardProgressMetrics {
     static let height: CGFloat = 8
-    static let minimumVisibleFillWidth: CGFloat = 4
+    static let minimumVisibleFillWidth: CGFloat = 6
     static let animationDuration: Double = 0.24
 }
 
@@ -747,6 +750,10 @@ private struct BookCardProgressTrack: View {
 
     private var hasVisibleProgress: Bool {
         clampedProgress > 0
+    }
+
+    private var usesMinimumProgressIndicator: Bool {
+        clampedProgress > 0 && clampedProgress < 0.01
     }
 
     var body: some View {
@@ -796,16 +803,29 @@ private struct BookCardProgressTrack: View {
 
     @ViewBuilder
     private func progressFill(width: CGFloat) -> some View {
-        if usesLiquidGlass {
+        if usesMinimumProgressIndicator {
+            if usesLiquidGlass {
+                Color.clear
+                    .frame(
+                        width: BookCardProgressMetrics.minimumVisibleFillWidth,
+                        height: BookCardProgressMetrics.height
+                    )
+                    .glassEffect(
+                        .regular.tint(.accentColor),
+                        in: Ellipse()
+                    )
+            } else {
+                Ellipse()
+                    .fill(.tint)
+                    .frame(
+                        width: BookCardProgressMetrics.minimumVisibleFillWidth,
+                        height: BookCardProgressMetrics.height
+                    )
+            }
+        } else if usesLiquidGlass {
             Color.clear
-                .frame(
-                    width: width,
-                    height: BookCardProgressMetrics.height
-                )
-                .glassEffect(
-                    .regular.tint(.accentColor),
-                    in: Capsule()
-                )
+                .frame(width: width, height: BookCardProgressMetrics.height)
+                .glassEffect(.regular.tint(.accentColor), in: Capsule())
         } else {
             Capsule()
                 .fill(.tint)
