@@ -1,5 +1,69 @@
 import SwiftUI
 import SwiftData
+import UIKit
+
+private enum SearchHeaderBlurMetrics {
+    static let fadeTail: CGFloat = 12
+}
+
+private struct SearchHeaderGaussianBlur: UIViewRepresentable {
+    let statusBarFraction: CGFloat
+
+    func makeUIView(context: Context) -> GradientMaskedBlurView {
+        GradientMaskedBlurView()
+    }
+
+    func updateUIView(_ uiView: GradientMaskedBlurView, context: Context) {
+        uiView.statusBarFraction = statusBarFraction
+    }
+}
+
+private final class GradientMaskedBlurView: UIView {
+    private let blurView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+    private let gradientMask = CAGradientLayer()
+
+    var statusBarFraction: CGFloat = 0.35 {
+        didSet {
+            updateGradient()
+        }
+    }
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        isUserInteractionEnabled = false
+        addSubview(blurView)
+        blurView.layer.mask = gradientMask
+        updateGradient()
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        blurView.frame = bounds
+        gradientMask.frame = blurView.bounds
+    }
+
+    private func updateGradient() {
+        let statusEnd = min(max(statusBarFraction, 0), 0.72)
+        gradientMask.colors = [
+            UIColor.black.cgColor,
+            UIColor.black.cgColor,
+            UIColor.black.withAlphaComponent(0.42).cgColor,
+            UIColor.clear.cgColor
+        ]
+        gradientMask.locations = [
+            0,
+            NSNumber(value: Double(statusEnd)),
+            NSNumber(value: Double(statusEnd + (1 - statusEnd) * 0.58)),
+            1
+        ]
+        gradientMask.startPoint = CGPoint(x: 0.5, y: 0)
+        gradientMask.endPoint = CGPoint(x: 0.5, y: 1)
+    }
+}
 
 enum SearchHistoryStorage {
     static let key = "Nagi.search.history"
@@ -44,9 +108,11 @@ struct SearchView: View {
     @AppStorage(SearchHistoryStorage.key) private var storedSearchHistory = "[]"
 
     var body: some View {
-        NavigationStack {
-            searchContent
-                .toolbar(.hidden, for: .navigationBar)
+        GeometryReader { geometry in
+            NavigationStack {
+                searchContent(topInset: geometry.safeAreaInsets.top)
+                    .toolbar(.hidden, for: .navigationBar)
+            }
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -68,7 +134,7 @@ struct SearchView: View {
     }
 
     @ViewBuilder
-    private var searchContent: some View {
+    private func searchContent(topInset: CGFloat) -> some View {
         Group {
             if searchTerms.isEmpty {
                 if searchHistory.isEmpty {
@@ -76,12 +142,12 @@ struct SearchView: View {
                         searchUnavailableLabel("搜索书库")
                     }
                     .safeAreaBar(edge: .top, spacing: 0) {
-                        searchHeader
+                        searchHeader(topInset: topInset)
                     }
                 } else {
                     searchHistoryView
                         .safeAreaBar(edge: .top, spacing: 0) {
-                            searchHeader
+                            searchHeader(topInset: topInset)
                         }
                 }
             } else if matchingBooks.isEmpty {
@@ -91,7 +157,7 @@ struct SearchView: View {
                     Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
+                    searchHeader(topInset: topInset)
                 }
             } else {
                 List {
@@ -107,9 +173,8 @@ struct SearchView: View {
                     }
                 }
                 .listStyle(.plain)
-                .scrollEdgeEffectStyle(.soft, for: .top)
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
+                    searchHeader(topInset: topInset)
                 }
             }
         }
@@ -166,12 +231,24 @@ struct SearchView: View {
             .padding(.top, 28)
             .padding(.bottom, 24)
         }
-        .scrollEdgeEffectStyle(.soft, for: .top)
     }
 
-    private var searchHeader: some View {
+    private func searchHeader(topInset: CGFloat) -> some View {
+        let blurHeight = topInset
+            + NagiPageHeaderMetrics.contentHeight
+            + SearchHeaderBlurMetrics.fadeTail
+
         NagiPageHeader(title: "搜索")
             .padding(.bottom, 24)
+            .background(alignment: .top) {
+                SearchHeaderGaussianBlur(
+                    statusBarFraction: blurHeight > 0 ? topInset / blurHeight : 0
+                )
+                .frame(height: blurHeight)
+                .offset(y: -topInset)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
     }
 
     @ViewBuilder

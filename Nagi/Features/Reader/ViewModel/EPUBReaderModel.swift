@@ -562,13 +562,13 @@ final class EPUBReaderModel {
 
     private func makePreferences() -> EPUBPreferences {
         let effectiveTheme = resolvedTheme
-        let navigatorBackgroundColor: ReadiumNavigator.Color? = isReflowable
-            ? nil
-            : ReadiumNavigator.Color(
-                uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
-            )
+        let navigatorBackgroundColor = ReadiumNavigator.Color(
+            uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
+        )
         let preferences = EPUBPreferences(
-            // ReaderChrome owns reflowable backgrounds.
+            // Keep Readium's first paint in sync with ReaderChrome. The
+            // document override makes reflowable pages transparent once it
+            // is installed, but the fallback must never use WebKit white.
             backgroundColor: navigatorBackgroundColor,
             // Publisher styles only disable the app-owned typography rules.
             fontFamily: fontFamily.readiumFontFamily,
@@ -705,6 +705,11 @@ final class EPUBReaderModel {
                 return;
             }
 
+            const bootstrapStyle = document.getElementById(
+                "nagi-reader-surface-bootstrap"
+            );
+            if (bootstrapStyle) bootstrapStyle.remove();
+
             const appliedGeneration = Number(
                 root.getAttribute("data-nagi-reader-override-generation") || "0"
             );
@@ -783,6 +788,31 @@ final class EPUBReaderModel {
                 ].join("\\n");
                 (document.head || root).appendChild(style);
             }
+        })();
+        """
+    }
+
+    private func makeReaderSurfaceBootstrapScript() -> String {
+        let backgroundColor = Self.javascriptStringLiteral(
+            Self.cssColorLiteral(readerBackgroundUIColor)
+        )
+        let contentColor = Self.javascriptStringLiteral(
+            Self.cssColorLiteral(readerContentUIColor)
+        )
+
+        return """
+        (() => {
+            const root = document.documentElement;
+            if (!root) return;
+
+            const style = document.createElement("style");
+            style.id = "nagi-reader-surface-bootstrap";
+            style.textContent = "html, body { background-color: "
+                + \(backgroundColor)
+                + " !important; color: "
+                + \(contentColor)
+                + " !important; }";
+            root.appendChild(style);
         })();
         """
     }
@@ -1191,6 +1221,13 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         if latestOverrideRequestGeneration == 0 {
             latestOverrideRequestGeneration = 1
         }
+        userContentController.addUserScript(
+            WKUserScript(
+                source: makeReaderSurfaceBootstrapScript(),
+                injectionTime: .atDocumentStart,
+                forMainFrameOnly: true
+            )
+        )
         userContentController.addUserScript(
             WKUserScript(
                 source: makeReaderOverrideScript(

@@ -176,6 +176,10 @@ private func makeNagiReaderHierarchyTransparent(_ view: UIView) {
     view.backgroundColor = .clear
     view.isOpaque = false
 
+    if let webView = view as? WKWebView {
+        webView.underPageBackgroundColor = .clear
+    }
+
     if let scrollView = view as? UIScrollView {
         scrollView.backgroundColor = .clear
     }
