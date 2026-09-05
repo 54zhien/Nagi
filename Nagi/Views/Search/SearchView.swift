@@ -238,7 +238,7 @@ struct SearchView: View {
             + NagiPageHeaderMetrics.contentHeight
             + SearchHeaderBlurMetrics.fadeTail
 
-        NagiPageHeader(title: "搜索")
+        return NagiPageHeader(title: "搜索")
             .padding(.bottom, 24)
             .background(alignment: .top) {
                 SearchHeaderGaussianBlur(
