@@ -169,33 +169,24 @@ struct LibraryView: View {
                     ScrollView {
                         LazyVStack(alignment: .leading, spacing: 16) {
                             ForEach(sortedBooks) { book in
-                                BookCardButtonLabel(
+                                BookCardSurface(
                                     book: book,
                                     layout: .library,
                                     usesLiquidGlass: bookCardsUseLiquidGlass
                                 )
-                                .overlay {
-                                    Button {
-                                        switch book.importState {
-                                        case .ready:
-                                            selectedBook = book
-                                        case .importing:
-                                            break
-                                        case .failed:
-                                            viewModel.errorMessage = book.importErrorMessage
-                                                ?? "导入失败，请重新导入这本书"
-                                        }
-                                    } label: {
-                                        Color.clear
-                                            .contentShape(BookCardMetrics.cardShape)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(book.title)
-                                    .accessibilityHint(accessibilityHint(for: book))
-                                }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
+                                .onTapGesture {
+                                    open(book)
+                                }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(book.title)
+                                .accessibilityHint(accessibilityHint(for: book))
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityAction {
+                                    open(book)
+                                }
                                 .contextMenu {
                                     if book.importState == .failed {
                                         Button {
@@ -330,13 +321,17 @@ struct LibraryView: View {
 
     private var librarySortMenu: some View {
         Menu {
-            Picker("排序方式", selection: sortSelection) {
-                ForEach(LibrarySortOption.allCases) { option in
-                    Text(option.title)
-                        .tag(option)
+            Section {
+                Picker("", selection: sortSelection) {
+                    ForEach(LibrarySortOption.allCases) { option in
+                        Text(option.title)
+                            .tag(option)
+                    }
                 }
+                .pickerStyle(.inline)
+            } header: {
+                Text("排序方式")
             }
-            .pickerStyle(.inline)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
                 .font(.system(size: NagiPageHeaderMetrics.controlIconSize, weight: .medium))
@@ -392,6 +387,18 @@ struct LibraryView: View {
             withAnimation(.snappy(duration: 0.25)) {
                 storedSortOption = option.rawValue
             }
+        }
+    }
+
+    private func open(_ book: Book) {
+        switch book.importState {
+        case .ready:
+            selectedBook = book
+        case .importing:
+            break
+        case .failed:
+            viewModel.errorMessage = book.importErrorMessage
+                ?? "导入失败，请重新导入这本书"
         }
     }
 
@@ -451,6 +458,8 @@ enum BookCardMetrics {
     static let coverHeight: CGFloat = 112
     static let contentSpacing: CGFloat = 12
     static let cardPadding: CGFloat = 10
+    static let metadataFontSize: CGFloat = 12
+    static let metadataSpacing: CGFloat = 4
 
     static var cardShape: RoundedRectangle {
         RoundedRectangle(cornerRadius: cardCornerRadius, style: .continuous)
@@ -569,17 +578,17 @@ struct BookCard: View {
                         switch layout {
                         case .library, .home:
                             Text(authorText)
-                                .font(.caption)
-                                .foregroundStyle(.primary.opacity(0.68))
+                                .font(.system(size: BookCardMetrics.metadataFontSize))
+                                .foregroundStyle(.primary.opacity(0.58))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
 
-                            HStack(spacing: 0) {
+                            HStack(spacing: BookCardMetrics.metadataSpacing) {
                                 Image(systemName: "bookmark.fill")
                                 Text(chapterText)
                             }
-                                .font(.caption)
-                                .foregroundStyle(.primary.opacity(0.68))
+                                .font(.system(size: BookCardMetrics.metadataFontSize))
+                                .foregroundStyle(.primary.opacity(0.58))
                                 .lineLimit(1)
                                 .truncationMode(.tail)
                         case .list:
@@ -711,7 +720,7 @@ struct BookCard: View {
 
 private enum BookCardProgressMetrics {
     static let height: CGFloat = 8
-    static let minimumVisibleFillWidth: CGFloat = 12
+    static let minimumVisibleFillWidth: CGFloat = 4
     static let animationDuration: Double = 0.24
 }
 
@@ -808,8 +817,7 @@ private struct BookCardProgressTrack: View {
     }
 }
 
-/// 给主页和书库页的整卡按钮提供一个真正占满卡片的标签区域。
-struct BookCardButtonLabel: View {
+struct BookCardSurface: View {
     let book: Book
     let layout: BookCardLayout
     let usesLiquidGlass: Bool
@@ -826,7 +834,6 @@ struct BookCardButtonLabel: View {
             layout: layout,
             usesLiquidGlass: usesLiquidGlass
         )
-        .accessibilityHidden(true)
         .frame(
             maxWidth: .infinity,
             minHeight: BookCardMetrics.contentHeight,

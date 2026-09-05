@@ -26,25 +26,23 @@ struct HomeView: View {
                                 .font(.title2.weight(.semibold))
 
                             ForEach(readingBooks) { book in
-                                BookCardButtonLabel(
+                                BookCardSurface(
                                     book: book,
                                     layout: .home,
                                     usesLiquidGlass: bookCardsUseLiquidGlass
                                 )
-                                .overlay {
-                                    Button {
-                                        guard book.importState == .ready else { return }
-                                        selectedBook = book
-                                    } label: {
-                                        Color.clear
-                                            .contentShape(BookCardMetrics.cardShape)
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(book.title)
-                                    .accessibilityHint("打开阅读")
-                                }
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
+                                .onTapGesture {
+                                    open(book)
+                                }
+                                .accessibilityElement(children: .ignore)
+                                .accessibilityLabel(book.title)
+                                .accessibilityHint("打开阅读")
+                                .accessibilityAddTraits(.isButton)
+                                .accessibilityAction {
+                                    open(book)
+                                }
                             }
                         }
                         .padding(.horizontal, 16)
@@ -110,6 +108,11 @@ struct HomeView: View {
                 }
                 return leftDate > rightDate
             }
+    }
+
+    private func open(_ book: Book) {
+        guard book.importState == .ready else { return }
+        selectedBook = book
     }
 }
 
