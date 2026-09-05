@@ -173,7 +173,15 @@ struct LibraryView: View {
                         LazyVStack(alignment: .leading, spacing: 16) {
                             ForEach(sortedBooks) { book in
                                 Button {
-                                    selectedBook = book
+                                    switch book.importState {
+                                    case .ready:
+                                        selectedBook = book
+                                    case .importing:
+                                        break
+                                    case .failed:
+                                        viewModel.errorMessage = book.importErrorMessage
+                                            ?? "导入失败，请重新导入这本书"
+                                    }
                                 } label: {
                                     BookCardButtonLabel(
                                         book: book,
@@ -181,29 +189,43 @@ struct LibraryView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(.plain)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .modifier(
-                                    BookCardSurfaceModifier(
-                                        usesLiquidGlass: bookCardsUseLiquidGlass
+                                .buttonStyle(
+                                    BookCardButtonStyle(
+                                        usesLiquidGlass: bookCardsUseLiquidGlass,
+                                        reduceMotion: reduceMotion
                                     )
                                 )
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .contentShape(.contextMenuPreview, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
-                                .accessibilityHint("打开阅读")
+                                .accessibilityHint(accessibilityHint(for: book))
                                 .contextMenu {
+                                    if book.importState == .failed {
+                                        Button {
+                                            viewModel.retryImport(book, in: modelContext)
+                                        } label: {
+                                            Label("重试导入", systemImage: "arrow.clockwise")
+                                        }
+                                    }
                                     Button {
                                         bookToRename = book
                                         renameText = book.title
                                     } label: {
                                         Label("重命名", systemImage: "pencil")
                                     }
+                                    .disabled(book.importState != .ready)
                                     Button {
-                                        SharePresenter.present(items: [URL(fileURLWithPath: book.sourceURL)])
+                                        if let sourceURL = BookFileLocator.resolve(book.sourceURL),
+                                           FileManager.default.fileExists(atPath: sourceURL.path) {
+                                            SharePresenter.present(items: [sourceURL])
+                                        } else {
+                                            viewModel.errorMessage = "源文件已丢失，请重新导入这本书"
+                                        }
                                     } label: {
                                         Label("分享", systemImage: "square.and.arrow.up")
                                     }
+                                    .disabled(book.importState != .ready)
                                     Button(role: .destructive) {
                                         bookToDelete = book
                                         showDeleteConfirm = true
@@ -366,6 +388,17 @@ struct LibraryView: View {
         }
     }
 
+    private func accessibilityHint(for book: Book) -> String {
+        switch book.importState {
+        case .ready:
+            return "打开阅读"
+        case .importing:
+            return "正在导入"
+        case .failed:
+            return "导入失败，轻点查看原因"
+        }
+    }
+
     private func presentImportPicker() {
         pickerCoordinator = DocumentPickerPresenter.present(
             allowedContentTypes: [.plainText, .epub],
@@ -424,12 +457,61 @@ struct BookCardSurfaceModifier: ViewModifier {
     }
 }
 
+/// 保留系统 Button 的点击取消与滚动协调，只补充整卡一致的即时按压反馈。
+struct BookCardButtonStyle: ButtonStyle {
+    let usesLiquidGlass: Bool
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .modifier(
+                BookCardSurfaceModifier(
+                    usesLiquidGlass: usesLiquidGlass
+                )
+            )
+            .scaleEffect(
+                configuration.isPressed && !reduceMotion ? 0.985 : 1
+            )
+            .brightness(configuration.isPressed ? -0.025 : 0)
+            .opacity(configuration.isPressed ? 0.96 : 1)
+            .animation(
+                reduceMotion ? nil : .smooth(duration: 0.14),
+                value: configuration.isPressed
+            )
+    }
+}
+
+@MainActor
+private final class BookCoverImageCache {
+    static let shared = BookCoverImageCache()
+
+    private let cache: NSCache<NSData, UIImage>
+
+    private init() {
+        cache = NSCache<NSData, UIImage>()
+        cache.countLimit = 80
+        cache.totalCostLimit = 48 * 1_024 * 1_024
+    }
+
+    func image(for data: Data) -> UIImage? {
+        let key = data as NSData
+        if let cachedImage = cache.object(forKey: key) {
+            return cachedImage
+        }
+
+        guard let image = UIImage(data: data) else { return nil }
+        let decodedCost = image.cgImage.map { $0.bytesPerRow * $0.height } ?? data.count
+        cache.setObject(image, forKey: key, cost: decodedCost)
+        return image
+    }
+}
+
 struct BookCoverView: View {
     let data: Data?
 
     var body: some View {
         Group {
-            if let data, let image = UIImage(data: data) {
+            if let data, let image = BookCoverImageCache.shared.image(for: data) {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFill()
@@ -492,6 +574,8 @@ struct BookCard: View {
                     }
 
                     Spacer(minLength: 6)
+
+                    importStatusIndicator
                 }
 
                 Label(chapterText, systemImage: "bookmark.fill")
@@ -579,10 +663,34 @@ struct BookCard: View {
     }
 
     private var chapterText: String {
+        switch book.importState {
+        case .importing:
+            return "正在导入…"
+        case .failed:
+            return "导入失败"
+        case .ready:
+            break
+        }
         guard book.lastReadAt != nil else { return "尚未阅读" }
 
         let title = book.currentChapterTitle?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         return title.isEmpty ? "尚未阅读" : title
+    }
+
+    @ViewBuilder
+    private var importStatusIndicator: some View {
+        switch book.importState {
+        case .importing:
+            ProgressView()
+                .controlSize(.small)
+                .accessibilityLabel("正在导入")
+        case .failed:
+            Image(systemName: "exclamationmark.circle.fill")
+                .foregroundStyle(.red)
+                .accessibilityLabel("导入失败")
+        case .ready:
+            EmptyView()
+        }
     }
 
     private var formatLabel: String {
@@ -706,15 +814,11 @@ struct BookCardButtonLabel: View {
     }
 
     var body: some View {
-        ZStack {
-            Color.clear
-
-            BookCard(
-                book: book,
-                layout: layout,
-                usesLiquidGlass: usesLiquidGlass
-            )
-        }
+        BookCard(
+            book: book,
+            layout: layout,
+            usesLiquidGlass: usesLiquidGlass
+        )
         .frame(
             maxWidth: .infinity,
             minHeight: BookCardMetrics.contentHeight,

@@ -15,26 +15,19 @@ struct NagiApp: App {
 
     @MainActor
     private func handleIncomingFile(_ url: URL) {
-        Task {
-            var results: [BookImportResult] = []
-            do {
-                let files = try FileImportService().importFiles([url])
-                results = try await LibraryViewModel.parseBooksInBackground(files)
-                let context = Persistence.container.mainContext
-                try LibraryViewModel.upsert(results, into: context)
-                try context.save()
-                AppImportState.shared.message = "已导入「\(results.first?.title ?? "书")」"
-            } catch {
-                for result in results {
-                    TXTReaderAssetStore.removeAsset(atPath: result.readerAssetURL)
-                }
-                AppImportState.shared.message = "导入失败：\(error.localizedDescription)"
+        let context = Persistence.container.mainContext
+        LibraryViewModel().importAndParse([url], into: context) { titles, failures in
+            if let title = titles.first, failures.isEmpty {
+                AppImportState.shared.message = "已导入「\(title)」"
+            } else if !failures.isEmpty {
+                AppImportState.shared.message = "导入失败：\(failures.joined(separator: "\n"))"
             }
         }
     }
 }
 
 struct RootTabView: View {
+    @Environment(\.modelContext) private var modelContext
     @State private var selection: AppTab = .home
     @State private var searchText = ""
     @State private var isSearchPresented = false
@@ -72,6 +65,11 @@ struct RootTabView: View {
             Button("好", role: .cancel) {}
         } message: {
             Text(importState.message ?? "")
+        }
+        .task {
+            FileImportService.removeAbandonedCopyFiles()
+            LibraryViewModel.migrateStoredFileLocations(in: modelContext)
+            LibraryViewModel.resumeInterruptedImports(in: modelContext)
         }
     }
 }

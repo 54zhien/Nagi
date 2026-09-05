@@ -78,6 +78,45 @@ struct TXTParser: Sendable {
         )
     }
 
+    /// Reads only the metadata needed by a library card and avoids materializing
+    /// a second complete set of chapter strings during import.
+    func parseMetadata(url: URL) throws -> ParsedBook {
+        let data: Data
+        do {
+            data = try Data(contentsOf: url, options: [.mappedIfSafe])
+        } catch {
+            throw ParseError.cannotRead(error.localizedDescription)
+        }
+
+        let text = Self.normalizeLineEndings(
+            Self.decode(data).replacingOccurrences(of: "\u{FEFF}", with: "")
+        )
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { throw ParseError.emptyContent }
+
+        var detectedChapterCount = 0
+        var hasContentBeforeFirstChapter = false
+        for line in trimmed.split(separator: "\n", omittingEmptySubsequences: false) {
+            let lineText = String(line)
+            if Self.chapterTitle(from: lineText) != nil {
+                detectedChapterCount += 1
+            } else if detectedChapterCount == 0,
+                      !lineText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                hasContentBeforeFirstChapter = true
+            }
+        }
+        if detectedChapterCount > 0, hasContentBeforeFirstChapter {
+            detectedChapterCount += 1
+        }
+
+        return ParsedBook(
+            title: url.deletingPathExtension().lastPathComponent,
+            author: nil,
+            chapterCount: max(detectedChapterCount, 1),
+            content: ""
+        )
+    }
+
     /// Decode the encodings commonly used by downloaded Chinese plain-text
     /// books. BOMs are authoritative; a conservative NUL-byte heuristic also
     /// covers the common ASCII-heavy UTF-16/32 files exported without a BOM

@@ -1002,7 +1002,12 @@ final class EPUBReaderModel {
         previewTask?.cancel()
         isLoadingPreview = true
 
-        let sourceURL = activePublicationURL ?? URL(fileURLWithPath: book.sourceURL)
+        guard let sourceURL = activePublicationURL ?? BookFileLocator.resolve(book.sourceURL) else {
+            isLoadingPreview = false
+            previewText = "暂时无法载入正文预览"
+            onStateChange?()
+            return
+        }
         previewTask = Task { [weak self] in
             let text = await Task.detached(priority: .userInitiated) {
                 try? EPUBParser().loadChapterContent(url: sourceURL, href: normalizedHref)

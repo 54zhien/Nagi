@@ -27,6 +27,7 @@ struct HomeView: View {
 
                             ForEach(readingBooks) { book in
                                 Button {
+                                    guard book.importState == .ready else { return }
                                     selectedBook = book
                                 } label: {
                                     BookCardButtonLabel(
@@ -35,13 +36,13 @@ struct HomeView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(.plain)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .modifier(
-                                    BookCardSurfaceModifier(
-                                        usesLiquidGlass: bookCardsUseLiquidGlass
+                                .buttonStyle(
+                                    BookCardButtonStyle(
+                                        usesLiquidGlass: bookCardsUseLiquidGlass,
+                                        reduceMotion: reduceMotion
                                     )
                                 )
+                                .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)
                                 .accessibilityHint("打开阅读")
@@ -102,7 +103,7 @@ struct HomeView: View {
 
     private var readingBooks: [Book] {
         books
-            .filter { $0.lastReadAt != nil }
+            .filter { $0.lastReadAt != nil && $0.importState == .ready }
             .sorted { left, right in
                 guard let leftDate = left.lastReadAt,
                       let rightDate = right.lastReadAt else {

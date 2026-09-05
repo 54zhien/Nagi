@@ -1,5 +1,10 @@
 import SwiftUI
 import SwiftData
+import UIKit
+
+private enum SearchHeaderMetrics {
+    static let fadeExtension: CGFloat = 32
+}
 
 struct SearchView: View {
     @Query(sort: \Book.title) private var books: [Book]
@@ -55,6 +60,7 @@ struct SearchView: View {
                 List {
                     ForEach(matchingBooks) { book in
                         Button {
+                            guard book.importState == .ready else { return }
                             selectedBook = book
                         } label: {
                             BookRow(book: book)
@@ -76,6 +82,23 @@ struct SearchView: View {
 
     private var searchHeader: some View {
         NagiPageHeader(title: "搜索")
+            .background(alignment: .bottom) {
+                LinearGradient(
+                    colors: [
+                        Color(uiColor: .systemBackground),
+                        Color(uiColor: .systemBackground).opacity(0)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .frame(
+                    height: NagiPageHeaderMetrics.contentHeight
+                        + SearchHeaderMetrics.fadeExtension
+                )
+                .offset(y: SearchHeaderMetrics.fadeExtension)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
     }
 
     @ViewBuilder

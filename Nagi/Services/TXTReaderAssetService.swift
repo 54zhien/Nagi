@@ -46,8 +46,12 @@ enum TXTReaderAssetStore {
     }
 
     static func removeAsset(atPath path: String?, fileManager: FileManager = .default) {
-        guard let path, !path.isEmpty else { return }
-        try? fileManager.removeItem(at: URL(fileURLWithPath: path))
+        guard let path,
+              !path.isEmpty,
+              let assetURL = BookFileLocator.resolve(path, fileManager: fileManager) else {
+            return
+        }
+        try? fileManager.removeItem(at: assetURL)
     }
 }
 
@@ -388,12 +392,22 @@ enum TXTReaderAssetBuilder {
 @MainActor
 enum ReaderAssetResolver {
     static func resolve(book: Book) async throws -> URL {
-        let sourceURL = URL(fileURLWithPath: book.sourceURL)
+        guard let sourceURL = BookFileLocator.resolve(book.sourceURL),
+              FileManager.default.fileExists(atPath: sourceURL.path) else {
+            throw CocoaError(
+                .fileReadNoSuchFile,
+                userInfo: [
+                    NSLocalizedDescriptionKey: "源文件已丢失，请重新导入这本书"
+                ]
+            )
+        }
         guard book.format == .txt else { return sourceURL }
 
         if let assetPath = book.readerAssetURL,
-           FileManager.default.fileExists(atPath: assetPath) {
-            return URL(fileURLWithPath: assetPath)
+           let assetURL = BookFileLocator.resolve(assetPath) {
+            if FileManager.default.fileExists(atPath: assetURL.path) {
+                return assetURL
+            }
         }
 
         let assetURL = try TXTReaderAssetStore.makeAssetURL()
@@ -415,7 +429,7 @@ enum ReaderAssetResolver {
             TXTReaderAssetStore.removeAsset(atPath: assetURL.path)
             throw error
         }
-        book.readerAssetURL = assetURL.path
+        book.readerAssetURL = BookFileLocator.persistedPath(for: assetURL)
         return assetURL
     }
 }
