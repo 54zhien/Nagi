@@ -14,9 +14,11 @@ struct SearchView: View {
     @State private var queryTask: Task<Void, Never>?
 
     var body: some View {
-        NavigationStack {
-            searchContent
-                .toolbar(.hidden, for: .navigationBar)
+        GeometryReader { geometry in
+            NavigationStack {
+                searchContent(topInset: geometry.safeAreaInsets.top)
+                    .toolbar(.hidden, for: .navigationBar)
+            }
         }
         .fullScreenCover(
             isPresented: Binding(
@@ -38,14 +40,14 @@ struct SearchView: View {
     }
 
     @ViewBuilder
-    private var searchContent: some View {
+    private func searchContent(topInset: CGFloat) -> some View {
         Group {
             if searchTerms.isEmpty {
                 ContentUnavailableView {
                     searchUnavailableLabel("搜索书库")
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
+                    searchHeader(topInset: topInset)
                 }
             } else if matchingBooks.isEmpty {
                 ContentUnavailableView {
@@ -54,7 +56,7 @@ struct SearchView: View {
                     Text("没有找到书名中包含“\(effectiveQuery)”的书籍")
                 }
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
+                    searchHeader(topInset: topInset)
                 }
             } else {
                 List {
@@ -70,16 +72,17 @@ struct SearchView: View {
                 }
                 .listStyle(.plain)
                 .safeAreaBar(edge: .top, spacing: 0) {
-                    searchHeader
+                    searchHeader(topInset: topInset)
                 }
             }
         }
+        .scrollEdgeEffectHidden(true, for: .top)
         .transaction { transaction in
             transaction.animation = nil
         }
     }
 
-    private var searchHeader: some View {
+    private func searchHeader(topInset: CGFloat) -> some View {
         NagiPageHeader(title: "搜索")
             .background(alignment: .bottom) {
                 LinearGradient(
@@ -91,7 +94,8 @@ struct SearchView: View {
                     endPoint: .bottom
                 )
                 .frame(
-                    height: NagiPageHeaderMetrics.contentHeight
+                    height: topInset
+                        + NagiPageHeaderMetrics.contentHeight
                         + SearchHeaderMetrics.fadeExtension
                 )
                 .offset(y: SearchHeaderMetrics.fadeExtension)
