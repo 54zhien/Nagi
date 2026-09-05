@@ -190,7 +190,7 @@ struct LibraryView: View {
                                     )
                                 }
                                 .buttonStyle(
-                                    BookCardButtonStyle(
+                                    BookCardContextMenuButtonStyle(
                                         usesLiquidGlass: bookCardsUseLiquidGlass,
                                         reduceMotion: reduceMotion
                                     )
@@ -441,13 +441,21 @@ enum BookCardMetrics {
 
 struct BookCardSurfaceModifier: ViewModifier {
     let usesLiquidGlass: Bool
+    var isInteractive = true
 
     func body(content: Content) -> some View {
         if usesLiquidGlass {
-            content.glassEffect(
-                .regular.interactive(),
-                in: BookCardMetrics.cardShape
-            )
+            if isInteractive {
+                content.glassEffect(
+                    .regular.interactive(),
+                    in: BookCardMetrics.cardShape
+                )
+            } else {
+                content.glassEffect(
+                    .regular,
+                    in: BookCardMetrics.cardShape
+                )
+            }
         } else {
             content.background(
                 Color(uiColor: .secondarySystemBackground),
@@ -476,6 +484,31 @@ struct BookCardButtonStyle: ButtonStyle {
             .opacity(configuration.isPressed ? 0.96 : 1)
             .animation(
                 reduceMotion ? nil : .smooth(duration: 0.14),
+                value: configuration.isPressed
+            )
+    }
+}
+
+/// 上下文菜单交互由系统负责，卡片表面保持稳定，仅增加轻量按压覆盖色。
+struct BookCardContextMenuButtonStyle: ButtonStyle {
+    let usesLiquidGlass: Bool
+    let reduceMotion: Bool
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .modifier(
+                BookCardSurfaceModifier(
+                    usesLiquidGlass: usesLiquidGlass,
+                    isInteractive: false
+                )
+            )
+            .overlay {
+                BookCardMetrics.cardShape
+                    .fill(.primary.opacity(configuration.isPressed ? 0.045 : 0))
+                    .allowsHitTesting(false)
+            }
+            .animation(
+                reduceMotion ? nil : .easeOut(duration: 0.1),
                 value: configuration.isPressed
             )
     }
@@ -561,16 +594,33 @@ struct BookCard: View {
 
             VStack(alignment: .leading, spacing: 0) {
                 HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 5) {
                         Text(book.title)
                             .font(.headline)
                             .lineLimit(1)
                             .truncationMode(.tail)
 
-                        Text(authorText)
-                            .font(.subheadline)
+                        switch layout {
+                        case .library:
+                            HStack(spacing: 8) {
+                                Text(authorText)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+
+                                Label(chapterText, systemImage: "bookmark.fill")
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
+                            }
+                            .font(.caption)
                             .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                        case .home:
+                            Text(authorText)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        case .list:
+                            EmptyView()
+                        }
                     }
 
                     Spacer(minLength: 6)
@@ -578,12 +628,14 @@ struct BookCard: View {
                     importStatusIndicator
                 }
 
-                Label(chapterText, systemImage: "bookmark.fill")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.top, 10)
+                if case .home = layout {
+                    Label(chapterText, systemImage: "bookmark.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                        .padding(.top, 10)
+                }
 
                 Spacer(minLength: 0)
 

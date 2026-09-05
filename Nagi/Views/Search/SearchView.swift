@@ -3,7 +3,7 @@ import SwiftData
 import UIKit
 
 private enum SearchHeaderMetrics {
-    static let fadeExtension: CGFloat = 32
+    static let fadeExtension: CGFloat = 72
 }
 
 struct SearchView: View {
@@ -85,22 +85,27 @@ struct SearchView: View {
     private func searchHeader(topInset: CGFloat) -> some View {
         NagiPageHeader(title: "搜索")
             .background(alignment: .bottom) {
-                LinearGradient(
-                    colors: [
-                        Color(uiColor: .systemBackground),
-                        Color(uiColor: .systemBackground).opacity(0)
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(
-                    height: topInset
-                        + NagiPageHeaderMetrics.contentHeight
-                        + SearchHeaderMetrics.fadeExtension
-                )
-                .offset(y: SearchHeaderMetrics.fadeExtension)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
+                Rectangle()
+                    .fill(.regularMaterial)
+                    .mask {
+                        LinearGradient(
+                            stops: [
+                                .init(color: .black, location: 0),
+                                .init(color: .black, location: 0.68),
+                                .init(color: .clear, location: 1)
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    }
+                    .frame(
+                        height: topInset
+                            + NagiPageHeaderMetrics.contentHeight
+                            + SearchHeaderMetrics.fadeExtension
+                    )
+                    .offset(y: SearchHeaderMetrics.fadeExtension)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
     }
 
