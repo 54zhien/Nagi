@@ -60,14 +60,14 @@ final class ReadiumRenderer: ReaderRenderer {
                         .buttonStyle(.borderedProminent)
                     }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(uiColor: backgroundColor))
+                    .background(SwiftUI.Color(uiColor: backgroundColor))
                 )
             }
 
             return AnyView(
                 ProgressView("正在打开阅读器…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(uiColor: backgroundColor))
+                    .background(SwiftUI.Color(uiColor: backgroundColor))
             )
         }
 
@@ -75,7 +75,7 @@ final class ReadiumRenderer: ReaderRenderer {
             ReadiumReaderSurface(
                 model: model,
                 navigator: navigator,
-                background: Color(uiColor: backgroundColor),
+                background: SwiftUI.Color(uiColor: backgroundColor),
                 isReflowable: model.isReflowable
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -142,7 +142,7 @@ final class ReadiumRenderer: ReaderRenderer {
 private struct ReadiumReaderSurface: View {
     let model: EPUBReaderModel
     let navigator: EPUBNavigatorViewController
-    let background: Color
+    let background: SwiftUI.Color
     let isReflowable: Bool
 
     var body: some View {
