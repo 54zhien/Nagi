@@ -36,12 +36,7 @@ struct HomeView: View {
                                         usesLiquidGlass: bookCardsUseLiquidGlass
                                     )
                                 }
-                                .buttonStyle(
-                                    BookCardButtonStyle(
-                                        usesLiquidGlass: bookCardsUseLiquidGlass,
-                                        reduceMotion: reduceMotion
-                                    )
-                                )
+                                .buttonStyle(.plain)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(.interaction, BookCardMetrics.cardShape)
                                 .accessibilityLabel(book.title)

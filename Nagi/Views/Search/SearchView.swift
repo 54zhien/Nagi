@@ -179,12 +179,13 @@ struct SearchView: View {
         NagiPageHeader(title: "搜索")
             .background(alignment: .bottom) {
                 Rectangle()
-                    .fill(.ultraThinMaterial)
+                    .fill(.thinMaterial)
                     .mask {
                         LinearGradient(
                             stops: [
                                 .init(color: .black, location: 0),
-                                .init(color: .black.opacity(0.42), location: 0.56),
+                                .init(color: .black.opacity(0.82), location: 0.4),
+                                .init(color: .black.opacity(0.28), location: 0.78),
                                 .init(color: .clear, location: 1)
                             ],
                             startPoint: .top,

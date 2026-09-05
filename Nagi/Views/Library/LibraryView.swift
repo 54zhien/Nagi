@@ -7,6 +7,7 @@ enum NagiPageHeaderMetrics {
     static let horizontalPadding: CGFloat = 16
     static let verticalPadding: CGFloat = 8
     static let controlSize: CGFloat = 48
+    static let controlIconSize: CGFloat = 20
     static let hideThreshold: CGFloat = 8
     static let revealTolerance: CGFloat = 0.5
     static let transitionDuration: Double = 0.25
@@ -74,7 +75,7 @@ struct NagiPageHeader: View {
                     if let action, let actionIcon {
                         Button(action: action) {
                             Image(systemName: actionIcon)
-                                .font(.system(size: 24, weight: .medium))
+                                .font(.system(size: NagiPageHeaderMetrics.controlIconSize, weight: .medium))
                                 .frame(
                                     width: NagiPageHeaderMetrics.controlSize,
                                     height: NagiPageHeaderMetrics.controlSize
@@ -139,7 +140,6 @@ private enum LibrarySortOption: String, CaseIterable, Identifiable, Hashable {
 
 struct LibraryView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @Environment(\.legibilityWeight) private var legibilityWeight
     @Environment(\.modelContext) private var modelContext
     @AppStorage(NagiAppearanceSettings.bookCardsUseLiquidGlassKey)
     private var bookCardsUseLiquidGlass = true
@@ -184,12 +184,6 @@ struct LibraryView: View {
                                         book: book,
                                         layout: .library,
                                         usesLiquidGlass: bookCardsUseLiquidGlass
-                                    )
-                                    .modifier(
-                                        BookCardSurfaceModifier(
-                                            usesLiquidGlass: bookCardsUseLiquidGlass,
-                                            isInteractive: false
-                                        )
                                     )
                                 }
                                 .buttonStyle(.plain)
@@ -332,39 +326,22 @@ struct LibraryView: View {
 
     private var librarySortMenu: some View {
         Menu {
-            Section {
+            Picker("排序方式", selection: sortSelection) {
                 ForEach(LibrarySortOption.allCases) { option in
-                    Button {
-                        selectSortOption(option)
-                    } label: {
-                        Label {
-                            Text(option.title)
-                        } icon: {
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 14, weight: sortCheckmarkWeight))
-                                .frame(width: 16, height: 16)
-                                .opacity(sortOption == option ? 1 : 0)
-                        }
-                    }
-                }
-            } header: {
-                Label {
-                    Text("排序方式")
-                } icon: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 14, weight: sortCheckmarkWeight))
-                        .frame(width: 16, height: 16)
-                        .opacity(0)
+                    Text(option.title)
+                        .tag(option)
                 }
             }
+            .pickerStyle(.inline)
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .font(.title2.weight(.medium))
+                .font(.system(size: NagiPageHeaderMetrics.controlIconSize, weight: .medium))
                 .frame(
                     width: NagiPageHeaderMetrics.controlSize,
                     height: NagiPageHeaderMetrics.controlSize
                 )
         }
+        .menuOrder(.fixed)
         .buttonStyle(.plain)
         .glassEffect(.regular.interactive(), in: Circle())
         .disabled(books.isEmpty)
@@ -372,8 +349,11 @@ struct LibraryView: View {
         .accessibilityValue(Text(sortOption.title))
     }
 
-    private var sortCheckmarkWeight: Font.Weight {
-        legibilityWeight == .bold ? .semibold : .medium
+    private var sortSelection: Binding<LibrarySortOption> {
+        Binding(
+            get: { sortOption },
+            set: selectSortOption
+        )
     }
 
     private func normalizedAuthor(for book: Book) -> String {
@@ -483,51 +463,16 @@ enum BookCardMetrics {
 
 struct BookCardSurfaceModifier: ViewModifier {
     let usesLiquidGlass: Bool
-    var isInteractive = true
 
     func body(content: Content) -> some View {
         if usesLiquidGlass {
-            if isInteractive {
-                content.glassEffect(
-                    .regular.interactive(),
-                    in: BookCardMetrics.cardShape
-                )
-            } else {
-                content.glassEffect(
-                    .regular,
-                    in: BookCardMetrics.cardShape
-                )
-            }
-        } else {
-            content.background(
-                Color(uiColor: .secondarySystemBackground),
+            content.glassEffect(
+                .regular,
                 in: BookCardMetrics.cardShape
             )
+        } else {
+            content
         }
-    }
-}
-
-/// 保留系统 Button 的点击取消与滚动协调，只补充整卡一致的即时按压反馈。
-struct BookCardButtonStyle: ButtonStyle {
-    let usesLiquidGlass: Bool
-    let reduceMotion: Bool
-
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .modifier(
-                BookCardSurfaceModifier(
-                    usesLiquidGlass: usesLiquidGlass
-                )
-            )
-            .scaleEffect(
-                configuration.isPressed && !reduceMotion ? 0.985 : 1
-            )
-            .brightness(configuration.isPressed ? -0.025 : 0)
-            .opacity(configuration.isPressed ? 0.96 : 1)
-            .animation(
-                reduceMotion ? nil : .smooth(duration: 0.14),
-                value: configuration.isPressed
-            )
     }
 }
 
@@ -892,6 +837,11 @@ struct BookCardButtonLabel: View {
             maxWidth: .infinity,
             minHeight: BookCardMetrics.contentHeight,
             alignment: .leading
+        )
+        .modifier(
+            BookCardSurfaceModifier(
+                usesLiquidGlass: usesLiquidGlass
+            )
         )
     }
 }
