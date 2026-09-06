@@ -1,6 +1,15 @@
 import UIKit
 
 @MainActor
+protocol PageTurnAnimating: AnyObject {
+    func install()
+    func update(progress: CGFloat)
+    func animateCompletion(completion: @escaping (Bool) -> Void)
+    func animateCancellation(completion: @escaping () -> Void)
+    func remove()
+}
+
+@MainActor
 enum PageTurnVisualStyle {
     case cover
     case fade
@@ -9,7 +18,7 @@ enum PageTurnVisualStyle {
 /// Animates detached page surfaces only. Live WebKit content is never changed
 /// while an animation is running.
 @MainActor
-final class PageTurnVisualAnimator {
+final class PageTurnVisualAnimator: PageTurnAnimating {
     private let style: PageTurnVisualStyle
     private let hostView: UIView
     private let rootView = UIView()

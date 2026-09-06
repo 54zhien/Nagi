@@ -14,7 +14,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private let pageTurnStateMachine = PageTurnStateMachine()
     private var pageTurnTask: Task<Void, Never>?
     private var activePageSurface: PageSurface?
-    private var pageTurnAnimator: PageTurnVisualAnimator?
+    private var pageTurnAnimator: (any PageTurnAnimating)?
     private var activeTurnGeneration: UInt?
     private var pendingPanTranslationX: CGFloat = 0
     private var pendingPanVelocityX: CGFloat = 0
@@ -446,15 +446,42 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 direction: direction,
                 readingDirection: readingDirection
             )
-            let style: PageTurnVisualStyle = model.preferences.pageTransition == .fade ? .fade : .cover
-            let animator = PageTurnVisualAnimator(
-                style: style,
-                hostView: snapshotHostView,
-                currentView: currentComposite,
-                targetView: targetComposite,
-                completionTranslationX: destinationX,
-                isDark: isDarkPageBackground
-            )
+            let animator: any PageTurnAnimating
+            switch model.preferences.pageTransition {
+            case .pageCurl:
+                animator = PageTurnCurlAnimator(
+                    hostView: snapshotHostView,
+                    currentView: currentComposite,
+                    targetView: targetComposite,
+                    completionTranslationX: destinationX,
+                    isDark: isDarkPageBackground
+                ) ?? PageTurnVisualAnimator(
+                    style: .cover,
+                    hostView: snapshotHostView,
+                    currentView: currentComposite,
+                    targetView: targetComposite,
+                    completionTranslationX: destinationX,
+                    isDark: isDarkPageBackground
+                )
+            case .fade:
+                animator = PageTurnVisualAnimator(
+                    style: .fade,
+                    hostView: snapshotHostView,
+                    currentView: currentComposite,
+                    targetView: targetComposite,
+                    completionTranslationX: destinationX,
+                    isDark: isDarkPageBackground
+                )
+            case .slide, .scroll:
+                animator = PageTurnVisualAnimator(
+                    style: .cover,
+                    hostView: snapshotHostView,
+                    currentView: currentComposite,
+                    targetView: targetComposite,
+                    completionTranslationX: destinationX,
+                    isDark: isDarkPageBackground
+                )
+            }
 
             activePageSurface = surface
             pageTurnAnimator = animator

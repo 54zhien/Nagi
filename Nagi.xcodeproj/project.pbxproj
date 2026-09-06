@@ -79,6 +79,8 @@
 		4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */; };
 		4A0000000000000000000097 /* PageTurnDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000097 /* PageTurnDomain.swift */; };
 		4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000098 /* PageTurnVisualAnimator.swift */; };
+		4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000099 /* PageTurnCurlAnimator.swift */; };
+		4A000000000000000000009A /* PageTurnCurlShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009A /* PageTurnCurlShaders.metal */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -151,6 +153,8 @@
 		3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFontSizeStepperControl.swift; sourceTree = "<group>"; };
 		3A0000000000000000000097 /* PageTurnDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnDomain.swift; sourceTree = "<group>"; };
 		3A0000000000000000000098 /* PageTurnVisualAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnVisualAnimator.swift; sourceTree = "<group>"; };
+		3A0000000000000000000099 /* PageTurnCurlAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnCurlAnimator.swift; sourceTree = "<group>"; };
+		3A000000000000000000009A /* PageTurnCurlShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PageTurnCurlShaders.metal; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -334,6 +338,8 @@
 			children = (
 				3A0000000000000000000097 /* PageTurnDomain.swift */,
 				3A0000000000000000000098 /* PageTurnVisualAnimator.swift */,
+				3A0000000000000000000099 /* PageTurnCurlAnimator.swift */,
+				3A000000000000000000009A /* PageTurnCurlShaders.metal */,
 				3A0000000000000000000079 /* ReaderArchitecture.swift */,
 				3A000000000000000000007A /* ReaderRenderer.swift */,
 			);
@@ -657,6 +663,8 @@
 				4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */,
 				4A0000000000000000000097 /* PageTurnDomain.swift in Sources */,
 				4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */,
+				4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */,
+				4A000000000000000000009A /* PageTurnCurlShaders.metal in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
