@@ -251,6 +251,7 @@ final class EPUBReaderModel {
                 config: .init(
                     preferences: makePreferences(),
                     disablePageTurnsWhileScrolling: true,
+                    continuousScroll: true,
                     preloadPreviousPositionCount: 2,
                     preloadNextPositionCount: 6,
                     fontFamilyDeclarations: EPUBFontResources.declarations(),
