@@ -45,7 +45,7 @@ vertex PageTurnRasterizerData page_turn_curl_vertex(
     uint vertexID [[vertex_id]]
 ) {
     PageTurnRasterizerData output;
-    PageTurnVertex vertex = vertices[vertexID];
+    PageTurnVertex inputVertex = vertices[vertexID];
     float progress = clamp(uniforms.progress, 0.0, 1.0);
     float direction = uniforms.direction < 0.0 ? -1.0 : 1.0;
 
@@ -54,16 +54,16 @@ vertex PageTurnRasterizerData page_turn_curl_vertex(
     // makes the cost independent of the page's DOM complexity.
     float fold = sin(progress * 3.14159265);
     float edgeDistance = direction < 0.0
-        ? (1.0 - vertex.uv.x)
-        : vertex.uv.x;
+        ? (1.0 - inputVertex.uv.x)
+        : inputVertex.uv.x;
     float curl = sin(edgeDistance * 3.14159265) * fold * 0.18;
-    float2 position = vertex.position;
+    float2 position = inputVertex.position;
     position.x += direction * progress * 2.0;
     position.x += direction * curl;
     position.y *= 1.0 - curl * 0.035;
 
     output.position = float4(position, 0.0, 1.0);
-    output.uv = vertex.uv;
+    output.uv = inputVertex.uv;
     output.shade = 1.0 - curl * (uniforms.isDark > 0.5 ? 0.28 : 0.16);
     return output;
 }
