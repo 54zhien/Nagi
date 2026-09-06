@@ -61,7 +61,7 @@ final class EPUBReaderModel {
         }?.id
     }
 
-    var fontScale: Double { didSet { preferencesDidChange() } }
+    var fontSizeLevel: Int { didSet { preferencesDidChange() } }
     var fontFamily: ReaderFontFamily { didSet { preferencesDidChange() } }
     var boldText: Bool { didSet { preferencesDidChange() } }
     var lineHeight: Double { didSet { preferencesDidChange() } }
@@ -134,7 +134,8 @@ final class EPUBReaderModel {
     ]
 
     private enum PreferenceKey {
-        static let fontScale = "reader.epub.fontScale"
+        static let fontSizeLevel = "reader.epub.fontSizeLevel"
+        static let legacyFontScale = "reader.epub.fontScale"
         static let fontFamily = "reader.epub.fontFamily"
         static let boldText = "reader.epub.boldText"
         static let lineHeight = "reader.epub.lineHeight"
@@ -166,11 +167,13 @@ final class EPUBReaderModel {
         progress = min(max(book.progressPercent, 0), 1)
 
         let defaults = UserDefaults.standard
-        let savedFontScale = defaults.object(forKey: PreferenceKey.fontScale) as? Double ?? 1.0
-        fontScale = min(
-            max(savedFontScale, ReaderFontSize.minimumScale),
-            ReaderFontSize.maximumScale
-        )
+        if let savedLevel = defaults.object(forKey: PreferenceKey.fontSizeLevel) as? Int {
+            fontSizeLevel = ReaderFontSize.clampedLevel(savedLevel)
+        } else if let legacyScale = defaults.object(forKey: PreferenceKey.legacyFontScale) as? Double {
+            fontSizeLevel = ReaderFontSize.nearestLevel(forScale: legacyScale)
+        } else {
+            fontSizeLevel = ReaderFontSize.defaultLevel
+        }
         fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(ReaderFontFamily.init) ?? .original
         boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
         lineHeight = ReaderLayoutMetrics.clampLineHeight(
@@ -371,7 +374,7 @@ final class EPUBReaderModel {
 
     var readerPreferences: ReaderPreferences {
         ReaderPreferences(
-            fontSize: ReaderFontSize.defaultValue * fontScale,
+            fontSizeLevel: fontSizeLevel,
             fontFamily: fontFamily,
             boldText: boldText,
             lineHeight: lineHeight,
@@ -394,10 +397,7 @@ final class EPUBReaderModel {
     ) {
         let previousPreferences = readerPreferences
         withPreferenceUpdatesSuspended {
-            fontScale = min(
-                max(preferences.fontSize / ReaderFontSize.defaultValue, ReaderFontSize.minimumScale),
-                ReaderFontSize.maximumScale
-            )
+            fontSizeLevel = ReaderFontSize.clampedLevel(preferences.fontSizeLevel)
             fontFamily = preferences.fontFamily
             boldText = preferences.boldText
             lineHeight = ReaderLayoutMetrics.clampLineHeight(preferences.lineHeight)
@@ -540,7 +540,7 @@ final class EPUBReaderModel {
             include(.theme)
         }
 
-        if previous.fontSize != next.fontSize
+        if previous.fontSizeLevel != next.fontSizeLevel
             || previous.fontFamily != next.fontFamily
             || previous.boldText != next.boldText {
             include(.font)
@@ -575,7 +575,7 @@ final class EPUBReaderModel {
             backgroundColor: navigatorBackgroundColor,
             // Publisher styles only disable the app-owned typography rules.
             fontFamily: fontFamily.readiumFontFamily,
-            fontSize: fontScale,
+            fontSize: ReaderFontSize.scale(for: fontSizeLevel),
             fontWeight: boldText ? 1.75 : fontFamily.readiumFontWeight,
             letterSpacing: nil,
             lineHeight: nil,
@@ -1082,7 +1082,8 @@ final class EPUBReaderModel {
 
     private func persistPreferences() {
         let defaults = UserDefaults.standard
-        defaults.set(fontScale, forKey: PreferenceKey.fontScale)
+        defaults.set(fontSizeLevel, forKey: PreferenceKey.fontSizeLevel)
+        defaults.removeObject(forKey: PreferenceKey.legacyFontScale)
         defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
         defaults.set(boldText, forKey: PreferenceKey.boldText)
         defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)

@@ -103,11 +103,7 @@ struct MediumReaderSettingsView: View {
     }
 
     private var fontSizeIndicatorIndex: Int {
-        let rawIndex = Int(
-            ((model.preferences.fontSize - ReaderFontSize.minimum) / ReaderFontSize.step)
-                .rounded()
-        )
-        return min(max(rawIndex, 0), ReaderFontSize.indicatorCount - 1)
+        model.preferences.fontSizeLevel
     }
 
     private var fontSizeControl: some View {
@@ -116,7 +112,7 @@ struct MediumReaderSettingsView: View {
                 fontSizeButton(
                     title: "小",
                     assetName: "readerFontSizeSmaller",
-                    adjustment: -ReaderFontSize.step,
+                    levelStep: -1,
                     iconPointSize: 20
                 )
 
@@ -127,7 +123,7 @@ struct MediumReaderSettingsView: View {
                 fontSizeButton(
                     title: "大",
                     assetName: "readerFontSizeLarger",
-                    adjustment: ReaderFontSize.step,
+                    levelStep: 1,
                     iconPointSize: 28
                 )
             }
@@ -143,22 +139,18 @@ struct MediumReaderSettingsView: View {
     private func fontSizeButton(
         title: String,
         assetName: String,
-        adjustment: Double,
+        levelStep: Int,
         iconPointSize: CGFloat
     ) -> some View {
-        let currentSize = model.preferences.fontSize
-        let direction = adjustment < 0 ? -1 : 1
         let adjustedIndex = min(
-            max(fontSizeIndicatorIndex + direction, 0),
+            max(fontSizeIndicatorIndex + levelStep, 0),
             ReaderFontSize.indicatorCount - 1
         )
-        let adjustedSize = ReaderFontSize.minimum
-            + Double(adjustedIndex) * ReaderFontSize.step
         let canAdjust = adjustedIndex != fontSizeIndicatorIndex
 
         return Button {
             guard canAdjust else { return }
-            model.setFontSize(adjustedSize)
+            model.setFontSizeLevel(adjustedIndex)
             fontSizeIndicatorToken &+= 1
             if reduceMotion {
                 showFontSizeIndicator = true
@@ -712,7 +704,7 @@ struct CustomReaderSettingsSheet: View {
     }
 
     private var previewFont: Font {
-        let size = CGFloat(min(max(fontSize, 8), 42))
+        let size = CGFloat(min(max(fontSize, 14), 105))
         return draft.fontFamily.swiftUIFont(ofSize: size)
     }
 

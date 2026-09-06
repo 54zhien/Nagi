@@ -118,13 +118,40 @@ enum ReaderThemePreset: String, CaseIterable, Identifiable, Codable, Sendable, H
 }
 
 enum ReaderFontSize {
-    static let defaultValue = 17.0
-    static let step = 2.0
-    static let minimum = 9.0
-    static let maximum = 41.0
-    static let indicatorCount = Int((maximum - minimum) / step) + 1
-    static let minimumScale = minimum / defaultValue
-    static let maximumScale = maximum / defaultValue
+    static let basePointSize = 14.0
+    private static let legacyBasePointSize = 17.0
+    static let fontScales: [Double] = [
+        1.00, 1.15, 1.33, 1.54, 1.78,
+        2.05, 2.37, 2.74, 3.16, 3.65,
+        4.22, 4.87, 5.62, 6.49, 7.50
+    ]
+    static let minimumLevel = 0
+    static let maximumLevel = fontScales.count - 1
+    static let defaultLevel = 2
+    static let indicatorCount = fontScales.count
+
+    static func clampedLevel(_ level: Int) -> Int {
+        min(max(level, minimumLevel), maximumLevel)
+    }
+
+    static func scale(for level: Int) -> Double {
+        fontScales[clampedLevel(level)]
+    }
+
+    static func pointSize(for level: Int) -> Double {
+        basePointSize * scale(for: level)
+    }
+
+    static func nearestLevel(forScale scale: Double) -> Int {
+        guard scale.isFinite else { return defaultLevel }
+        fontScales.indices.min {
+            abs(fontScales[$0] - scale) < abs(fontScales[$1] - scale)
+        } ?? defaultLevel
+    }
+
+    static func nearestLevel(forLegacyPointSize pointSize: Double) -> Int {
+        nearestLevel(forScale: pointSize / legacyBasePointSize)
+    }
 }
 
 enum ReaderLayoutMetrics {
@@ -190,7 +217,9 @@ enum ReaderLayoutMetrics {
 }
 
 struct ReaderPreferences: Codable, Equatable, Sendable {
-    var fontSize: Double
+    var fontSizeLevel: Int
+    var fontSizeScale: Double { ReaderFontSize.scale(for: fontSizeLevel) }
+    var fontSize: Double { ReaderFontSize.pointSize(for: fontSizeLevel) }
     var fontFamily: ReaderFontFamily
     var boldText: Bool
     var lineHeight: Double
@@ -209,7 +238,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var showBookTitleInPageHeader: Bool
 
     init(
-        fontSize: Double = ReaderFontSize.defaultValue,
+        fontSizeLevel: Int = ReaderFontSize.defaultLevel,
         fontFamily: ReaderFontFamily = .original,
         boldText: Bool = false,
         lineHeight: Double = ReaderLayoutMetrics.defaultLineHeight,
@@ -224,7 +253,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         pageTransition: ReaderPageTransition = .slide,
         showBookTitleInPageHeader: Bool = false
     ) {
-        self.fontSize = fontSize
+        self.fontSizeLevel = ReaderFontSize.clampedLevel(fontSizeLevel)
         self.fontFamily = fontFamily
         self.boldText = boldText
         self.lineHeight = ReaderLayoutMetrics.clampLineHeight(lineHeight)
@@ -242,6 +271,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
 
     private enum CodingKeys: String, CodingKey {
         case storageVersion
+        case fontSizeLevel
         case fontSize
         case fontFamily
         case boldText
@@ -258,7 +288,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case showBookTitleInPageHeader
     }
 
-    private static let currentStorageVersion = 4
+    private static let currentStorageVersion = 5
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -276,8 +306,17 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
             pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(storedPageMargins)
         }
 
+        let fontSizeLevel: Int
+        if let storedLevel = try container.decodeIfPresent(Int.self, forKey: .fontSizeLevel) {
+            fontSizeLevel = ReaderFontSize.clampedLevel(storedLevel)
+        } else if let legacyPointSize = try container.decodeIfPresent(Double.self, forKey: .fontSize) {
+            fontSizeLevel = ReaderFontSize.nearestLevel(forLegacyPointSize: legacyPointSize)
+        } else {
+            fontSizeLevel = ReaderFontSize.defaultLevel
+        }
+
         self.init(
-            fontSize: try container.decodeIfPresent(Double.self, forKey: .fontSize) ?? ReaderFontSize.defaultValue,
+            fontSizeLevel: fontSizeLevel,
             fontFamily: try container.decodeIfPresent(ReaderFontFamily.self, forKey: .fontFamily) ?? .original,
             boldText: try container.decodeIfPresent(Bool.self, forKey: .boldText) ?? false,
             lineHeight: try container.decodeIfPresent(Double.self, forKey: .lineHeight) ?? ReaderLayoutMetrics.defaultLineHeight,
@@ -296,7 +335,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.currentStorageVersion, forKey: .storageVersion)
-        try container.encode(fontSize, forKey: .fontSize)
+        try container.encode(fontSizeLevel, forKey: .fontSizeLevel)
         try container.encode(fontFamily, forKey: .fontFamily)
         try container.encode(boldText, forKey: .boldText)
         try container.encode(lineHeight, forKey: .lineHeight)
@@ -643,9 +682,9 @@ final class ReaderViewModel {
         )
     }
 
-    func setFontSize(_ size: Double) {
+    func setFontSizeLevel(_ level: Int) {
         setPreference {
-            $0.fontSize = min(max(size, ReaderFontSize.minimum), ReaderFontSize.maximum)
+            $0.fontSizeLevel = ReaderFontSize.clampedLevel(level)
         }
     }
 

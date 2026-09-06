@@ -15,6 +15,7 @@ final class GlassControlView: UIControl {
     private var currentReduceMotion = false
     private var preferredCornerRadius: CGFloat?
     private var suppressTouchHighlight = false
+    private var centersCombinedContent = false
 
     override init(frame: CGRect) {
         surfaceView = GlassSurfaceView(frame: .zero)
@@ -87,7 +88,9 @@ final class GlassControlView: UIControl {
         isSelected: Bool = false,
         cornerRadius: CGFloat? = nil,
         contentColor: UIColor? = nil,
-        fillColor: UIColor? = nil
+        fillColor: UIColor? = nil,
+        contentFont: UIFont? = nil,
+        centersCombinedContent: Bool = false
     ) {
         let imageChanged: Bool
         if let currentImage = iconView.image {
@@ -104,10 +107,12 @@ final class GlassControlView: UIControl {
         }
         titleLabel.isHidden = title == nil
         titleLabel.textColor = contentColor ?? tintColor ?? .label
-        titleLabel.font = .preferredFont(forTextStyle: title == nil ? .body : .subheadline)
+        titleLabel.font = contentFont
+            ?? .preferredFont(forTextStyle: title == nil ? .body : .subheadline)
         fillView.backgroundColor = fillColor
         fillView.isHidden = fillColor == nil
         preferredCornerRadius = cornerRadius
+        self.centersCombinedContent = centersCombinedContent
         if self.accessibilityLabel != accessibilityLabel {
             self.accessibilityLabel = accessibilityLabel
         }
@@ -288,7 +293,25 @@ final class GlassControlView: UIControl {
         selectedStrokeLayer.frame = bounds.insetBy(dx: 1, dy: 1)
         selectedStrokeLayer.cornerRadius = max(0, radius - 1)
 
-        if !iconView.isHidden, !titleLabel.isHidden {
+        if !iconView.isHidden, !titleLabel.isHidden, centersCombinedContent {
+            let spacing: CGFloat = 6
+            let iconWidth = ceil(iconView.image?.size.width ?? 0)
+            let titleWidth = ceil(titleLabel.intrinsicContentSize.width)
+            let contentWidth = min(bounds.width - 20, iconWidth + spacing + titleWidth)
+            let startX = max(10, (bounds.width - contentWidth) / 2)
+            iconView.frame = CGRect(
+                x: startX,
+                y: 0,
+                width: iconWidth,
+                height: bounds.height
+            )
+            titleLabel.frame = CGRect(
+                x: iconView.frame.maxX + spacing,
+                y: 0,
+                width: min(titleWidth, max(0, bounds.maxX - iconView.frame.maxX - spacing - 10)),
+                height: bounds.height
+            )
+        } else if !iconView.isHidden, !titleLabel.isHidden {
             let iconWidth: CGFloat = 22
             iconView.frame = CGRect(
                 x: 10,

@@ -77,6 +77,7 @@ final class ReaderSettingsViewController: UIViewController {
     deinit {
         indicatorHideTask?.cancel()
         deferredMutationTask?.cancel()
+        NotificationCenter.default.removeObserver(self)
     }
 
     override func viewDidLoad() {
@@ -136,6 +137,12 @@ final class ReaderSettingsViewController: UIViewController {
 
         configurePersistentControls()
         updateAllControls()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(boldTextStatusDidChange),
+            name: UIAccessibility.boldTextStatusDidChangeNotification,
+            object: nil
+        )
     }
 
     func update(
@@ -162,7 +169,7 @@ final class ReaderSettingsViewController: UIViewController {
             updateThemeControls()
             updateCustomControl()
         } else {
-            if previousPreferences.fontSize != preferences.fontSize {
+            if previousPreferences.fontSizeLevel != preferences.fontSizeLevel {
                 updateFontControls()
             }
             if previousPreferences.pageTransition != preferences.pageTransition {
@@ -269,21 +276,22 @@ final class ReaderSettingsViewController: UIViewController {
     }
 
     private enum Layout {
-        static let horizontalInset: CGFloat = 18
-        static let topY: CGFloat = 8
+        static let horizontalInset: CGFloat = 28
+        static let topY: CGFloat = 2
         static let topHeight: CGFloat = 44
-        static let indicatorY: CGFloat = 58
-        static let brightnessY: CGFloat = 84
+        static let indicatorY: CGFloat = 48
+        static let brightnessY: CGFloat = 62
         static let brightnessHeight: CGFloat = 44
-        static let presetY: CGFloat = 142
+        static let presetY: CGFloat = 116
         static let presetHeight: CGFloat = 208
-        static let customY: CGFloat = 368
+        static let customY: CGFloat = 338
         static let customHeight: CGFloat = 48
     }
 
     private enum IconMetrics {
         static let fontSmaller: CGFloat = 18
-        static let fontLarger: CGFloat = 27
+        static let fontLarger: CGFloat = 21
+        static let custom: CGFloat = 18
         static let topTransition: CGFloat = 23
         static let topAppearance: CGFloat = 23
         static let menuTransition: CGFloat = 20
@@ -292,6 +300,14 @@ final class ReaderSettingsViewController: UIViewController {
 
     private var accentColor: UIColor {
         UIColor(named: "AccentColor") ?? .systemBlue
+    }
+
+    private var emphasizedContentWeight: UIImage.SymbolWeight {
+        UIAccessibility.isBoldTextEnabled ? .semibold : .medium
+    }
+
+    private var emphasizedFontWeight: UIFont.Weight {
+        UIAccessibility.isBoldTextEnabled ? .semibold : .medium
     }
 
     private func symbolConfiguration(pointSize: CGFloat) -> UIImage.SymbolConfiguration {
@@ -334,16 +350,17 @@ final class ReaderSettingsViewController: UIViewController {
     }
 
     private func updateFontControls() {
-        let currentFontIndex = fontSizeIndex(for: latestPreferences.fontSize)
+        let currentFontIndex = latestPreferences.fontSizeLevel
         let smallerIndex = max(0, currentFontIndex - 1)
         let largerIndex = min(ReaderFontSize.indicatorCount - 1, currentFontIndex + 1)
-        let accessibilityValue = "当前字号 \(Int(latestPreferences.fontSize.rounded())) 磅"
+        let accessibilityValue = "当前字号第 \(currentFontIndex + 1) 档，约 \(Int(latestPreferences.fontSize.rounded())) 磅"
 
         fontSizeStepperControl.update(
             isSmallerEnabled: smallerIndex != currentFontIndex,
             isLargerEnabled: largerIndex != currentFontIndex,
             smallerPointSize: IconMetrics.fontSmaller,
             largerPointSize: IconMetrics.fontLarger,
+            symbolWeight: emphasizedContentWeight,
             tintColor: .label,
             accessibilityValue: accessibilityValue
         )
@@ -449,16 +466,30 @@ final class ReaderSettingsViewController: UIViewController {
     }
 
     private func updateCustomControl() {
+        let pointSize = IconMetrics.custom
         customControl.update(
-            image: UIImage(systemName: "gear"),
+            image: UIImage(
+                systemName: "gear",
+                withConfiguration: UIImage.SymbolConfiguration(
+                    pointSize: pointSize,
+                    weight: emphasizedContentWeight
+                )
+            ),
             accessibilityLabel: "自定义",
             tintColor: nil,
             isEnabled: true,
             reduceMotion: latestReduceMotion,
             title: "自定义",
             cornerRadius: 24,
-            contentColor: .label
+            contentColor: .label,
+            contentFont: .systemFont(ofSize: pointSize, weight: emphasizedFontWeight),
+            centersCombinedContent: true
         )
+    }
+
+    @objc private func boldTextStatusDidChange() {
+        updateFontControls()
+        updateCustomControl()
     }
 
     private func updateBrightness() {
@@ -482,13 +513,6 @@ final class ReaderSettingsViewController: UIViewController {
         }
     }
 
-    private func fontSizeIndex(for size: Double) -> Int {
-        let rawIndex = Int(
-            ((size - ReaderFontSize.minimum) / ReaderFontSize.step).rounded()
-        )
-        return min(max(rawIndex, 0), ReaderFontSize.indicatorCount - 1)
-    }
-
     private func controlID(for preset: ReaderThemePreset) -> ReaderSettingsControlID {
         switch preset {
         case .original: return .original
@@ -499,7 +523,7 @@ final class ReaderSettingsViewController: UIViewController {
 
     private func adjustFontSize(by step: Int) {
         guard ReaderFontSize.indicatorCount > 0 else { return }
-        let currentIndex = fontSizeIndex(for: model.preferences.fontSize)
+        let currentIndex = model.preferences.fontSizeLevel
         let targetIndex = min(
             max(currentIndex + step, 0),
             ReaderFontSize.indicatorCount - 1
@@ -586,14 +610,13 @@ final class ReaderSettingsViewController: UIViewController {
 
         switch mutation {
         case .fontStep(let step):
-            let currentIndex = fontSizeIndex(for: model.preferences.fontSize)
+            let currentIndex = model.preferences.fontSizeLevel
             let targetIndex = min(
                 max(currentIndex + step, 0),
                 ReaderFontSize.indicatorCount - 1
             )
             guard targetIndex != currentIndex else { return }
-            let size = ReaderFontSize.minimum + Double(targetIndex) * ReaderFontSize.step
-            model.setFontSize(size)
+            model.setFontSizeLevel(targetIndex)
             showFontSizeIndicator()
 
         case .preset(let preset):
@@ -614,7 +637,7 @@ final class ReaderSettingsViewController: UIViewController {
     }
 
     private func updateChangedPreferenceControls(from previous: ReaderPreferences) {
-        if previous.fontSize != latestPreferences.fontSize {
+        if previous.fontSizeLevel != latestPreferences.fontSizeLevel {
             updateFontControls()
         }
         if previous.pageTransition != latestPreferences.pageTransition {

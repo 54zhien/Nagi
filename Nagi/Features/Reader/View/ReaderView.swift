@@ -184,23 +184,23 @@ private struct ReaderSessionView: View {
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    HStack(spacing: 12) {
-                        Button {
-                            showSettings = false
-                        } label: {
-                            Image(systemName: "xmark")
-                                .frame(width: 44, height: 44)
-                                .contentShape(Circle())
-                        }
-                        .frame(width: 44, height: 44)
-                        .contentShape(Circle())
-                        .glassEffect(.regular.interactive(), in: Circle())
-                        .accessibilityLabel("关闭主题与排版")
-
-                        Text("主题与排版")
-                            .font(.headline)
+                ToolbarItemGroup(placement: .topBarLeading) {
+                    Button {
+                        showSettings = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .frame(width: 44, height: 44)
+                            .contentShape(Circle())
                     }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Circle())
+                    .glassEffect(.regular.interactive(), in: Circle())
+                    .accessibilityLabel("关闭主题与布局")
+
+                    Text("主题与布局")
+                        .font(.headline)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityAddTraits(.isHeader)
                 }
                 .sharedBackgroundVisibility(.hidden)
             }

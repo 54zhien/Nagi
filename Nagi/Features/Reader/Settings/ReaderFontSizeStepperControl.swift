@@ -54,6 +54,7 @@ final class ReaderFontSizeStepperControl: UIControl {
         isLargerEnabled: Bool,
         smallerPointSize: CGFloat,
         largerPointSize: CGFloat,
+        symbolWeight: UIImage.SymbolWeight,
         tintColor: UIColor,
         accessibilityValue: String
     ) {
@@ -62,11 +63,11 @@ final class ReaderFontSizeStepperControl: UIControl {
 
         let smallerConfiguration = UIImage.SymbolConfiguration(
             pointSize: smallerPointSize,
-            weight: .regular
+            weight: symbolWeight
         )
         let largerConfiguration = UIImage.SymbolConfiguration(
             pointSize: largerPointSize,
-            weight: .regular
+            weight: symbolWeight
         )
         smallerButton.setImage(
             UIImage(
