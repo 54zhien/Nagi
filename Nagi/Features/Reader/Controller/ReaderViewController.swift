@@ -13,12 +13,19 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var panGestureRecognizer: UIPanGestureRecognizer?
     private let pageTurnStateMachine = PageTurnStateMachine()
     private var pageTurnTask: Task<Void, Never>?
+    private var pageTurnPrewarmTask: Task<Void, Never>?
+    private var pageTurnPrewarmRevision: UInt = 0
+    private var cachedCurrentComposite: UIView?
+    private var activeTargetComposite: UIView?
+    private var adjacentSurfaceCacheIsWarm = false
     private var activePageSurface: PageSurface?
     private var pageTurnAnimator: (any PageTurnAnimating)?
     private var activeTurnGeneration: UInt?
     private var pendingPanTranslationX: CGFloat = 0
     private var pendingPanVelocityX: CGFloat = 0
     private var pendingPanDidEnd = false
+    private var panHasStartedTurn = false
+    private var isBoundaryResistanceTurn = false
 
     private var latestStateRevision = 0
     private var latestTitle: String
@@ -99,9 +106,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         contentController.didMove(toParent: self)
         contentHostController = contentController
 
-        chromeView.onDismiss = { [weak self] in self?.onDismiss() }
-        chromeView.onTableOfContents = { [weak self] in self?.onTableOfContents() }
-        chromeView.onSettings = { [weak self] in self?.onSettings() }
+        chromeView.onDismiss = { [weak self] in self?.performAfterCancellingPageTurn { $0.onDismiss() } }
+        chromeView.onTableOfContents = { [weak self] in self?.performAfterCancellingPageTurn { $0.onTableOfContents() } }
+        chromeView.onSettings = { [weak self] in self?.performAfterCancellingPageTurn { $0.onSettings() } }
         view.addSubview(chromeView)
 
         snapshotHostView.isUserInteractionEnabled = false
@@ -133,6 +140,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         updateChrome()
         configurePageTurnInteraction()
         setNeedsStatusBarAppearanceUpdate()
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        schedulePageTurnPrewarm()
     }
 
     override func viewSafeAreaInsetsDidChange() {
@@ -181,10 +193,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
         if stateRevisionChanged {
             refreshContentIfNeeded()
+            schedulePageTurnPrewarm()
         }
         if pageSurfacePreferencesChanged {
             cancelPageTurn(animated: false)
-            model.pageSurfaceProvider?.invalidatePreparedSurfaces()
+            invalidatePageTurnCache()
         }
         configurePageTurnInteraction()
     }
@@ -198,6 +211,15 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         snapshotHostView.frame = bounds
 
         let chromeSafeAreaInsets = view.safeAreaInsets
+        let inheritedCornerRadius = max(view.layer.cornerRadius, view.window?.layer.cornerRadius ?? 0)
+        let safeAreaDerivedRadius = max(chromeSafeAreaInsets.top, chromeSafeAreaInsets.bottom)
+        let pageCornerRadius = min(
+            max(inheritedCornerRadius, safeAreaDerivedRadius),
+            min(bounds.width, bounds.height) / 2
+        )
+        snapshotHostView.layer.cornerCurve = .continuous
+        snapshotHostView.layer.cornerRadius = pageCornerRadius
+        snapshotHostView.layer.masksToBounds = true
         let contentInsets = readableContentInsets(for: chromeSafeAreaInsets)
         let displayScale = view.window?.screen.scale ?? UIScreen.main.scale
         guard bounds != lastViewportBounds
@@ -212,18 +234,22 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         lastViewportDisplayScale = displayScale
         if viewportChanged {
             cancelPageTurn(animated: false)
-            model.pageSurfaceProvider?.invalidatePreparedSurfaces()
+            invalidatePageTurnCache()
         }
         model.updateViewport(
             size: bounds.size,
             safeAreaInsets: contentInsets,
             displayScale: displayScale
         )
+        schedulePageTurnPrewarm()
     }
 
     func dismantle() {
         NotificationCenter.default.removeObserver(self)
         cancelPageTurn(animated: false)
+        pageTurnPrewarmTask?.cancel()
+        pageTurnPrewarmTask = nil
+        cachedCurrentComposite = nil
         model.pageSurfaceProvider?.setBuiltInPageTurnInteractionEnabled(true)
         panGestureRecognizer?.removeTarget(nil, action: nil)
         panGestureRecognizer?.delegate = nil
@@ -254,26 +280,22 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         switch gesture.state {
         case .began:
             guard isCustomPageTurnEnabled else { return }
-            chromeView.hideControlsForSwipe()
             pendingPanTranslationX = translation.x
             pendingPanVelocityX = velocity.x
             pendingPanDidEnd = false
-            let edge: PageTurnEdge = velocity.x < 0 ? .right : .left
-            let direction = PageTurnMetrics.pageDirection(
-                for: edge,
-                readingDirection: model.pageSurfaceProvider?.readingDirection ?? .leftToRight
-            )
-            startPageTurn(direction: direction, interactive: true)
+            panHasStartedTurn = false
 
         case .changed:
             pendingPanTranslationX = translation.x
             pendingPanVelocityX = velocity.x
+            startPageTurnFromPanIfNeeded()
             updateInteractivePageTurn()
 
         case .ended:
             pendingPanTranslationX = translation.x
             pendingPanVelocityX = velocity.x
             pendingPanDidEnd = true
+            startPageTurnFromPanIfNeeded()
             finishInteractivePageTurnIfReady()
 
         case .cancelled, .failed:
@@ -292,7 +314,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     override func didReceiveMemoryWarning() {
         super.didReceiveMemoryWarning()
         cancelPageTurn(animated: false)
-        model.pageSurfaceProvider?.invalidatePreparedSurfaces()
+        invalidatePageTurnCache()
     }
 
     @objc private func accessibilityToggleControls(
@@ -385,6 +407,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         if !enabled, pageTurnStateMachine.state != .idle {
             cancelPageTurn(animated: false)
         }
+        if enabled {
+            schedulePageTurnPrewarm()
+        }
     }
 
     private func startPageTurn(direction: PageDirection, interactive: Bool) {
@@ -395,12 +420,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return }
 
+        guard let currentComposite = cachedCurrentComposite else {
+            pageTurnStateMachine.invalidate()
+            schedulePageTurnPrewarm()
+            return
+        }
+
         activeTurnGeneration = generation
         pendingPanDidEnd = !interactive
         if !interactive {
             pendingPanTranslationX = 0
             pendingPanVelocityX = 0
-            chromeView.hideControlsForSwipe()
         }
 
         pageTurnTask?.cancel()
@@ -417,10 +447,26 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
             guard let surface = await provider.prepareAdjacentSurface(direction: direction) else {
                 guard pageTurnStateMachine.accepts(generation) else { return }
-                _ = pageTurnStateMachine.enterFallback(.surfaceUnavailable, generation: generation)
-                _ = await provider.navigateWithoutCustomTransition(direction: direction)
-                _ = pageTurnStateMachine.finish(generation: generation)
-                activeTurnGeneration = nil
+                let destinationX = PageTurnMetrics.completionTranslationX(
+                    containerWidth: snapshotHostView.bounds.width,
+                    direction: direction,
+                    readingDirection: provider.readingDirection
+                )
+                let boundaryAnimator = PageTurnBoundaryAnimator(
+                    hostView: snapshotHostView,
+                    currentView: currentComposite,
+                    completionTranslationX: destinationX
+                )
+                isBoundaryResistanceTurn = true
+                pageTurnAnimator = boundaryAnimator
+                chromeView.setPageHeaderHiddenForTransition(true)
+                boundaryAnimator.install()
+                guard pageTurnStateMachine.beginInteractive(generation: generation) else {
+                    cleanupPageTurn(cancelPreparedSurface: false)
+                    return
+                }
+                updateInteractivePageTurn()
+                finishInteractivePageTurnIfReady()
                 return
             }
 
@@ -429,17 +475,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 return
             }
 
-            guard let currentContent = makeCurrentContentSnapshot() else {
-                provider.cancel(surface: surface)
-                _ = pageTurnStateMachine.enterFallback(.snapshotFailed, generation: generation)
-                _ = await provider.navigateWithoutCustomTransition(direction: direction)
-                _ = pageTurnStateMachine.finish(generation: generation)
-                activeTurnGeneration = nil
-                return
-            }
-
-            let currentComposite = makeCompositeSurface(content: currentContent)
+            cachedCurrentComposite = nil
             let targetComposite = makeCompositeSurface(content: surface.view)
+            activeTargetComposite = targetComposite
+            adjacentSurfaceCacheIsWarm = false
             let readingDirection = provider.readingDirection
             let destinationX = PageTurnMetrics.completionTranslationX(
                 containerWidth: snapshotHostView.bounds.width,
@@ -454,12 +493,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     currentView: currentComposite,
                     targetView: targetComposite,
                     completionTranslationX: destinationX,
+                    direction: direction,
                     isDark: isDarkPageBackground
                 ) ?? PageTurnVisualAnimator(
                     style: .cover,
                     hostView: snapshotHostView,
                     currentView: currentComposite,
                     targetView: targetComposite,
+                    direction: direction,
                     completionTranslationX: destinationX,
                     isDark: isDarkPageBackground
                 )
@@ -469,6 +510,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     hostView: snapshotHostView,
                     currentView: currentComposite,
                     targetView: targetComposite,
+                    direction: direction,
                     completionTranslationX: destinationX,
                     isDark: isDarkPageBackground
                 )
@@ -478,6 +520,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     hostView: snapshotHostView,
                     currentView: currentComposite,
                     targetView: targetComposite,
+                    direction: direction,
                     completionTranslationX: destinationX,
                     isDark: isDarkPageBackground
                 )
@@ -485,6 +528,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
             activePageSurface = surface
             pageTurnAnimator = animator
+            chromeView.hideControlsForSwipe()
             chromeView.setPageHeaderHiddenForTransition(true)
             animator.install()
             guard pageTurnStateMachine.beginInteractive(generation: generation) else {
@@ -522,7 +566,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               let direction = pageTurnStateMachine.direction,
               pageTurnStateMachine.state == .interactive else { return }
 
-        let decision = PageTurnMetrics.decision(
+        let decision: PageTurnDecision = isBoundaryResistanceTurn ? .cancel : PageTurnMetrics.decision(
             progress: pageTurnStateMachine.progress,
             velocityX: pendingPanVelocityX,
             direction: direction,
@@ -561,12 +605,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 let committed = await provider.commit(surface: surface)
                 guard let self, self.pageTurnStateMachine.accepts(generation) else { return }
                 if committed {
+                    let committedComposite = self.activeTargetComposite
                     self.activePageSurface = nil
                     _ = self.pageTurnStateMachine.finish(generation: generation)
                     self.cleanupPageTurn(cancelPreparedSurface: false)
+                    self.cachedCurrentComposite = committedComposite
+                    self.schedulePageTurnPrewarm()
                 } else {
                     self.pageTurnStateMachine.invalidate()
                     self.cleanupPageTurn(cancelPreparedSurface: false)
+                    self.invalidatePageTurnCache()
+                    self.schedulePageTurnPrewarm()
                 }
             }
         }
@@ -588,6 +637,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 guard let self else { return }
                 _ = self.pageTurnStateMachine.finishCancellation(generation: generation)
                 self.cleanupPageTurn(cancelPreparedSurface: true)
+                self.schedulePageTurnPrewarm()
             }
             return
         }
@@ -603,6 +653,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             model.pageSurfaceProvider?.cancel(surface: surface)
         }
         activePageSurface = nil
+        activeTargetComposite = nil
         pageTurnAnimator?.remove()
         pageTurnAnimator = nil
         chromeView.setPageHeaderHiddenForTransition(false)
@@ -610,6 +661,78 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pendingPanTranslationX = 0
         pendingPanVelocityX = 0
         pendingPanDidEnd = false
+        panHasStartedTurn = false
+        isBoundaryResistanceTurn = false
+    }
+
+    private func startPageTurnFromPanIfNeeded() {
+        guard !panHasStartedTurn else { return }
+        let horizontalIntent = abs(pendingPanTranslationX) > 2
+            ? pendingPanTranslationX
+            : pendingPanVelocityX
+        guard abs(horizontalIntent) > 0 else { return }
+        panHasStartedTurn = true
+        let edge: PageTurnEdge = horizontalIntent < 0 ? .right : .left
+        let direction = PageTurnMetrics.pageDirection(
+            for: edge,
+            readingDirection: model.pageSurfaceProvider?.readingDirection ?? .leftToRight
+        )
+        startPageTurn(direction: direction, interactive: true)
+    }
+
+    private func schedulePageTurnPrewarm() {
+        guard isViewLoaded, view.window != nil, isCustomPageTurnEnabled,
+              pageTurnStateMachine.state == .idle,
+              !adjacentSurfaceCacheIsWarm,
+              pageTurnPrewarmTask == nil,
+              let provider = model.pageSurfaceProvider,
+              snapshotHostView.bounds.width > 0,
+              snapshotHostView.bounds.height > 0 else { return }
+
+        pageTurnPrewarmTask?.cancel()
+        pageTurnPrewarmRevision &+= 1
+        let revision = pageTurnPrewarmRevision
+        pageTurnPrewarmTask = Task { @MainActor [weak self, weak provider] in
+            await Task.yield()
+            guard let self, let provider, !Task.isCancelled else { return }
+            await provider.prewarmAdjacentSurfaces()
+            guard revision == self.pageTurnPrewarmRevision else { return }
+            self.pageTurnPrewarmTask = nil
+            guard !Task.isCancelled, self.pageTurnStateMachine.state == .idle else { return }
+            self.adjacentSurfaceCacheIsWarm = true
+            if self.cachedCurrentComposite == nil,
+               let currentContent = self.makeCurrentContentSnapshot() {
+                self.cachedCurrentComposite = self.makeCompositeSurface(content: currentContent)
+            }
+        }
+    }
+
+    private func invalidatePageTurnCache() {
+        pageTurnPrewarmRevision &+= 1
+        pageTurnPrewarmTask?.cancel()
+        pageTurnPrewarmTask = nil
+        cachedCurrentComposite = nil
+        adjacentSurfaceCacheIsWarm = false
+        model.pageSurfaceProvider?.invalidatePreparedSurfaces()
+    }
+
+    private func performAfterCancellingPageTurn(
+        _ action: @escaping (ReaderViewController) -> Void
+    ) {
+        if pageTurnStateMachine.state == .committing, let committingTask = pageTurnTask {
+            committingTask.cancel()
+            pageTurnStateMachine.invalidate()
+            cleanupPageTurn(cancelPreparedSurface: true)
+            Task { @MainActor [weak self] in
+                await committingTask.value
+                guard let self else { return }
+                self.invalidatePageTurnCache()
+                action(self)
+            }
+            return
+        }
+        cancelPageTurn(animated: false)
+        action(self)
     }
 
     private func makeCurrentContentSnapshot() -> UIView? {

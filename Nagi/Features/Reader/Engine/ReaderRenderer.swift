@@ -165,6 +165,11 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         return surface
     }
 
+    func prewarmAdjacentSurfaces() async {
+        guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
+        await navigator.prewarmAdjacentPageSurfaces()
+    }
+
     func commit(surface: PageSurface) async -> Bool {
         guard let navigator = model.navigator,
               let prepared = preparedSurfaces.removeValue(forKey: surface.id) else {
@@ -198,6 +203,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             preparedSurfaces.removeAll()
             return
         }
+        navigator.invalidateAdjacentPageSurfaces()
         for prepared in preparedSurfaces.values {
             navigator.cancelAdjacentPage(prepared)
         }
