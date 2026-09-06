@@ -1263,7 +1263,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
             if pageTransition == .scroll {
                 onToggleControls?()
             } else {
-                let readingDirection: PageTurnReadingDirection = navigator.pageReadingProgression == .rtl
+                let readingDirection: PageTurnReadingDirection = self.navigator?.pageReadingProgression == .rtl
                     ? .rightToLeft
                     : .leftToRight
                 onPageTurnRequested?(
@@ -1274,7 +1274,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
             if pageTransition == .scroll {
                 onToggleControls?()
             } else {
-                let readingDirection: PageTurnReadingDirection = navigator.pageReadingProgression == .rtl
+                let readingDirection: PageTurnReadingDirection = self.navigator?.pageReadingProgression == .rtl
                     ? .rightToLeft
                     : .leftToRight
                 onPageTurnRequested?(

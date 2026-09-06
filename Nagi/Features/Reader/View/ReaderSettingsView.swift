@@ -176,7 +176,7 @@ struct MediumReaderSettingsView: View {
         .disabled(!canAdjust)
         .opacity(canAdjust ? 1 : 0.45)
         .accessibilityLabel("字号\(title)")
-        .accessibilityValue("当前字号 \(Int(currentSize.rounded())) 磅")
+        .accessibilityValue("当前字号 \(Int(model.preferences.fontSize.rounded())) 磅")
     }
 
     private var transitionMenu: some View {
