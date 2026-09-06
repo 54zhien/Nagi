@@ -138,6 +138,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     ) {
         let stateRevisionChanged = latestStateRevision != stateRevision
         let showsTitleChanged = latestShowsTitle != showsTitle
+        let cornerInsetsChanged = latestCornerInsets != cornerInsets
         latestStateRevision = stateRevision
         latestTitle = title
         latestTitleColor = titleColor
@@ -155,7 +156,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         view.backgroundColor = readerBackground
         snapshotHostView.fallbackBackgroundColor = readerBackground
         updateChrome()
-        if showsTitleChanged {
+        if showsTitleChanged || cornerInsetsChanged {
             view.setNeedsLayout()
         }
         if stateRevisionChanged {
@@ -257,9 +258,23 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func readableContentInsets(for systemInsets: UIEdgeInsets) -> UIEdgeInsets {
         var contentInsets = systemInsets
-        if latestShowsTitle {
-            contentInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
-        }
+        contentInsets.top += CGFloat(
+            ReaderLayoutMetrics.pageHeaderHeight
+                + ReaderLayoutMetrics.contentTopSpacing
+        )
+
+        let controlRadius = CGFloat(ReaderLayoutMetrics.chromeControlDiameter / 2)
+        let bottomControlCenter = max(
+            controlRadius,
+            max(
+                latestCornerInsets.bottomLeading.height,
+                latestCornerInsets.bottomTrailing.height
+            )
+        )
+        let controlClearance = bottomControlCenter
+            + controlRadius
+            + CGFloat(ReaderLayoutMetrics.contentBottomControlSpacing)
+        contentInsets.bottom = max(contentInsets.bottom, controlClearance)
         return contentInsets
     }
 

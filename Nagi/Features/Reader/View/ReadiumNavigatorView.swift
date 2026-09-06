@@ -20,8 +20,10 @@ struct ReadiumNavigatorView: UIViewControllerRepresentable {
         _ uiViewController: EPUBNavigatorViewController,
         context: Context
     ) {
-        guard !isReflowable else { return }
-        uiViewController.view.backgroundColor = UIColor(background)
+        uiViewController.applyNagiReaderBaseAppearance(
+            isReflowable: isReflowable,
+            fallbackBackground: UIColor(background)
+        )
     }
 }
 
@@ -38,7 +40,15 @@ extension EPUBNavigatorViewController {
             return
         }
 
-        applyNagiReaderBackground(fallbackBackground, to: view)
+        view.backgroundColor = fallbackBackground
+        view.isOpaque = true
+
+        for webView in makeNagiReaderWebViews(in: view) {
+            webView.isOpaque = false
+            webView.backgroundColor = fallbackBackground
+            webView.scrollView.backgroundColor = fallbackBackground
+            webView.underPageBackgroundColor = fallbackBackground
+        }
     }
 
     /// Applies an app-owned document override to the visible spread only.
@@ -168,25 +178,6 @@ private func evaluateNagiReaderJavaScript(_ script: String, in webView: WKWebVie
         webView.evaluateJavaScript(script) { _, _ in
             continuation.resume()
         }
-    }
-}
-
-private func applyNagiReaderBackground(_ background: UIColor, to view: UIView) {
-    view.backgroundColor = background
-    view.isOpaque = true
-
-    if let webView = view as? WKWebView {
-        webView.backgroundColor = background
-        webView.underPageBackgroundColor = background
-        webView.scrollView.backgroundColor = background
-    }
-
-    if let scrollView = view as? UIScrollView {
-        scrollView.backgroundColor = background
-    }
-
-    for subview in view.subviews {
-        applyNagiReaderBackground(background, to: subview)
     }
 }
 

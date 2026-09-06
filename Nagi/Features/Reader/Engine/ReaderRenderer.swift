@@ -1,4 +1,3 @@
-import ReadiumNavigator
 import SwiftUI
 import UIKit
 
@@ -72,10 +71,9 @@ final class ReadiumRenderer: ReaderRenderer {
         }
 
         return AnyView(
-            ReadiumReaderSurface(
-                model: model,
+            ReadiumNavigatorView(
                 navigator: navigator,
-                background: SwiftUI.Color(uiColor: backgroundColor),
+                background: Color(uiColor: backgroundColor),
                 isReflowable: model.isReflowable
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -136,33 +134,5 @@ final class ReadiumRenderer: ReaderRenderer {
     func readingPosition() -> ReadingPosition? {
         guard let locatorJSON = model.currentLocatorJSON else { return nil }
         return ReadingPosition(locatorJSON: locatorJSON)
-    }
-}
-
-private struct ReadiumReaderSurface: View {
-    let model: EPUBReaderModel
-    let navigator: EPUBNavigatorViewController
-    let background: SwiftUI.Color
-    let isReflowable: Bool
-
-    var body: some View {
-        ZStack {
-            ReadiumNavigatorView(
-                navigator: navigator,
-                background: background,
-                isReflowable: isReflowable
-            )
-            .accessibilityHidden(isReflowable && !model.isInitialSurfaceReady)
-
-            if isReflowable && !model.isInitialSurfaceReady {
-                background
-                    .ignoresSafeArea()
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
-        .onAppear {
-            model.navigatorDidMount()
-        }
     }
 }

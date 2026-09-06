@@ -52,7 +52,6 @@ final class EPUBReaderModel {
     private(set) var currentLocatorJSON: String?
     var progress = 0.0
     var tableOfContents: [EPUBTOCEntry] = []
-    private(set) var isInitialSurfaceReady = false
 
     var currentTOCEntryID: String? {
         guard let currentReadingHref else { return nil }
@@ -261,9 +260,6 @@ final class EPUBReaderModel {
             self.navigator = navigator
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
-            if !isReflowable {
-                isInitialSurfaceReady = true
-            }
             hasLoaded = true
 
             if currentReadingHref == nil, initialLocation == nil {
@@ -603,12 +599,6 @@ final class EPUBReaderModel {
         )
     }
 
-    func navigatorDidMount() {
-        guard isReflowable, !isInitialSurfaceReady else { return }
-        applyVisibleReaderBaseAppearance()
-        refreshVisibleReaderOverrides()
-    }
-
     /// Updates the visible spread before preloaded pages.
     private func refreshVisibleReaderOverrides(
         generation: UInt64? = nil
@@ -657,23 +647,7 @@ final class EPUBReaderModel {
                     guard self.latestPreferenceGeneration == generation else { return }
                 }
 
-                if await navigator.waitForNagiReaderReadiness(readinessScript) {
-                    if !self.isInitialSurfaceReady {
-                        self.isInitialSurfaceReady = true
-                        self.onStateChange?()
-                    }
-                    break
-                }
-            }
-
-            // Some publisher styles make computed-color validation stricter
-            // than the page actually requires. Never leave the native cover
-            // up indefinitely: every UIKit, WebKit, and document surface has
-            // already been forced to the resolved theme before this point.
-            if !self.isInitialSurfaceReady {
-                self.applyVisibleReaderBaseAppearance()
-                self.isInitialSurfaceReady = true
-                self.onStateChange?()
+                if await navigator.waitForNagiReaderReadiness(readinessScript) { break }
             }
 
             guard !Task.isCancelled,
@@ -916,14 +890,7 @@ final class EPUBReaderModel {
             const mutationKind = "\(mutationKind)";
 
             const normalizeColor = (value) => {
-                const probe = document.createElement("span");
-                probe.style.color = value;
-                probe.style.position = "fixed";
-                probe.style.visibility = "hidden";
-                document.body.appendChild(probe);
-                const normalized = getComputedStyle(probe).color;
-                probe.remove();
-                return normalized.replace(/\\s+/g, "").toLowerCase();
+                return value.replace(/\\s+/g, "").toLowerCase();
             };
 
             const approximately = (value, expected, tolerance) => {
@@ -1218,9 +1185,14 @@ extension EPUBReaderModel {
         } else {
             var fallbackSystemInsets = navigator.view.window?.safeAreaInsets
                 ?? navigator.view.safeAreaInsets
-            if showBookTitleInPageHeader {
-                fallbackSystemInsets.top += CGFloat(ReaderLayoutMetrics.pageHeaderHeight)
-            }
+            fallbackSystemInsets.top += CGFloat(
+                ReaderLayoutMetrics.pageHeaderHeight
+                    + ReaderLayoutMetrics.contentTopSpacing
+            )
+            let controlRadius = CGFloat(ReaderLayoutMetrics.chromeControlDiameter / 2)
+            fallbackSystemInsets.bottom = max(controlRadius, fallbackSystemInsets.bottom)
+                + controlRadius
+                + CGFloat(ReaderLayoutMetrics.contentBottomControlSpacing)
             contentInsets = fallbackSystemInsets
         }
         return ReaderContentInsetResolver.resolve(

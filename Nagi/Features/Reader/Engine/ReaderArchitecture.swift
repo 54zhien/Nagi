@@ -130,6 +130,9 @@ enum ReaderFontSize {
 enum ReaderLayoutMetrics {
     // ReaderChrome reserves this height above the content.
     static let pageHeaderHeight = 48.0
+    static let chromeControlDiameter = 48.0
+    static let contentTopSpacing = 16.0
+    static let contentBottomControlSpacing = 20.0
     static let fixedParagraphIndent = 2.0
 
     static let pageMarginBase = 24.0

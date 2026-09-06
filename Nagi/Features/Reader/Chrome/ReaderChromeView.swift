@@ -427,7 +427,7 @@ final class ReaderChromeView: UIView {
 }
 
 private enum ReaderChromeMetrics {
-    static let diameter: CGFloat = 48
+    static let diameter = CGFloat(ReaderLayoutMetrics.chromeControlDiameter)
     static let iconPointSize: CGFloat = 20
     static let headerHorizontalInset: CGFloat = 72
     static let exitTrailingInset: CGFloat = 24
