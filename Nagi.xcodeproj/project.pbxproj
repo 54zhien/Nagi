@@ -551,7 +551,7 @@
 			repositoryURL = "https://github.com/54zhien/swift-toolkit.git";
 			requirement = {
 				kind = revision;
-				revision = 9404417e52e7aaadf0b462ac78816a4faec48e94;
+				revision = 6ca2e04fdfac100e69eff1411476aa6b763cfb88;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
