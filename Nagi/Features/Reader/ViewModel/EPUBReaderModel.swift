@@ -97,6 +97,7 @@ final class EPUBReaderModel {
 
     var onToggleControls: (() -> Void)?
     var onSwipeStart: (() -> Void)?
+    var onPageTurnRequested: ((PageDirection) -> Void)?
     var onStateChange: (() -> Void)?
 
     private var publication: Publication?
@@ -341,16 +342,6 @@ final class EPUBReaderModel {
         flushReadingProgress()
     }
 
-    private func goLeft() {
-        guard let navigator else { return }
-        Task { await navigator.goLeft(options: .animated) }
-    }
-
-    private func goRight() {
-        guard let navigator else { return }
-        Task { await navigator.goRight(options: .animated) }
-    }
-
     func go(to entry: EPUBTOCEntry) {
         guard let navigator else { return }
         Task { await navigator.go(to: entry.link, options: .animated) }
@@ -431,6 +422,7 @@ final class EPUBReaderModel {
         navigator?.delegate = nil
         onToggleControls = nil
         onSwipeStart = nil
+        onPageTurnRequested = nil
     }
 
     private func loadTableOfContents(from publication: Publication) async {
@@ -1266,12 +1258,30 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         let width = self.navigator?.view.bounds.width ?? 0
         guard width > 0 else { return }
 
-        switch point.x / width {
-        case ..<0.25:
-            goLeft()
-        case 0.75...:
-            goRight()
-        default:
+        switch PageTurnMetrics.edgeHit(atX: point.x, screenWidth: width) {
+        case .left:
+            if pageTransition == .scroll {
+                onToggleControls?()
+            } else {
+                let readingDirection: PageTurnReadingDirection = navigator.pageReadingProgression == .rtl
+                    ? .rightToLeft
+                    : .leftToRight
+                onPageTurnRequested?(
+                    PageTurnMetrics.pageDirection(for: .left, readingDirection: readingDirection)
+                )
+            }
+        case .right:
+            if pageTransition == .scroll {
+                onToggleControls?()
+            } else {
+                let readingDirection: PageTurnReadingDirection = navigator.pageReadingProgression == .rtl
+                    ? .rightToLeft
+                    : .leftToRight
+                onPageTurnRequested?(
+                    PageTurnMetrics.pageDirection(for: .right, readingDirection: readingDirection)
+                )
+            }
+        case nil:
             onToggleControls?()
         }
     }

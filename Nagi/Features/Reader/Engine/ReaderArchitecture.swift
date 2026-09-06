@@ -437,12 +437,14 @@ protocol ReaderRenderer: AnyObject {
     var backgroundColor: UIColor { get }
     var contentColor: UIColor { get }
     var headerColor: UIColor { get }
+    var pageSurfaceProvider: (any PageSurfaceProvider)? { get }
     var onStateChange: (() -> Void)? { get set }
 
     func load() async
     func makeContentView(
         onToggleControls: @escaping () -> Void,
-        onSwipeStart: @escaping () -> Void
+        onSwipeStart: @escaping () -> Void,
+        onPageTurnRequested: @escaping (PageDirection) -> Void
     ) -> AnyView
     func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async
     func restoreFromForeground(isDark: Bool) async
@@ -515,11 +517,13 @@ final class ReaderEngine {
 
     func makeContentView(
         onToggleControls: @escaping () -> Void,
-        onSwipeStart: @escaping () -> Void
+        onSwipeStart: @escaping () -> Void,
+        onPageTurnRequested: @escaping (PageDirection) -> Void
     ) -> AnyView {
         renderer.makeContentView(
             onToggleControls: onToggleControls,
-            onSwipeStart: onSwipeStart
+            onSwipeStart: onSwipeStart,
+            onPageTurnRequested: onPageTurnRequested
         )
     }
 
@@ -618,6 +622,7 @@ final class ReaderViewModel {
     var contentColor: UIColor { engine.renderer.contentColor }
     var headerColor: UIColor { engine.renderer.headerColor }
     var isContentReady: Bool { engine.renderer.isContentReady }
+    var pageSurfaceProvider: (any PageSurfaceProvider)? { engine.renderer.pageSurfaceProvider }
 
     func loadIfNeeded() async {
         await engine.loadIfNeeded()
@@ -631,11 +636,13 @@ final class ReaderViewModel {
 
     func makeContentView(
         onToggleControls: @escaping () -> Void,
-        onSwipeStart: @escaping () -> Void
+        onSwipeStart: @escaping () -> Void,
+        onPageTurnRequested: @escaping (PageDirection) -> Void
     ) -> AnyView {
         return engine.makeContentView(
             onToggleControls: onToggleControls,
-            onSwipeStart: onSwipeStart
+            onSwipeStart: onSwipeStart,
+            onPageTurnRequested: onPageTurnRequested
         )
     }
 

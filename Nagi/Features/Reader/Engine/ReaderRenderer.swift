@@ -1,9 +1,11 @@
+import ReadiumNavigator
 import SwiftUI
 import UIKit
 
 @MainActor
-final class ReadiumRenderer: ReaderRenderer {
+final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     let model: EPUBReaderModel
+    private var preparedSurfaces: [UUID: NavigatorPageSurface] = [:]
 
     var onStateChange: (() -> Void)?
 
@@ -29,6 +31,11 @@ final class ReadiumRenderer: ReaderRenderer {
     var backgroundColor: UIColor { model.readerBackgroundUIColor }
     var contentColor: UIColor { model.readerContentUIColor }
     var headerColor: UIColor { model.readerContentUIColor }
+    var pageSurfaceProvider: (any PageSurfaceProvider)? { self }
+
+    var readingDirection: PageTurnReadingDirection {
+        model.navigator?.pageReadingProgression == .rtl ? .rightToLeft : .leftToRight
+    }
 
     func load() async {
         model.onStateChange = { [weak self] in self?.onStateChange?() }
@@ -38,10 +45,12 @@ final class ReadiumRenderer: ReaderRenderer {
 
     func makeContentView(
         onToggleControls: @escaping () -> Void,
-        onSwipeStart: @escaping () -> Void
+        onSwipeStart: @escaping () -> Void,
+        onPageTurnRequested: @escaping (PageDirection) -> Void
     ) -> AnyView {
         model.onToggleControls = onToggleControls
         model.onSwipeStart = onSwipeStart
+        model.onPageTurnRequested = onPageTurnRequested
 
         guard let navigator = model.navigator else {
             if let error = model.errorMessage {
@@ -85,6 +94,7 @@ final class ReadiumRenderer: ReaderRenderer {
     }
 
     func restoreFromForeground(isDark: Bool) async {
+        invalidatePreparedSurfaces()
         await model.restoreFromForeground(isDark: isDark)
         onStateChange?()
     }
@@ -102,27 +112,34 @@ final class ReadiumRenderer: ReaderRenderer {
         preferences: ReaderPreferences,
         commitBehavior: ReaderPreferenceCommitBehavior
     ) {
+        if preferences != model.readerPreferences {
+            invalidatePreparedSurfaces()
+        }
         model.apply(preferences: preferences, commitBehavior: commitBehavior)
         onStateChange?()
     }
 
     func updateSystemAppearance(isDark: Bool) {
+        invalidatePreparedSurfaces()
         model.updateSystemAppearance(isDark: isDark)
         onStateChange?()
     }
 
     func selectPreset(_ preset: ReaderThemePreset) {
+        invalidatePreparedSurfaces()
         model.apply(preset: preset)
         onStateChange?()
     }
 
     func tearDown() {
+        invalidatePreparedSurfaces()
         model.tearDown()
         model.onStateChange = nil
     }
 
     func selectChapter(at index: Int) {
         guard model.tableOfContents.indices.contains(index) else { return }
+        invalidatePreparedSurfaces()
         model.go(to: model.tableOfContents[index])
     }
 
@@ -134,5 +151,56 @@ final class ReadiumRenderer: ReaderRenderer {
     func readingPosition() -> ReadingPosition? {
         guard let locatorJSON = model.currentLocatorJSON else { return nil }
         return ReadingPosition(locatorJSON: locatorJSON)
+    }
+
+    func prepareAdjacentSurface(direction: PageDirection) async -> PageSurface? {
+        guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
+        let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
+        guard let prepared = await navigator.prepareAdjacentPage(direction: navigatorDirection) else {
+            return nil
+        }
+
+        let surface = PageSurface(direction: direction, view: prepared.view)
+        preparedSurfaces[surface.id] = prepared
+        return surface
+    }
+
+    func commit(surface: PageSurface) async -> Bool {
+        guard let navigator = model.navigator,
+              let prepared = preparedSurfaces.removeValue(forKey: surface.id) else {
+            return false
+        }
+        return await navigator.commitAdjacentPage(prepared)
+    }
+
+    func cancel(surface: PageSurface) {
+        guard let navigator = model.navigator,
+              let prepared = preparedSurfaces.removeValue(forKey: surface.id) else { return }
+        navigator.cancelAdjacentPage(prepared)
+    }
+
+    func navigateWithoutCustomTransition(direction: PageDirection) async -> Bool {
+        guard let navigator = model.navigator else { return false }
+        switch direction {
+        case .forward:
+            return await navigator.goForward(options: .none)
+        case .backward:
+            return await navigator.goBackward(options: .none)
+        }
+    }
+
+    func setBuiltInPageTurnInteractionEnabled(_ enabled: Bool) {
+        model.navigator?.isUserPageTurnInteractionEnabled = enabled
+    }
+
+    func invalidatePreparedSurfaces() {
+        guard let navigator = model.navigator else {
+            preparedSurfaces.removeAll()
+            return
+        }
+        for prepared in preparedSurfaces.values {
+            navigator.cancelAdjacentPage(prepared)
+        }
+        preparedSurfaces.removeAll()
     }
 }
