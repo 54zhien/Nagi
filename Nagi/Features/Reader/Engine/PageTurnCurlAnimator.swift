@@ -66,11 +66,11 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
               let curlFragmentFunction = library.makeFunction(name: "page_turn_curl_fragment")
         else { return nil }
 
+        let (vertices, indices) = Self.makeGrid()
         guard let targetImage = Self.snapshotImage(for: targetView),
               let currentImage = Self.snapshotImage(for: currentView),
               let targetTexture = Self.makeTexture(device: device, image: targetImage),
               let currentTexture = Self.makeTexture(device: device, image: currentImage),
-              let (vertices, indices) = Self.makeGrid(),
               let vertexBuffer = Self.makeBuffer(device: device, values: vertices),
               let indexBuffer = Self.makeBuffer(device: device, values: indices)
         else { return nil }
