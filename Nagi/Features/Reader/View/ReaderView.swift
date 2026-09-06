@@ -46,6 +46,9 @@ struct ReaderView: View {
             guard brightnessBeforeReader != nil else { return }
             UIScreen.main.brightness = CGFloat(min(max(newValue, 0), 1))
         }
+        .onChange(of: book.title) { _, _ in
+            model?.synchronizeBookTitle()
+        }
         .onDisappear {
             restoreSystemBrightness()
         }
@@ -180,21 +183,24 @@ private struct ReaderSessionView: View {
                 }
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .navigationTitle("主题与排版")
-            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        showSettings = false
-                    } label: {
-                        Image(systemName: "xmark")
-                            .frame(width: 44, height: 44)
-                            .contentShape(Circle())
+                    HStack(spacing: 12) {
+                        Button {
+                            showSettings = false
+                        } label: {
+                            Image(systemName: "xmark")
+                                .frame(width: 44, height: 44)
+                                .contentShape(Circle())
+                        }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle())
+                        .glassEffect(.regular.interactive(), in: Circle())
+                        .accessibilityLabel("关闭主题与排版")
+
+                        Text("主题与排版")
+                            .font(.headline)
                     }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle())
-                    .glassEffect(.regular.interactive(), in: Circle())
-                    .accessibilityLabel("关闭主题与排版")
                 }
                 .sharedBackgroundVisibility(.hidden)
             }

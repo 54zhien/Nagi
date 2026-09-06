@@ -585,6 +585,11 @@ final class ReaderViewModel {
         synchronize()
     }
 
+    func synchronizeBookTitle() {
+        title = book.title
+        stateRevision &+= 1
+    }
+
     func makeContentView(
         onToggleControls: @escaping () -> Void,
         onSwipeStart: @escaping () -> Void
@@ -738,7 +743,7 @@ final class ReaderViewModel {
 
     private func synchronize() {
         let renderer = engine.renderer
-        title = renderer.title
+        title = book.title
         isLoading = renderer.isLoading
         errorMessage = renderer.errorMessage
         currentChapterID = renderer.currentChapterID

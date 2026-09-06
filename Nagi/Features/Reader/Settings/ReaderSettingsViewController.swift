@@ -344,7 +344,7 @@ final class ReaderSettingsViewController: UIViewController {
             isLargerEnabled: largerIndex != currentFontIndex,
             smallerPointSize: IconMetrics.fontSmaller,
             largerPointSize: IconMetrics.fontLarger,
-            tintColor: accentColor,
+            tintColor: .label,
             accessibilityValue: accessibilityValue
         )
 
@@ -372,7 +372,7 @@ final class ReaderSettingsViewController: UIViewController {
         transitionControl.accessibilityValue = transition.label
         transitionControl.setPrimaryMenu(UIMenu(
             title: "翻页方式",
-            children: ReaderPageTransition.allCases.map { option in
+            children: ReaderPageTransition.allCases.reversed().map { option in
                 UIAction(
                     title: option.label,
                     image: UIImage(
@@ -406,7 +406,7 @@ final class ReaderSettingsViewController: UIViewController {
         appearanceControl.accessibilityValue = appearance.label
         appearanceControl.setPrimaryMenu(UIMenu(
             title: "外观模式",
-            children: ReaderAppearanceMode.allCases.map { option in
+            children: ReaderAppearanceMode.allCases.reversed().map { option in
                 UIAction(
                     title: option.label,
                     image: UIImage(
@@ -457,7 +457,7 @@ final class ReaderSettingsViewController: UIViewController {
             reduceMotion: latestReduceMotion,
             title: "自定义",
             cornerRadius: 24,
-            contentColor: accentColor
+            contentColor: .label
         )
     }
 

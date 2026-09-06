@@ -223,7 +223,10 @@ final class EPUBReaderModel {
             try Task.checkCancellation()
             activePublicationURL = readingURL
             self.publication = publication
-            title = publication.metadata.title ?? book.title
+            // The library title is user-editable and is the source of truth for
+            // reader chrome. Publication metadata must not restore the imported
+            // title after the user renames a book.
+            title = book.title
 
             let initialLocation: Locator?
             if let locatorJSON = book.readerLocatorJSON,

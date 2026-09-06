@@ -69,11 +69,17 @@ final class ReaderFontSizeStepperControl: UIControl {
             weight: .regular
         )
         smallerButton.setImage(
-            UIImage(systemName: "character", withConfiguration: smallerConfiguration),
+            UIImage(
+                systemName: "textformat.size.smaller.zh",
+                withConfiguration: smallerConfiguration
+            ),
             for: .normal
         )
         largerButton.setImage(
-            UIImage(systemName: "character", withConfiguration: largerConfiguration),
+            UIImage(
+                systemName: "textformat.size.larger.zh",
+                withConfiguration: largerConfiguration
+            ),
             for: .normal
         )
         smallerButton.tintColor = tintColor
