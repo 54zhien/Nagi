@@ -144,7 +144,7 @@ enum ReaderFontSize {
 
     static func nearestLevel(forScale scale: Double) -> Int {
         guard scale.isFinite else { return defaultLevel }
-        fontScales.indices.min {
+        return fontScales.indices.min {
             abs(fontScales[$0] - scale) < abs(fontScales[$1] - scale)
         } ?? defaultLevel
     }
