@@ -467,22 +467,32 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return
         }
 
-        // Taking a surface is deliberately synchronous. A confirmed edge gets
-        // resistance; preparing/failed surfaces preserve the release threshold
-        // and then use settled non-animated navigation instead of pretending
-        // the publication has ended. No WebKit work starts on the drag path.
+        // Taking a surface is deliberately synchronous. Only a confirmed edge
+        // gets resistance. Preparing/failed surfaces remain visually still,
+        // preserve the release threshold, and then use settled non-animated
+        // navigation instead of pretending the publication has ended. No
+        // WebKit work starts on the drag path.
         guard let surface = provider.takePreparedAdjacentSurface(direction: direction) else {
             let readiness = provider.adjacentSurfaceReadiness(direction: direction)
-            let destinationX = PageTurnMetrics.completionTranslationX(
-                containerWidth: snapshotHostView.bounds.width,
-                direction: direction,
-                readingDirection: provider.readingDirection
-            )
-            let boundaryAnimator = PageTurnBoundaryAnimator(
-                hostView: snapshotHostView,
-                currentView: makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry),
-                completionTranslationX: destinationX
-            )
+            let currentView = makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry)
+            let fallbackAnimator: any PageTurnAnimating
+            if readiness == .unavailable {
+                let destinationX = PageTurnMetrics.completionTranslationX(
+                    containerWidth: snapshotHostView.bounds.width,
+                    direction: direction,
+                    readingDirection: provider.readingDirection
+                )
+                fallbackAnimator = PageTurnBoundaryAnimator(
+                    hostView: snapshotHostView,
+                    currentView: currentView,
+                    completionTranslationX: destinationX
+                )
+            } else {
+                fallbackAnimator = PageTurnNoAnimationAnimator(
+                    hostView: snapshotHostView,
+                    currentView: currentView
+                )
+            }
             isBoundaryResistanceTurn = readiness == .unavailable
             isFallbackNavigationTurn = readiness != .unavailable
             activeTurnGeneration = generation
@@ -491,9 +501,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 pendingPanTranslationX = 0
                 pendingPanVelocityX = 0
             }
-            pageTurnAnimator = boundaryAnimator
+            pageTurnAnimator = fallbackAnimator
             chromeView.setPageHeaderHiddenForTransition(true)
-            guard boundaryAnimator.install() else {
+            guard fallbackAnimator.install() else {
                 pageTurnStateMachine.invalidate()
                 cleanupPageTurn(cancelPreparedSurface: false)
                 schedulePageTurnPrewarm()
