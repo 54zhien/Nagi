@@ -32,6 +32,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var panHasStartedTurn = false
     private var isBoundaryResistanceTurn = false
     private static let pageSurfaceResolutionBudget: UInt64 = 2_000_000_000
+    private static let pageSurfaceRecoveryBudget: UInt64 = 1_200_000_000
+    private static let pageSurfaceRecoveryAttempts = 3
 
     private var latestStateRevision = 0
     private var latestTitle: String
@@ -598,6 +600,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 guard let self else { return }
                 _ = self.pageTurnStateMachine.finishCancellation(generation: generation)
                 self.cleanupPageTurn(cancelPreparedSurface: true)
+                self.schedulePageTurnPrewarm()
             }
         }
     }
@@ -608,6 +611,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             guard finished else {
                 self.pageTurnStateMachine.invalidate()
                 self.cleanupPageTurn(cancelPreparedSurface: true)
+                self.schedulePageTurnPrewarm()
                 return
             }
             guard self.pageTurnStateMachine.beginCommitting(generation: generation),
@@ -659,11 +663,29 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     self.invalidatePageTurnCache()
                     self.schedulePageTurnPrewarm()
                 case .indeterminate:
-                    // An unknown locator is not a commit. Keep the last real
-                    // overlay and its reconciliation token in place; an
-                    // external owner can invalidate this generation and
-                    // start a fresh capture without exposing live WebKit.
-                    return
+                    // The provider could not prove either target or origin.
+                    // Converge to the navigator's actual visible state while
+                    // the immutable overlay remains mounted; never leave the
+                    // state machine permanently in `committing`.
+                    let recoveredImage = await self.recoverIndeterminatePageSurface(
+                        surface: surface,
+                        generation: generation,
+                        provider: provider
+                    )
+                    guard !Task.isCancelled else { return }
+                    guard self.pageTurnStateMachine.accepts(generation) else {
+                        self.finishQueuedExternalTakeover()
+                        return
+                    }
+
+                    provider.invalidatePreparedSurfaces()
+                    self.activePageSurface = nil
+                    _ = self.pageTurnStateMachine.finish(generation: generation)
+                    self.cleanupPageTurn(cancelPreparedSurface: false)
+                    if let recoveredImage {
+                        self.cachedCurrentImage = recoveredImage
+                    }
+                    self.schedulePageTurnPrewarm()
                 }
             }
         }
@@ -708,6 +730,59 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         // immutable overlay remains the only safe visual fact until an
         // external owner starts a new generation.
         return .indeterminate
+    }
+
+    /// Resolves an indeterminate commit without guessing whether the target
+    /// or origin won. The live navigator remains covered while its current
+    /// location and pixels settle. A generation check surrounds every await so
+    /// an external takeover or teardown can interrupt this bounded recovery.
+    private func recoverIndeterminatePageSurface(
+        surface: PageSurface,
+        generation: UInt,
+        provider: any PageSurfaceProvider
+    ) async -> UIImage? {
+        provider.discardReconciliation(for: surface)
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            &+ Self.pageSurfaceRecoveryBudget
+
+        for attempt in 0 ..< Self.pageSurfaceRecoveryAttempts {
+            guard !Task.isCancelled,
+                  pageTurnStateMachine.accepts(generation),
+                  pageTurnStateMachine.state == .committing,
+                  DispatchTime.now().uptimeNanoseconds < deadline else {
+                return nil
+            }
+
+            await model.waitForVisualUpdate(for: .full)
+            guard !Task.isCancelled,
+                  pageTurnStateMachine.accepts(generation),
+                  pageTurnStateMachine.state == .committing else {
+                return nil
+            }
+            await Task.yield()
+
+            if let image = makeCurrentContentSnapshot(),
+               model.engine.renderer.readingPosition() != nil {
+                return image
+            }
+
+            if attempt == 1 {
+                // Rebuild only the SwiftUI content host. The Readium
+                // navigator remains the source of truth and is not moved or
+                // navigated again during recovery.
+                rebuildReaderContentForRecovery()
+            }
+
+            try? await Task.sleep(nanoseconds: 50_000_000)
+        }
+
+        return nil
+    }
+
+    private func rebuildReaderContentForRecovery() {
+        guard let contentHostController else { return }
+        contentSignature = makeContentSignature()
+        contentHostController.rootView = makeContentRoot()
     }
 
     private func cancelPageTurn(animated: Bool) {
