@@ -5,7 +5,21 @@ import UIKit
 @MainActor
 final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     let model: EPUBReaderModel
-    private var preparedSurfaces: [UUID: NavigatorPageSurface] = [:]
+    private struct ActiveSurface {
+        let navigatorSurface: NavigatorPageSurface
+        let pageSurfaceID: UUID
+        let epoch: UInt64
+        var phase: Phase
+
+        enum Phase: Equatable {
+            case prepared
+            case committing
+            case reconciling
+        }
+    }
+
+    private var activeSurface: ActiveSurface?
+    private var surfaceEpoch: UInt64 = 0
 
     var onStateChange: (() -> Void)?
 
@@ -32,6 +46,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     var contentColor: UIColor { model.readerContentUIColor }
     var headerColor: UIColor { model.readerContentUIColor }
     var pageSurfaceProvider: (any PageSurfaceProvider)? { self }
+    var isPageSurfaceProviderReady: Bool { model.navigator != nil }
 
     var readingDirection: PageTurnReadingDirection {
         model.navigator?.pageReadingProgression == .rtl ? .rightToLeft : .leftToRight
@@ -132,7 +147,12 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func tearDown() {
-        invalidatePreparedSurfaces()
+        // Teardown is terminal: no caller can observe a later reconciliation,
+        // so terminate and discard every old transaction bookkeeping entry.
+        surfaceEpoch &+= 1
+        if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
+        model.navigator?.invalidateAdjacentPageSurfaces()
+        activeSurface = nil
         model.tearDown()
         model.onStateChange = nil
     }
@@ -153,15 +173,32 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         return ReadingPosition(locatorJSON: locatorJSON)
     }
 
-    func prepareAdjacentSurface(direction: PageDirection) async -> PageSurface? {
+    func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness {
+        guard model.pageTransition != .scroll, let navigator = model.navigator else {
+            return .unavailable
+        }
+        let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
+        return navigator.adjacentPageReadiness(direction: navigatorDirection)
+    }
+
+    func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface? {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
         let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
-        guard let prepared = await navigator.prepareAdjacentPage(direction: navigatorDirection) else {
+        guard let prepared = navigator.takePreparedAdjacentPage(direction: navigatorDirection) else {
             return nil
         }
 
-        let surface = PageSurface(direction: direction, view: prepared.view)
-        preparedSurfaces[surface.id] = prepared
+        let surface = PageSurface(
+            direction: direction,
+            image: prepared.image,
+            identity: prepared.identity
+        )
+        activeSurface = ActiveSurface(
+            navigatorSurface: prepared,
+            pageSurfaceID: surface.id,
+            epoch: surfaceEpoch,
+            phase: .prepared
+        )
         return surface
     }
 
@@ -170,18 +207,77 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         await navigator.prewarmAdjacentPageSurfaces()
     }
 
-    func commit(surface: PageSurface) async -> Bool {
-        guard let navigator = model.navigator,
-              let prepared = preparedSurfaces.removeValue(forKey: surface.id) else {
-            return false
+    func commit(surface: PageSurface) async -> PageSurfaceCommitResult {
+        guard var active = activeSurface,
+              active.pageSurfaceID == surface.id,
+              active.phase == .prepared else {
+            return .indeterminate
         }
-        return await navigator.commitAdjacentPage(prepared)
+        guard let navigator = model.navigator else {
+            activeSurface = nil
+            return .indeterminate
+        }
+        guard active.epoch == surfaceEpoch else {
+            navigator.cancelAdjacentPage(active.navigatorSurface)
+            activeSurface = nil
+            return .restored
+        }
+        active.phase = .committing
+        activeSurface = active
+        let result = await navigator.commitAdjacentPageResult(active.navigatorSurface)
+        guard active.epoch == surfaceEpoch,
+              activeSurface?.pageSurfaceID == surface.id,
+              activeSurface?.navigatorSurface === active.navigatorSurface else {
+            return .indeterminate
+        }
+        switch result {
+        case .committed:
+            activeSurface = nil
+            return .committed
+        case .restored:
+            activeSurface = nil
+            return .restored
+        case .indeterminate:
+            active.phase = .reconciling
+            activeSurface = active
+            return .indeterminate
+        }
+    }
+
+    func reconcile(
+        surface: PageSurface,
+        deadline: UInt64
+    ) async -> PageSurfaceCommitResult {
+        guard let navigator = model.navigator,
+              let active = activeSurface,
+              active.pageSurfaceID == surface.id,
+              active.phase == .reconciling else {
+            return .indeterminate
+        }
+        switch await navigator.reconcileAdjacentPageResult(
+            active.navigatorSurface,
+            deadline: deadline
+        ) {
+        case .committed:
+            activeSurface = nil
+            return .committed
+        case .restored:
+            activeSurface = nil
+            return .restored
+        case .indeterminate: return .indeterminate
+        }
+    }
+
+    func discardReconciliation(for surface: PageSurface) {
+        guard activeSurface?.pageSurfaceID == surface.id,
+              activeSurface?.phase == .reconciling else { return }
+        activeSurface = nil
     }
 
     func cancel(surface: PageSurface) {
-        guard let navigator = model.navigator,
-              let prepared = preparedSurfaces.removeValue(forKey: surface.id) else { return }
-        navigator.cancelAdjacentPage(prepared)
+        guard let active = activeSurface, active.pageSurfaceID == surface.id else { return }
+        model.navigator?.cancelAdjacentPage(active.navigatorSurface)
+        if active.phase == .prepared { activeSurface = nil }
     }
 
     func navigateWithoutCustomTransition(direction: PageDirection) async -> Bool {
@@ -199,14 +295,16 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func invalidatePreparedSurfaces() {
+        // External ownership changes invalidate the old token immediately.
+        // The old async task is generation/epoch-stale and must not block the
+        // new navigation or layout operation.
+        if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
+        surfaceEpoch &+= 1
         guard let navigator = model.navigator else {
-            preparedSurfaces.removeAll()
+            activeSurface = nil
             return
         }
         navigator.invalidateAdjacentPageSurfaces()
-        for prepared in preparedSurfaces.values {
-            navigator.cancelAdjacentPage(prepared)
-        }
-        preparedSurfaces.removeAll()
+        activeSurface = nil
     }
 }

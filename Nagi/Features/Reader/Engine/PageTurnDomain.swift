@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ReadiumNavigator
 import UIKit
 
 /// The logical direction of a page turn. The physical direction is derived
@@ -40,6 +41,15 @@ public enum PageTurnFallbackReason: String, Sendable {
     case memoryPressure
     case layoutInvalidated
     case unsupportedContent
+}
+
+/// Outcome of committing a detached page surface. `indeterminate` is a
+/// safety state: the transition must remain covered until the real navigator
+/// location can be reconciled.
+public enum PageSurfaceCommitResult: Equatable, Sendable {
+    case committed
+    case restored
+    case indeterminate
 }
 
 /// Values which affect gesture hit testing and the interactive decision.
@@ -174,15 +184,32 @@ public enum PageTurnMetrics {
 public final class PageSurface {
     public let id: UUID
     public let direction: PageDirection
-    public let view: UIView
+    /// Immutable pixels captured while the navigator was idle. Gesture code
+    /// must never retain or animate a live WebKit view.
+    public let image: UIImage
+    public let identity: NavigatorPageSurfaceIdentity
 
-    public init(id: UUID = UUID(), direction: PageDirection, view: UIView) {
-        self.id = id
-        self.direction = direction
-        self.view = view
+    /// UIKit animators consume detached views, so create a fresh image view
+    /// without exposing mutable renderer state.
+    public var view: UIImageView {
+        let view = UIImageView(image: image)
+        view.contentMode = .scaleToFill
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         view.isAccessibilityElement = false
+        return view
+    }
+
+    public init(
+        id: UUID = UUID(),
+        direction: PageDirection,
+        image: UIImage,
+        identity: NavigatorPageSurfaceIdentity
+    ) {
+        self.id = id
+        self.direction = direction
+        self.image = image
+        self.identity = identity
     }
 }
 
@@ -190,13 +217,23 @@ public final class PageSurface {
 @MainActor
 public protocol PageSurfaceProvider: AnyObject {
     var readingDirection: PageTurnReadingDirection { get }
+    /// True only while the renderer has an active navigator capable of
+    /// accepting a prepared surface. A provider object can exist during the
+    /// reader's loading phase, so object existence alone is insufficient.
+    var isPageSurfaceProviderReady: Bool { get }
 
     /// Populates detached adjacent-page snapshots while the reader is settled.
     /// Gesture handling must only consume this cache; it must never trigger
     /// WebKit navigation, layout, or snapshotting.
     func prewarmAdjacentSurfaces() async
-    func prepareAdjacentSurface(direction: PageDirection) async -> PageSurface?
-    func commit(surface: PageSurface) async -> Bool
+    func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness
+    func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface?
+    func commit(surface: PageSurface) async -> PageSurfaceCommitResult
+    func reconcile(
+        surface: PageSurface,
+        deadline: UInt64
+    ) async -> PageSurfaceCommitResult
+    func discardReconciliation(for surface: PageSurface)
     func cancel(surface: PageSurface)
     func navigateWithoutCustomTransition(direction: PageDirection) async -> Bool
     func setBuiltInPageTurnInteractionEnabled(_ enabled: Bool)

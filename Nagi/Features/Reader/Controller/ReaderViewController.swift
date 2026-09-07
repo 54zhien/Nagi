@@ -15,17 +15,23 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var pageTurnTask: Task<Void, Never>?
     private var pageTurnPrewarmTask: Task<Void, Never>?
     private var pageTurnPrewarmRevision: UInt = 0
-    private var cachedCurrentComposite: UIView?
-    private var activeTargetComposite: UIView?
-    private var adjacentSurfaceCacheIsWarm = false
+    /// Content pixels captured while idle. Keeping the source image separate
+    /// from the animator's temporary views prevents any live WebKit layer
+    /// from being reused during a turn.
+    private var cachedCurrentImage: UIImage?
+    private var activeTargetImage: UIImage?
     private var activePageSurface: PageSurface?
     private var pageTurnAnimator: (any PageTurnAnimating)?
+    private var externalTakeoverTask: Task<Void, Never>?
+    private var isExternalTakeoverActive = false
+    private var queuedExternalAction: ((ReaderViewController) -> Void)?
     private var activeTurnGeneration: UInt?
     private var pendingPanTranslationX: CGFloat = 0
     private var pendingPanVelocityX: CGFloat = 0
     private var pendingPanDidEnd = false
     private var panHasStartedTurn = false
     private var isBoundaryResistanceTurn = false
+    private static let pageSurfaceResolutionBudget: UInt64 = 2_000_000_000
 
     private var latestStateRevision = 0
     private var latestTitle: String
@@ -246,10 +252,13 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     func dismantle() {
         NotificationCenter.default.removeObserver(self)
+        externalTakeoverTask?.cancel()
+        externalTakeoverTask = nil
+        queuedExternalAction = nil
         cancelPageTurn(animated: false)
         pageTurnPrewarmTask?.cancel()
         pageTurnPrewarmTask = nil
-        cachedCurrentComposite = nil
+        cachedCurrentImage = nil
         model.pageSurfaceProvider?.setBuiltInPageTurnInteractionEnabled(true)
         panGestureRecognizer?.removeTarget(nil, action: nil)
         panGestureRecognizer?.delegate = nil
@@ -397,7 +406,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         model.preferences.pageTransition != .scroll
             && !latestReduceMotion
             && !UIAccessibility.isVoiceOverRunning
-            && model.pageSurfaceProvider != nil
+            && model.pageSurfaceProvider?.isPageSurfaceProviderReady == true
     }
 
     private func configurePageTurnInteraction() {
@@ -413,6 +422,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     }
 
     private func startPageTurn(direction: PageDirection, interactive: Bool) {
+        guard !isExternalTakeoverActive else { return }
         guard let provider = model.pageSurfaceProvider else { return }
         guard model.preferences.pageTransition != .scroll else {
             handleContentToggle()
@@ -420,9 +430,56 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return }
 
-        guard let currentComposite = cachedCurrentComposite else {
+        if latestReduceMotion || UIAccessibility.isVoiceOverRunning {
+            _ = pageTurnStateMachine.enterFallback(.unsupportedContent, generation: generation)
+            pageTurnTask?.cancel()
+            pageTurnTask = Task { @MainActor [weak self] in
+                guard let self else { return }
+                _ = await provider.navigateWithoutCustomTransition(direction: direction)
+                guard self.pageTurnStateMachine.accepts(generation) else { return }
+                _ = self.pageTurnStateMachine.finish(generation: generation)
+                self.activeTurnGeneration = nil
+            }
+            return
+        }
+
+        guard let currentImage = cachedCurrentImage else {
             pageTurnStateMachine.invalidate()
             schedulePageTurnPrewarm()
+            return
+        }
+
+        // Taking a surface is deliberately synchronous. If the idle prewarm
+        // has not produced a ready image yet, the gesture gets only the small
+        // boundary resistance; it never starts WebKit work on the touch path.
+        guard let surface = provider.takePreparedAdjacentSurface(direction: direction) else {
+            let destinationX = PageTurnMetrics.completionTranslationX(
+                containerWidth: snapshotHostView.bounds.width,
+                direction: direction,
+                readingDirection: provider.readingDirection
+            )
+            let boundaryAnimator = PageTurnBoundaryAnimator(
+                hostView: snapshotHostView,
+                currentView: makeCompositeSurface(contentImage: currentImage),
+                completionTranslationX: destinationX
+            )
+            isBoundaryResistanceTurn = true
+            activeTurnGeneration = generation
+            pendingPanDidEnd = !interactive
+            if !interactive {
+                pendingPanTranslationX = 0
+                pendingPanVelocityX = 0
+            }
+            pageTurnAnimator = boundaryAnimator
+            chromeView.setPageHeaderHiddenForTransition(true)
+            boundaryAnimator.install()
+            guard pageTurnStateMachine.beginInteractive(generation: generation) else {
+                cleanupPageTurn(cancelPreparedSurface: false)
+                return
+            }
+            schedulePageTurnPrewarm()
+            updateInteractivePageTurn()
+            finishInteractivePageTurnIfReady()
             return
         }
 
@@ -433,60 +490,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             pendingPanVelocityX = 0
         }
 
-        pageTurnTask?.cancel()
-        pageTurnTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-
-            if latestReduceMotion || UIAccessibility.isVoiceOverRunning {
-                _ = pageTurnStateMachine.enterFallback(.unsupportedContent, generation: generation)
-                _ = await provider.navigateWithoutCustomTransition(direction: direction)
-                _ = pageTurnStateMachine.finish(generation: generation)
-                activeTurnGeneration = nil
-                return
-            }
-
-            guard let surface = await provider.prepareAdjacentSurface(direction: direction) else {
-                guard pageTurnStateMachine.accepts(generation) else { return }
-                let destinationX = PageTurnMetrics.completionTranslationX(
-                    containerWidth: snapshotHostView.bounds.width,
-                    direction: direction,
-                    readingDirection: provider.readingDirection
-                )
-                let boundaryAnimator = PageTurnBoundaryAnimator(
-                    hostView: snapshotHostView,
-                    currentView: currentComposite,
-                    completionTranslationX: destinationX
-                )
-                isBoundaryResistanceTurn = true
-                pageTurnAnimator = boundaryAnimator
-                chromeView.setPageHeaderHiddenForTransition(true)
-                boundaryAnimator.install()
-                guard pageTurnStateMachine.beginInteractive(generation: generation) else {
-                    cleanupPageTurn(cancelPreparedSurface: false)
-                    return
-                }
-                updateInteractivePageTurn()
-                finishInteractivePageTurnIfReady()
-                return
-            }
-
-            guard !Task.isCancelled, pageTurnStateMachine.accepts(generation) else {
-                provider.cancel(surface: surface)
-                return
-            }
-
-            cachedCurrentComposite = nil
-            let targetComposite = makeCompositeSurface(content: surface.view)
-            activeTargetComposite = targetComposite
-            adjacentSurfaceCacheIsWarm = false
-            let readingDirection = provider.readingDirection
-            let destinationX = PageTurnMetrics.completionTranslationX(
-                containerWidth: snapshotHostView.bounds.width,
-                direction: direction,
-                readingDirection: readingDirection
-            )
-            let animator: any PageTurnAnimating
-            switch model.preferences.pageTransition {
+        let currentComposite = makeCompositeSurface(contentImage: currentImage)
+        let targetComposite = makeCompositeSurface(contentImage: surface.image)
+        activeTargetImage = surface.image
+        let readingDirection = provider.readingDirection
+        let destinationX = PageTurnMetrics.completionTranslationX(
+            containerWidth: snapshotHostView.bounds.width,
+            direction: direction,
+            readingDirection: readingDirection
+        )
+        let animator: any PageTurnAnimating
+        switch model.preferences.pageTransition {
             case .pageCurl:
                 animator = PageTurnCurlAnimator(
                     hostView: snapshotHostView,
@@ -524,25 +538,24 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     completionTranslationX: destinationX,
                     isDark: isDarkPageBackground
                 )
-            }
+        }
 
-            activePageSurface = surface
-            pageTurnAnimator = animator
-            chromeView.hideControlsForSwipe()
-            chromeView.setPageHeaderHiddenForTransition(true)
-            animator.install()
-            guard pageTurnStateMachine.beginInteractive(generation: generation) else {
-                cleanupPageTurn(cancelPreparedSurface: true)
-                return
-            }
+        activePageSurface = surface
+        pageTurnAnimator = animator
+        chromeView.hideControlsForSwipe()
+        chromeView.setPageHeaderHiddenForTransition(true)
+        animator.install()
+        guard pageTurnStateMachine.beginInteractive(generation: generation) else {
+            cleanupPageTurn(cancelPreparedSurface: true)
+            return
+        }
 
-            if interactive {
-                updateInteractivePageTurn()
-                finishInteractivePageTurnIfReady()
-            } else {
-                _ = pageTurnStateMachine.finish(with: .complete, generation: generation)
-                animatePageTurnCompletion(generation: generation)
-            }
+        if interactive {
+            updateInteractivePageTurn()
+            finishInteractivePageTurnIfReady()
+        } else {
+            _ = pageTurnStateMachine.finish(with: .complete, generation: generation)
+            animatePageTurnCompletion(generation: generation)
         }
     }
 
@@ -602,26 +615,103 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             }
 
             self.pageTurnTask = Task { @MainActor [weak self] in
-                let committed = await provider.commit(surface: surface)
-                guard let self, self.pageTurnStateMachine.accepts(generation) else { return }
-                if committed {
-                    let committedComposite = self.activeTargetComposite
+                let initialResult = await provider.commit(surface: surface)
+                guard let self, !Task.isCancelled else { return }
+                guard self.pageTurnStateMachine.accepts(generation) else {
+                    self.finishQueuedExternalTakeover()
+                    return
+                }
+                let result: PageSurfaceCommitResult
+                if initialResult == .indeterminate {
+                    result = await self.waitForPageSurfaceReconciliation(
+                        surface: surface,
+                        generation: generation,
+                        provider: provider
+                    )
+                } else {
+                    result = initialResult
+                }
+
+                guard !Task.isCancelled else { return }
+                guard self.pageTurnStateMachine.accepts(generation) else {
+                    self.finishQueuedExternalTakeover()
+                    return
+                }
+                switch result {
+                case .committed:
+                    // Only a proven target locator may replace the cached
+                    // current image and remove the transition cover.
+                    let committedImage = self.activeTargetImage
                     self.activePageSurface = nil
                     _ = self.pageTurnStateMachine.finish(generation: generation)
                     self.cleanupPageTurn(cancelPreparedSurface: false)
-                    self.cachedCurrentComposite = committedComposite
+                    self.cachedCurrentImage = committedImage
                     self.schedulePageTurnPrewarm()
-                } else {
-                    self.pageTurnStateMachine.invalidate()
+                case .restored:
+                    // The navigator is proven back at origin. Never expose
+                    // the target pixels as the new current page.
+                    self.activePageSurface = nil
+                    _ = self.pageTurnStateMachine.finish(generation: generation)
                     self.cleanupPageTurn(cancelPreparedSurface: false)
                     self.invalidatePageTurnCache()
                     self.schedulePageTurnPrewarm()
+                case .indeterminate:
+                    // An unknown locator is not a commit. Keep the last real
+                    // overlay and its reconciliation token in place; an
+                    // external owner can invalidate this generation and
+                    // start a fresh capture without exposing live WebKit.
+                    return
                 }
             }
         }
     }
 
+    private func waitForPageSurfaceReconciliation(
+        surface: PageSurface,
+        generation: UInt,
+        provider: any PageSurfaceProvider
+    ) async -> PageSurfaceCommitResult {
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            &+ Self.pageSurfaceResolutionBudget
+        return await performPageSurfaceReconciliation(
+            surface: surface,
+            generation: generation,
+            provider: provider,
+            deadline: deadline
+        )
+    }
+
+    private func performPageSurfaceReconciliation(
+        surface: PageSurface,
+        generation: UInt,
+        provider: any PageSurfaceProvider,
+        deadline: UInt64
+    ) async -> PageSurfaceCommitResult {
+        func stillValid() -> Bool {
+            !Task.isCancelled
+                && DispatchTime.now().uptimeNanoseconds < deadline
+                && pageTurnStateMachine.accepts(generation)
+                && pageTurnStateMachine.state == .committing
+        }
+
+        guard stillValid() else {
+            return .indeterminate
+        }
+        let result = await provider.reconcile(surface: surface, deadline: deadline)
+        if result != .indeterminate {
+            return result
+        }
+        // An unresolved locator is deliberately left covered. The active
+        // immutable overlay remains the only safe visual fact until an
+        // external owner starts a new generation.
+        return .indeterminate
+    }
+
     private func cancelPageTurn(animated: Bool) {
+        if pageTurnStateMachine.state == .committing {
+            abortCommittingPageTurn(preserveOverlay: false)
+            return
+        }
         pageTurnTask?.cancel()
         pageTurnTask = nil
 
@@ -651,9 +741,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pageTurnTask = nil
         if cancelPreparedSurface, let surface = activePageSurface {
             model.pageSurfaceProvider?.cancel(surface: surface)
+            model.pageSurfaceProvider?.discardReconciliation(for: surface)
         }
         activePageSurface = nil
-        activeTargetComposite = nil
+        activeTargetImage = nil
         pageTurnAnimator?.remove()
         pageTurnAnimator = nil
         chromeView.setPageHeaderHiddenForTransition(false)
@@ -683,11 +774,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private func schedulePageTurnPrewarm() {
         guard isViewLoaded, view.window != nil, isCustomPageTurnEnabled,
               pageTurnStateMachine.state == .idle,
-              !adjacentSurfaceCacheIsWarm,
               pageTurnPrewarmTask == nil,
               let provider = model.pageSurfaceProvider,
               snapshotHostView.bounds.width > 0,
-              snapshotHostView.bounds.height > 0 else { return }
+              snapshotHostView.bounds.height > 0,
+              cachedCurrentImage == nil
+                || provider.adjacentSurfaceReadiness(direction: .forward) != .ready
+                || provider.adjacentSurfaceReadiness(direction: .backward) != .ready
+        else { return }
 
         pageTurnPrewarmTask?.cancel()
         pageTurnPrewarmRevision &+= 1
@@ -699,49 +793,104 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             guard revision == self.pageTurnPrewarmRevision else { return }
             self.pageTurnPrewarmTask = nil
             guard !Task.isCancelled, self.pageTurnStateMachine.state == .idle else { return }
-            self.adjacentSurfaceCacheIsWarm = true
-            if self.cachedCurrentComposite == nil,
+            if self.cachedCurrentImage == nil,
                let currentContent = self.makeCurrentContentSnapshot() {
-                self.cachedCurrentComposite = self.makeCompositeSurface(content: currentContent)
+                self.cachedCurrentImage = currentContent
             }
         }
     }
 
     private func invalidatePageTurnCache() {
+        // A committing fork transaction owns the navigator until it reports
+        // committed/restored or reconciliation proves a safe outcome.
+        guard pageTurnStateMachine.state != .committing else { return }
         pageTurnPrewarmRevision &+= 1
         pageTurnPrewarmTask?.cancel()
         pageTurnPrewarmTask = nil
-        cachedCurrentComposite = nil
-        adjacentSurfaceCacheIsWarm = false
+        cachedCurrentImage = nil
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
     }
 
     private func performAfterCancellingPageTurn(
         _ action: @escaping (ReaderViewController) -> Void
     ) {
-        if pageTurnStateMachine.state == .committing, let committingTask = pageTurnTask {
-            committingTask.cancel()
-            pageTurnStateMachine.invalidate()
-            cleanupPageTurn(cancelPreparedSurface: true)
-            Task { @MainActor [weak self] in
-                await committingTask.value
-                guard let self else { return }
-                self.invalidatePageTurnCache()
-                action(self)
-            }
+        if isExternalTakeoverActive {
+            queuedExternalAction = action
+            return
+        }
+        if pageTurnStateMachine.state == .committing {
+            abortCommittingPageTurn(preserveOverlay: true)
+            queuedExternalAction = action
             return
         }
         cancelPageTurn(animated: false)
         action(self)
     }
 
-    private func makeCurrentContentSnapshot() -> UIView? {
-        guard let contentView = contentHostController?.view else { return nil }
-        contentView.layoutIfNeeded()
-        return contentView.snapshotView(afterScreenUpdates: false)
+    /// External ownership changes invalidate the old generation immediately.
+    /// Keep the last real immutable cover over the live navigator until the
+    /// new owner reports a stable visual update.
+    private func abortCommittingPageTurn(preserveOverlay: Bool) {
+        if let surface = activePageSurface {
+            model.pageSurfaceProvider?.cancel(surface: surface)
+        }
+        if !preserveOverlay {
+            pageTurnTask?.cancel()
+        }
+        pageTurnStateMachine.invalidate()
+        externalTakeoverTask?.cancel()
+        externalTakeoverTask = nil
+        isExternalTakeoverActive = preserveOverlay
+        model.pageSurfaceProvider?.invalidatePreparedSurfaces()
+        if !preserveOverlay {
+            cleanupPageTurn(cancelPreparedSurface: false)
+            schedulePageTurnPrewarm()
+        }
     }
 
-    private func makeCompositeSurface(content: UIView) -> UIView {
+    private func finishQueuedExternalTakeover() {
+        guard isExternalTakeoverActive else { return }
+        let action = queuedExternalAction
+        queuedExternalAction = nil
+        action?(self)
+        resolveExternalTakeover()
+    }
+
+    private func resolveExternalTakeover() {
+        externalTakeoverTask?.cancel()
+        externalTakeoverTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.model.waitForVisualUpdate(for: .full)
+            guard !Task.isCancelled, self.isExternalTakeoverActive else { return }
+            await Task.yield()
+            guard !Task.isCancelled, self.isExternalTakeoverActive else { return }
+            let stableImage = self.makeCurrentContentSnapshot()
+            self.isExternalTakeoverActive = false
+            self.cleanupPageTurn(cancelPreparedSurface: false)
+            if let stableImage {
+                self.cachedCurrentImage = stableImage
+            }
+            self.externalTakeoverTask = nil
+            self.schedulePageTurnPrewarm()
+        }
+    }
+
+    private func makeCurrentContentSnapshot() -> UIImage? {
+        guard let contentView = contentHostController?.view else { return nil }
+        contentView.layoutIfNeeded()
+        let bounds = contentView.bounds.integral
+        guard bounds.width > 0, bounds.height > 0 else { return nil }
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = view.window?.windowScene?.screen.scale ?? UIScreen.main.scale
+        format.opaque = true
+        return UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
+            latestReaderBackground.setFill()
+            UIRectFill(bounds)
+            contentView.drawHierarchy(in: bounds, afterScreenUpdates: false)
+        }
+    }
+
+    private func makeCompositeSurface(contentImage: UIImage) -> UIView {
         let composite = UIView(frame: snapshotHostView.bounds)
         composite.backgroundColor = latestReaderBackground
         composite.isOpaque = true
@@ -749,8 +898,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         composite.accessibilityElementsHidden = true
         composite.isAccessibilityElement = false
 
+        let content = UIImageView(image: contentImage)
+        content.contentMode = .scaleToFill
         content.frame = composite.bounds
         content.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        content.isUserInteractionEnabled = false
         composite.addSubview(content)
         if let header = chromeView.makePageHeaderSnapshot(in: snapshotHostView) {
             composite.addSubview(header)
