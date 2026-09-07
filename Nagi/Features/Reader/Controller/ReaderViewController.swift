@@ -504,14 +504,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     completionTranslationX: destinationX,
                     direction: direction,
                     isDark: isDarkPageBackground
-                ) ?? PageTurnVisualAnimator(
-                    style: .cover,
+                ) ?? PageTurnNoAnimationAnimator(
                     hostView: snapshotHostView,
-                    currentView: currentComposite,
-                    targetView: targetComposite,
-                    direction: direction,
-                    completionTranslationX: destinationX,
-                    isDark: isDarkPageBackground
+                    currentView: currentComposite
                 )
             case .fade:
                 animator = PageTurnVisualAnimator(

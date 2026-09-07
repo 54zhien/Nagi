@@ -29,7 +29,9 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
     private let hostView: UIView
     private let metalView: MTKView
+    private let fallbackCurrentView: UIView
     private let commandQueue: MTLCommandQueue
+    private let depthState: MTLDepthStencilState
     private let vertexBuffer: MTLBuffer
     private let indexBuffer: MTLBuffer
     private let indexCount: Int
@@ -58,6 +60,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     // GPU errors can arrive after encoding. Defer a successful completion
     // until the final submitted frame has completed successfully.
     private var renderFailure = false
+    private var drawableRetryCount = 0
     private var submittedFrameID: UInt64 = 0
     private var completedFrameID: UInt64 = 0
     private var pendingFrameID: UInt64?
@@ -118,15 +121,19 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         backDescriptor.vertexFunction = curlVertexFunction
         backDescriptor.fragmentFunction = backFragmentFunction
         backDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        backDescriptor.colorAttachments[0].isBlendingEnabled = true
-        backDescriptor.colorAttachments[0].rgbBlendOperation = .add
-        backDescriptor.colorAttachments[0].alphaBlendOperation = .add
-        backDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        backDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-        backDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        backDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
+        // The back face is an opaque paper sample. Disabling blending makes
+        // its projected overlap deterministic instead of relying on
+        // alpha-ordering that can vary between GPU families.
 
-        guard let targetPipeline = try? device.makeRenderPipelineState(descriptor: targetDescriptor),
+        targetDescriptor.depthAttachmentPixelFormat = .depth32Float
+        curlDescriptor.depthAttachmentPixelFormat = .depth32Float
+        backDescriptor.depthAttachmentPixelFormat = .depth32Float
+        let depthDescriptor = MTLDepthStencilDescriptor()
+        depthDescriptor.depthCompareFunction = .greater
+        depthDescriptor.isDepthWriteEnabled = true
+
+        guard let depthState = device.makeDepthStencilState(descriptor: depthDescriptor),
+              let targetPipeline = try? device.makeRenderPipelineState(descriptor: targetDescriptor),
               let curlPipeline = try? device.makeRenderPipelineState(descriptor: curlDescriptor),
               let backPipeline = try? device.makeRenderPipelineState(descriptor: backDescriptor)
         else { return nil }
@@ -138,6 +145,8 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.enableSetNeedsDisplay = true
         metalView.contentScaleFactor = scale
         metalView.drawableSize = CGSize(width: bounds.width * scale, height: bounds.height * scale)
+        metalView.depthStencilPixelFormat = .depth32Float
+        metalView.clearDepth = 0
         let maximumFramesPerSecond = hostView.window?.windowScene?.screen.maximumFramesPerSecond ?? 60
         metalView.preferredFramesPerSecond = min(120, maximumFramesPerSecond)
         // A transparent clear keeps a transient drawable failure from showing
@@ -150,7 +159,9 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
         self.hostView = hostView
         self.metalView = metalView
+        self.fallbackCurrentView = currentView
         self.commandQueue = commandQueue
+        self.depthState = depthState
         self.vertexBuffer = vertexBuffer
         self.indexBuffer = indexBuffer
         self.indexCount = indices.count
@@ -172,6 +183,18 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     func install() {
         animationRevision &+= 1
         stopAnimation()
+        drawableRetryCount = 0
+        fallbackCurrentView.frame = hostView.bounds
+        fallbackCurrentView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        fallbackCurrentView.isUserInteractionEnabled = false
+        fallbackCurrentView.layer.cornerCurve = .continuous
+        let configuredRadius = hostView.effectiveRadius(corner: .allCorners)
+        fallbackCurrentView.layer.cornerRadius = configuredRadius > 0
+            ? configuredRadius
+            : hostView.layer.cornerRadius
+        fallbackCurrentView.layer.masksToBounds = true
+        fallbackCurrentView.removeFromSuperview()
+        hostView.addSubview(fallbackCurrentView)
         metalView.frame = hostView.bounds
         metalView.contentScaleFactor = displayScale
         metalView.drawableSize = CGSize(
@@ -181,6 +204,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         metalView.removeFromSuperview()
         hostView.addSubview(metalView)
+        metalView.isHidden = false
         metalView.layer.zPosition = 0
         update(progress: 0)
     }
@@ -212,10 +236,12 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     func remove() {
         animationRevision &+= 1
         stopAnimation()
+        drawableRetryCount = 0
         pendingFrameID = nil
         pendingGPUCompletion = nil
         metalView.delegate = nil
         metalView.removeFromSuperview()
+        fallbackCurrentView.removeFromSuperview()
     }
 
     // A temporary zero size is normal while the view is detached or the scene
@@ -223,34 +249,54 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
 
     func draw(in view: MTKView) {
-        guard !renderFailure,
-              let descriptor = view.currentRenderPassDescriptor,
+        guard !renderFailure else { return }
+
+        // MTKView can temporarily have no drawable while the scene is
+        // presenting, rotating, or recovering from a missed frame. This is
+        // not a renderer failure and must not permanently disable the turn.
+        guard let descriptor = view.currentRenderPassDescriptor,
               let drawable = view.currentDrawable,
               let colorTexture = descriptor.colorAttachments[0].texture,
               colorTexture.pixelFormat == .bgra8Unorm,
               drawable.texture.pixelFormat == .bgra8Unorm,
-              let commandBuffer = commandQueue.makeCommandBuffer(),
-              let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor)
+              let commandBuffer = commandQueue.makeCommandBuffer()
         else {
-            renderFailure = true
+            scheduleDrawableRetry()
             return
         }
+        if let depthAttachment = descriptor.depthAttachment {
+            depthAttachment.loadAction = .clear
+            depthAttachment.storeAction = .dontCare
+            depthAttachment.clearDepth = 0
+        }
+        guard let encoder = commandBuffer.makeRenderCommandEncoder(descriptor: descriptor) else {
+            scheduleDrawableRetry()
+            return
+        }
+        drawableRetryCount = 0
+        encoder.setDepthStencilState(depthState)
 
         var uniforms = makeUniforms(side: 0)
         encoder.setRenderPipelineState(targetPipeline)
         encoder.setVertexBuffer(vertexBuffer, offset: 0, index: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
-        encoder.setFragmentTexture(pageDirection == .forward ? targetTexture : currentTexture, index: 0)
+        // The target is always the stable background. At progress == 0 the
+        // current page fully covers it; at progress == 1 the curled page has
+        // left the viewport and the target is already visible.
+        encoder.setFragmentTexture(targetTexture, index: 0)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: indexCount,
                                       indexType: .uint32, indexBuffer: indexBuffer,
                                       indexBufferOffset: 0)
 
+        // The fixed/front face is drawn first; the explicitly opaque back
+        // face then owns its folded projected band. The depth attachment
+        // additionally resolves self-overlap consistently on device GPUs.
         encoder.setRenderPipelineState(curlPipeline)
         uniforms = makeUniforms(side: 0)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
-        encoder.setFragmentTexture(pageDirection == .forward ? currentTexture : targetTexture, index: 0)
+        encoder.setFragmentTexture(currentTexture, index: 0)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: indexCount,
                                       indexType: .uint32, indexBuffer: indexBuffer,
                                       indexBufferOffset: 0)
@@ -259,7 +305,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         uniforms = makeUniforms(side: 1)
         encoder.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         encoder.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
-        encoder.setFragmentTexture(pageDirection == .forward ? currentTexture : targetTexture, index: 0)
+        encoder.setFragmentTexture(currentTexture, index: 0)
         encoder.drawIndexedPrimitives(type: .triangle, indexCount: indexCount,
                                       indexType: .uint32, indexBuffer: indexBuffer,
                                       indexBufferOffset: 0)
@@ -270,7 +316,10 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         commandBuffer.addCompletedHandler { [weak self] buffer in
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if buffer.status != .completed { self.renderFailure = true }
+                if buffer.status != .completed {
+                    self.renderFailure = true
+                    self.metalView.isHidden = true
+                }
                 self.completedFrameID = max(self.completedFrameID, frameID)
                 self.finishPendingGPUCompletionIfPossible()
             }
@@ -287,10 +336,11 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     }
 
     private var direction: Float {
-        let physicalCompletion: Float = completionTranslationX < 0 ? -1 : 1
-        // A backward turn brings the target sheet in from the opposite edge;
-        // a forward turn sends the current sheet toward its completion edge.
-        return pageDirection == .forward ? physicalCompletion : -physicalCompletion
+        // There is one physical direction source for both forward and
+        // backward turns. The provider already supplies the signed destination
+        // in container coordinates, so reversing it again for backward turns
+        // made RTL/reverse turns curl from the wrong edge.
+        completionTranslationX < 0 ? -1 : 1
     }
 
     private func beginDisplayLink(targetProgress: CGFloat, duration: TimeInterval,
@@ -325,7 +375,13 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         let completing = animationTargetProgress > 0
         stopAnimation()
         if !completing { cancellation?() }
-        else if renderFailure || submittedFrameID == 0 { completion?(false) }
+        else if renderFailure || submittedFrameID == 0 {
+            // The immutable current view remains underneath the Metal layer.
+            // A drawable/GPU failure therefore becomes a safe no-animation
+            // commit instead of abandoning the already accepted turn.
+            metalView.isHidden = true
+            completion?(true)
+        }
         else {
             pendingFrameID = submittedFrameID
             pendingGPUCompletion = completion
@@ -338,7 +394,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         let completion = pendingGPUCompletion
         self.pendingFrameID = nil
         pendingGPUCompletion = nil
-        completion?(!renderFailure)
+        completion?(true)
     }
 
     private func stopAnimation() {
@@ -346,6 +402,15 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         displayLink = nil
         animationCompletion = nil
         cancellationCompletion = nil
+    }
+
+    private func scheduleDrawableRetry() {
+        guard drawableRetryCount < 3, metalView.superview != nil else { return }
+        drawableRetryCount += 1
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.renderFailure, self.metalView.superview != nil else { return }
+            self.metalView.draw()
+        }
     }
 
     private static func displayScale(for view: UIView) -> CGFloat {
@@ -410,5 +475,62 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
             guard let baseAddress = rawBuffer.baseAddress else { return nil }
             return device.makeBuffer(bytes: baseAddress, length: rawBuffer.count, options: [])
         }
+    }
+}
+
+/// Safe terminal path for a curl renderer that cannot be constructed (for
+/// example, Metal is unavailable or a pipeline/resource failed to compile).
+/// It intentionally does not substitute cover/fade: the last immutable
+/// current surface remains visible until the navigator commit completes.
+@MainActor
+final class PageTurnNoAnimationAnimator: PageTurnAnimating {
+    private let hostView: UIView
+    private let currentView: UIView
+    private var callbackToken: UInt = 0
+
+    init(hostView: UIView, currentView: UIView) {
+        self.hostView = hostView
+        self.currentView = currentView
+    }
+
+    func install() {
+        callbackToken &+= 1
+        currentView.frame = hostView.bounds
+        currentView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        currentView.isUserInteractionEnabled = false
+        currentView.layer.cornerCurve = .continuous
+        let configuredRadius = hostView.effectiveRadius(corner: .allCorners)
+        currentView.layer.cornerRadius = configuredRadius > 0
+            ? configuredRadius
+            : hostView.layer.cornerRadius
+        currentView.layer.masksToBounds = true
+        hostView.addSubview(currentView)
+    }
+
+    func update(progress: CGFloat) {}
+
+    func animateCompletion(completion: @escaping (Bool) -> Void) {
+        // Defer one run-loop turn so ReaderViewController can enter committing
+        // before it starts the safe, overlay-preserving provider commit.
+        callbackToken &+= 1
+        let token = callbackToken
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.callbackToken == token else { return }
+            completion(true)
+        }
+    }
+
+    func animateCancellation(completion: @escaping () -> Void) {
+        callbackToken &+= 1
+        let token = callbackToken
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.callbackToken == token else { return }
+            completion()
+        }
+    }
+
+    func remove() {
+        callbackToken &+= 1
+        currentView.removeFromSuperview()
     }
 }
