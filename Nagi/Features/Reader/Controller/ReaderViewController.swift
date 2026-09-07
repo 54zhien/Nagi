@@ -474,6 +474,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         // WebKit work starts on the drag path.
         guard let surface = provider.takePreparedAdjacentSurface(direction: direction) else {
             let readiness = provider.adjacentSurfaceReadiness(direction: direction)
+            if !interactive, readiness != .unavailable {
+                pageTurnStateMachine.invalidate()
+                navigateWithoutCustomTransition(direction: direction, provider: provider)
+                return
+            }
             let currentView = makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry)
             let fallbackAnimator: any PageTurnAnimating
             if readiness == .unavailable {
