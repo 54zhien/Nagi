@@ -1,3 +1,4 @@
+import ReadiumNavigator
 import SwiftUI
 import UIKit
 
