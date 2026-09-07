@@ -551,7 +551,7 @@
 			repositoryURL = "https://github.com/54zhien/swift-toolkit.git";
 			requirement = {
 				kind = revision;
-				revision = ac35f8675a55aaa35aa7fb90f058ed2219da4d7a;
+				revision = d99e363cdb6404dc11a743c9ffda4428f140dad1;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -758,7 +758,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 156;
+				CURRENT_PROJECT_VERSION = 157;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -784,7 +784,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 156;
+				CURRENT_PROJECT_VERSION = 157;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;

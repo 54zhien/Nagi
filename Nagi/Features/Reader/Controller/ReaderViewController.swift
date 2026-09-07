@@ -432,15 +432,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return }
 
         if latestReduceMotion || UIAccessibility.isVoiceOverRunning {
-            _ = pageTurnStateMachine.enterFallback(.unsupportedContent, generation: generation)
-            pageTurnTask?.cancel()
-            pageTurnTask = Task { @MainActor [weak self] in
-                guard let self else { return }
-                _ = await provider.navigateWithoutCustomTransition(direction: direction)
-                guard self.pageTurnStateMachine.accepts(generation) else { return }
-                _ = self.pageTurnStateMachine.finish(generation: generation)
-                self.activeTurnGeneration = nil
-            }
+            pageTurnStateMachine.invalidate()
+            navigateWithoutCustomTransition(direction: direction, provider: provider)
             return
         }
 
@@ -464,7 +457,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             )
             let boundaryAnimator = PageTurnBoundaryAnimator(
                 hostView: snapshotHostView,
-                currentView: makeCompositeSurface(contentImage: currentImage),
+                currentView: makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry),
                 completionTranslationX: destinationX
             )
             isBoundaryResistanceTurn = readiness == .unavailable
@@ -519,8 +512,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             pendingPanVelocityX = 0
         }
 
-        let currentComposite = makeCompositeSurface(contentImage: currentImage)
-        let targetComposite = makeCompositeSurface(contentImage: surface.image)
+        let currentComposite = makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry)
+        let targetComposite = makeCompositeSurface(contentImage: surface.image, geometry: surface.geometry)
         activeTargetImage = surface.image
         let readingDirection = provider.readingDirection
         let destinationX = PageTurnMetrics.completionTranslationX(
@@ -1011,7 +1004,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
     }
 
-    private func makeCompositeSurface(contentImage: UIImage) -> UIView {
+    private func makeCompositeSurface(
+        contentImage: UIImage,
+        geometry: NavigatorPageSurfaceGeometry
+    ) -> UIView {
         let composite = UIView(frame: snapshotHostView.bounds)
         composite.backgroundColor = latestReaderBackground
         composite.isOpaque = true
@@ -1021,8 +1017,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         let content = UIImageView(image: contentImage)
         content.contentMode = .center
-        content.frame = composite.bounds
-        content.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        content.frame = geometry.contentRect
         content.isUserInteractionEnabled = false
         composite.addSubview(content)
         if let header = chromeView.makePageHeaderSnapshot(in: snapshotHostView) {
@@ -1047,8 +1042,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             && equal(current.contentRect.height, target.contentRect.height)
             && equal(current.contentRect.minX, target.contentRect.minX)
             && equal(current.contentRect.minY, target.contentRect.minY)
-            && equal(current.pointSize.width, viewportSize.width)
-            && equal(current.pointSize.height, viewportSize.height)
+            && equal(current.pointSize.width, current.contentRect.width)
+            && equal(current.pointSize.height, current.contentRect.height)
+            && current.contentRect.minX >= -tolerance
+            && current.contentRect.minY >= -tolerance
+            && current.contentRect.maxX <= viewportSize.width + tolerance
+            && current.contentRect.maxY <= viewportSize.height + tolerance
     }
 
     private func navigateWithoutCustomTransition(
@@ -1058,7 +1057,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pageTurnTask?.cancel()
         pageTurnTask = Task { @MainActor [weak self] in
             _ = await provider.navigateWithoutCustomTransition(direction: direction)
-            guard let self else { return }
+            guard let self, !Task.isCancelled else { return }
             self.invalidatePageTurnCache()
             self.schedulePageTurnPrewarm()
         }
