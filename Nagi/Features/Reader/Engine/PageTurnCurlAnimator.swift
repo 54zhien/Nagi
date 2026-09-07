@@ -180,11 +180,14 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.delegate = self
     }
 
-    func install() {
+    @discardableResult
+    func install() -> Bool {
+        let bounds = hostView.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return false }
         animationRevision &+= 1
         stopAnimation()
         drawableRetryCount = 0
-        fallbackCurrentView.frame = hostView.bounds
+        fallbackCurrentView.frame = bounds
         fallbackCurrentView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         fallbackCurrentView.isUserInteractionEnabled = false
         fallbackCurrentView.layer.cornerCurve = .continuous
@@ -195,11 +198,11 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         fallbackCurrentView.layer.masksToBounds = true
         fallbackCurrentView.removeFromSuperview()
         hostView.addSubview(fallbackCurrentView)
-        metalView.frame = hostView.bounds
+        metalView.frame = bounds
         metalView.contentScaleFactor = displayScale
         metalView.drawableSize = CGSize(
-            width: max(1, hostView.bounds.width * displayScale),
-            height: max(1, hostView.bounds.height * displayScale)
+            width: max(1, bounds.width * displayScale),
+            height: max(1, bounds.height * displayScale)
         )
         metalView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         metalView.removeFromSuperview()
@@ -207,6 +210,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.isHidden = false
         metalView.layer.zPosition = 0
         update(progress: 0)
+        return true
     }
 
     func update(progress rawProgress: CGFloat) {
@@ -493,9 +497,12 @@ final class PageTurnNoAnimationAnimator: PageTurnAnimating {
         self.currentView = currentView
     }
 
-    func install() {
+    @discardableResult
+    func install() -> Bool {
+        let bounds = hostView.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return false }
         callbackToken &+= 1
-        currentView.frame = hostView.bounds
+        currentView.frame = bounds
         currentView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         currentView.isUserInteractionEnabled = false
         currentView.layer.cornerCurve = .continuous
@@ -505,6 +512,7 @@ final class PageTurnNoAnimationAnimator: PageTurnAnimating {
             : hostView.layer.cornerRadius
         currentView.layer.masksToBounds = true
         hostView.addSubview(currentView)
+        return true
     }
 
     func update(progress: CGFloat) {}

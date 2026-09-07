@@ -401,6 +401,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         model.preferences.pageTransition != .scroll
             && !latestReduceMotion
             && !UIAccessibility.isVoiceOverRunning
+            && !isExternalTakeoverActive
             && model.pageSurfaceProvider?.isPageSurfaceProviderReady == true
     }
 
@@ -467,8 +468,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             }
             pageTurnAnimator = boundaryAnimator
             chromeView.setPageHeaderHiddenForTransition(true)
-            boundaryAnimator.install()
+            guard boundaryAnimator.install() else {
+                pageTurnStateMachine.invalidate()
+                cleanupPageTurn(cancelPreparedSurface: false)
+                schedulePageTurnPrewarm()
+                return
+            }
             guard pageTurnStateMachine.beginInteractive(generation: generation) else {
+                pageTurnStateMachine.invalidate()
                 cleanupPageTurn(cancelPreparedSurface: false)
                 return
             }
@@ -534,8 +541,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pageTurnAnimator = animator
         chromeView.hideControlsForSwipe()
         chromeView.setPageHeaderHiddenForTransition(true)
-        animator.install()
+        guard animator.install() else {
+            pageTurnStateMachine.invalidate()
+            cleanupPageTurn(cancelPreparedSurface: true)
+            schedulePageTurnPrewarm()
+            return
+        }
         guard pageTurnStateMachine.beginInteractive(generation: generation) else {
+            pageTurnStateMachine.invalidate()
             cleanupPageTurn(cancelPreparedSurface: true)
             return
         }
@@ -699,7 +712,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func cancelPageTurn(animated: Bool) {
         if pageTurnStateMachine.state == .committing {
-            abortCommittingPageTurn(preserveOverlay: false)
+            abortCommittingPageTurn()
             return
         }
         pageTurnTask?.cancel()
@@ -809,7 +822,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return
         }
         if pageTurnStateMachine.state == .committing {
-            abortCommittingPageTurn(preserveOverlay: true)
+            abortCommittingPageTurn()
             queuedExternalAction = action
             return
         }
@@ -820,22 +833,20 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     /// External ownership changes invalidate the old generation immediately.
     /// Keep the last real immutable cover over the live navigator until the
     /// new owner reports a stable visual update.
-    private func abortCommittingPageTurn(preserveOverlay: Bool) {
+    private func abortCommittingPageTurn() {
         if let surface = activePageSurface {
             model.pageSurfaceProvider?.cancel(surface: surface)
-        }
-        if !preserveOverlay {
-            pageTurnTask?.cancel()
         }
         pageTurnStateMachine.invalidate()
         externalTakeoverTask?.cancel()
         externalTakeoverTask = nil
-        isExternalTakeoverActive = preserveOverlay
+        // A commit owns the navigator until its provider reports committed or
+        // restored. Keep the last immutable page mounted while cancellation,
+        // layout changes, settings changes, and external actions settle; the
+        // async commit task will start the takeover resolution once its state
+        // is no longer accepted by this generation.
+        isExternalTakeoverActive = true
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
-        if !preserveOverlay {
-            cleanupPageTurn(cancelPreparedSurface: false)
-            schedulePageTurnPrewarm()
-        }
     }
 
     private func finishQueuedExternalTakeover() {
@@ -861,6 +872,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 self.cachedCurrentImage = stableImage
             }
             self.externalTakeoverTask = nil
+            self.configurePageTurnInteraction()
             self.schedulePageTurnPrewarm()
         }
     }

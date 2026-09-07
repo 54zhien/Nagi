@@ -2,7 +2,10 @@ import UIKit
 
 @MainActor
 protocol PageTurnAnimating: AnyObject {
-    func install()
+    /// Installs the immutable overlay only when the host has a usable
+    /// viewport. A false result must never enter the interactive/commit path.
+    @discardableResult
+    func install() -> Bool
     func update(progress: CGFloat)
     func animateCompletion(completion: @escaping (Bool) -> Void)
     func animateCancellation(completion: @escaping () -> Void)
@@ -60,12 +63,13 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         self.isDark = isDark
     }
 
-    func install() {
+    @discardableResult
+    func install() -> Bool {
         invalidateAnimation()
         rootView.removeFromSuperview()
 
         let bounds = hostView.bounds
-        guard bounds.width > 0, bounds.height > 0 else { return }
+        guard bounds.width > 0, bounds.height > 0 else { return false }
 
         rootView.frame = bounds
         rootView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -148,16 +152,16 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         UIView.performWithoutAnimation {
             self.update(progress: 0)
         }
+        return true
     }
 
     func update(progress rawProgress: CGFloat) {
         progress = min(max(rawProgress.isFinite ? rawProgress : 0, 0), 1)
         guard rootView.superview != nil else { return }
 
-        applyCornerGeometry()
-
         switch style {
         case .cover:
+            applyCornerGeometry()
             updateCover()
         case .fade:
             updateFade()
@@ -211,16 +215,15 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     }
 
     private func updateFade() {
-        targetContainer.transform = .identity
-        currentContainer.transform = .identity
-        targetContainer.layer.shadowOpacity = 0
-        currentContainer.layer.shadowOpacity = 0
-        targetShadeView.alpha = 0
-        currentTintView.alpha = 0
-
-        // Both surfaces remain present for the entire transition. Animating
-        // alpha through the compositor avoids the intermittent blank frame
-        // produced when the old implementation changed hierarchy/visibility.
+        // Fade is deliberately a two-layer opacity-only transition. Geometry,
+        // shadows, and tint layers are configured once in `install`; touching
+        // them on every display-link tick used to make this mode compete with
+        // the cover animator and could expose a transient blank/black frame.
+        // Both immutable composites stay mounted for the complete turn.
+        // `UIView.alpha` is a compositor property and does not implicitly
+        // animate when assigned outside an animation block. When this method
+        // is called from `UIViewPropertyAnimator`, the same assignments are
+        // captured as the completion animation's endpoints.
         targetView.alpha = progress
         currentView.alpha = 1 - progress
     }
@@ -304,14 +307,18 @@ final class PageTurnBoundaryAnimator: PageTurnAnimating {
         self.completionTranslationX = completionTranslationX
     }
 
-    func install() {
-        currentView.frame = hostView.bounds
+    @discardableResult
+    func install() -> Bool {
+        let bounds = hostView.bounds
+        guard bounds.width > 0, bounds.height > 0 else { return false }
+        currentView.frame = bounds
         currentView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         currentView.layer.cornerCurve = .continuous
         currentView.layer.cornerRadius = hostView.layer.cornerRadius
         currentView.layer.masksToBounds = true
         hostView.addSubview(currentView)
         update(progress: 0)
+        return true
     }
 
     func update(progress rawProgress: CGFloat) {
