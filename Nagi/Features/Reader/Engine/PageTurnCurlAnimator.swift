@@ -354,8 +354,9 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     }
 
     private static func cornerRadius(for view: UIView, bounds: CGRect) -> Float {
-        let explicit = view.layer.cornerRadius
-        let radius = explicit > 0 ? explicit : min(bounds.width, bounds.height) * 0.04
+        let configured = view.effectiveRadius(corner: .allCorners)
+        let fallback = view.layer.cornerRadius
+        let radius = configured > 0 ? configured : fallback
         return Float(max(0, min(radius / max(bounds.height, 1), 0.5)))
     }
 

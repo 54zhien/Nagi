@@ -92,6 +92,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         view.backgroundColor = latestReaderBackground
         view.isOpaque = true
+        view.cornerConfiguration = .corners(radius: .containerConcentric())
+        view.layer.masksToBounds = true
         view.accessibilityLabel = "阅读器"
         view.accessibilityElementsHidden = false
 
@@ -120,6 +122,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         snapshotHostView.isUserInteractionEnabled = false
         snapshotHostView.accessibilityElementsHidden = true
         snapshotHostView.isAccessibilityElement = false
+        snapshotHostView.cornerConfiguration = .corners(radius: .containerConcentric())
+        snapshotHostView.layer.masksToBounds = true
         snapshotHostView.fallbackBackgroundColor = latestReaderBackground
         view.insertSubview(snapshotHostView, belowSubview: chromeView)
 
@@ -217,15 +221,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         snapshotHostView.frame = bounds
 
         let chromeSafeAreaInsets = view.safeAreaInsets
-        let inheritedCornerRadius = max(view.layer.cornerRadius, view.window?.layer.cornerRadius ?? 0)
-        let safeAreaDerivedRadius = max(chromeSafeAreaInsets.top, chromeSafeAreaInsets.bottom)
-        let pageCornerRadius = min(
-            max(inheritedCornerRadius, safeAreaDerivedRadius),
-            min(bounds.width, bounds.height) / 2
-        )
-        snapshotHostView.layer.cornerCurve = .continuous
-        snapshotHostView.layer.cornerRadius = pageCornerRadius
-        snapshotHostView.layer.masksToBounds = true
         let contentInsets = readableContentInsets(for: chromeSafeAreaInsets)
         let displayScale = view.window?.screen.scale ?? UIScreen.main.scale
         guard bounds != lastViewportBounds

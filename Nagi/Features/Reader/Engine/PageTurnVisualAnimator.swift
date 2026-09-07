@@ -82,6 +82,7 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         // fixed for the complete turn, including interactive and settling
         // phases.
         cornerRadius = Self.containerCornerRadius(for: hostView, bounds: bounds)
+        rootView.layer.cornerRadius = cornerRadius
         applyCornerGeometry()
         hostView.addSubview(rootView)
 
@@ -105,17 +106,13 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         currentContainer.layer.masksToBounds = false
         rootView.addSubview(currentContainer)
 
-        // The moving page is the top page in both directions: current page
-        // for a forward turn, previous/target page for a backward turn.
-        // Without this explicit ordering the backward page would remain below
-        // the current page and could never cover it.
-        if direction == .forward {
-            targetContainer.layer.zPosition = 0
-            currentContainer.layer.zPosition = 1
-        } else {
-            currentContainer.layer.zPosition = 0
-            targetContainer.layer.zPosition = 1
-        }
+        // The prepared target is always the moving sheet and always sits above
+        // the immutable current sheet.  Keeping this ordering identical in
+        // both directions is important: at progress == 0 the target is fully
+        // outside the viewport, while at progress == 1 it is the only sheet
+        // visible.  The live reader is never used as the moving layer.
+        currentContainer.layer.zPosition = 0
+        targetContainer.layer.zPosition = 1
 
         targetView.frame = targetContainer.bounds
         targetView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -187,42 +184,30 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     }
 
     private func updateCover() {
-        let isForward = direction == .forward
+        // Both forward and backward turns use the same physical model: the
+        // target page enters from its edge while the current page remains
+        // pixel-for-pixel fixed underneath.  `completionTranslationX` is the
+        // signed off-screen distance derived from the book direction, so this
+        // also handles RTL without a second set of geometry rules.
+        currentContainer.transform = .identity
+        targetContainer.transform = CGAffineTransform(
+            translationX: completionTranslationX * (1 - progress),
+            y: 0
+        )
+        currentTintView.alpha = 0
 
-        // Forward: the current page is the moving page and reveals the next
-        // page underneath. Backward: the previous page enters from the left
-        // and covers the current page; the current page never slides right.
-        if isForward {
-            targetContainer.transform = .identity
-            currentContainer.transform = CGAffineTransform(
-                translationX: completionTranslationX * progress,
-                y: 0
-            )
-            targetShadeView.alpha = 0
-            currentTintView.alpha = isDark ? 0.06 * pow(progress, 1.6) : 0
-            setShadow(
-                on: currentContainer,
-                opacity: 0.18 * (1 - progress),
-                leading: completionTranslationX > 0
-            )
-            targetContainer.layer.shadowOpacity = 0
-        } else {
-            currentContainer.transform = .identity
-            targetContainer.transform = CGAffineTransform(
-                translationX: -completionTranslationX * (1 - progress),
-                y: 0
-            )
-            currentTintView.alpha = 0
-            // A restrained shade gives the incoming page physical separation
-            // without the opaque red/black block caused by the old overlay.
-            targetShadeView.alpha = isDark ? 0.035 * (1 - progress) : 0.025 * (1 - progress)
-            setShadow(
-                on: targetContainer,
-                opacity: 0.16 * (1 - progress),
-                leading: completionTranslationX < 0
-            )
-            currentContainer.layer.shadowOpacity = 0
-        }
+        // Keep the overlay nearly neutral in light mode.  The page shadow is
+        // the separation cue; a broad opaque shade is what previously made
+        // the curl/cover transition look like a red or black rectangle.
+        targetShadeView.alpha = isDark ? 0.018 * (1 - progress) : 0.012 * (1 - progress)
+        currentContainer.layer.shadowOpacity = 0
+        setShadow(
+            on: targetContainer,
+            opacity: 0.20 * (1 - progress),
+            // A page arriving from the right casts its separation shadow to
+            // the left, and vice versa.
+            leading: completionTranslationX > 0
+        )
     }
 
     private func updateFade() {
@@ -295,13 +280,10 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     }
 
     private static func containerCornerRadius(for view: UIView, bounds: CGRect) -> CGFloat {
-        var candidate: CGFloat = 0
-        var current: UIView? = view
-        while let node = current {
-            candidate = max(candidate, node.layer.cornerRadius)
-            current = node.superview
-        }
-        return min(candidate, min(bounds.width, bounds.height) / 2)
+        let configured = view.effectiveRadius(corner: .allCorners)
+        let fallback = view.layer.cornerRadius
+        let radius = configured > 0 ? configured : fallback
+        return min(max(radius, 0), min(bounds.width, bounds.height) / 2)
     }
 }
 
