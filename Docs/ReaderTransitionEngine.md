@@ -16,8 +16,8 @@ ReaderViewController
 ├─ fixed controls
 └─ ReaderPageContainerViewController
    ├─ live Readium content
-   ├─ PageSurfaceHost
-   └─ PageTurnCoordinator
+      ├─ PageSurfaceHost
+      └─ PageTurnCoordinator
       ├─ CoverTransitionRenderer
       ├─ CurlMetalTransitionRenderer
       └─ FadeTransitionRenderer
@@ -30,15 +30,15 @@ Readium fork
 
 `PageSurface` contains the rendered document body, document background, moving book-title header, and future page number. Reader controls, the status bar, and the Home Indicator are not part of the surface.
 
-The committed Locator is immutable during an interactive turn. A candidate Locator becomes committed only after Readium reaches the target, the target document is visually ready, and the custom transition completes.
+Current and adjacent page pixels now come from the same Readium WebKit snapshot path. Every surface carries point size, pixel size, image scale, and content rect; incompatible geometry is rejected instead of stretched. The committed Locator is immutable during an interactive turn. On release, navigation and visual settling start together, and the overlay remains until both complete.
 
 ## MIGRATION
 
-1. Add the page-turn domain model, state machine, cache invalidation generations, and adaptive edge-tap metrics.
-2. Add a stable adjacent-surface and settled-navigation API to the Readium 3.11 fork.
-3. Implement cover turning with Core Animation. Validate commit, cancellation, chapter boundaries, RTL, interruption, and memory-pressure fallback.
-4. Implement the staggered fade renderer on the same surface pipeline.
-5. Implement the Metal curl renderer. Upload textures before interaction and update only uniforms while animating.
+1. Add the page-turn domain model, state machine, cache invalidation generations, and adaptive edge-tap metrics. **Implemented.**
+2. Add current/adjacent surfaces with explicit geometry plus settled navigation to the Readium 3.11 fork. **Implemented; device validation pending.**
+3. Implement cover turning with Core Animation and parallel navigator commit. **Implemented; 100-page device gate pending.**
+4. Implement the staggered fade renderer on the same surface pipeline. **Implemented; device validation pending.**
+5. Implement the Metal curl renderer without bitmap Y scaling; fall back to a short fade on Metal failure. **Implemented; device validation pending.**
 6. Add `ContinuousPaginationView` to the fork with a bounded WebView window, cached resource heights, anchor compensation, and Readium Locator conversion.
 7. Measure on 60 Hz and ProMotion hardware with Instruments. High refresh rate is an optimization target; interaction stability and reading-position correctness take priority.
 

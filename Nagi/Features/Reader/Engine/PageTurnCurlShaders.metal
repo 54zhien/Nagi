@@ -94,8 +94,8 @@ vertex PageTurnRasterizerData page_turn_curl_vertex(
             ? 1.0 - 2.0 * progress
             : -1.0 + 2.0 * progress;
         position.x = creaseX + direction * radius * sin(foldAngle);
-        position.y *= 1.0 - 0.075 * fold;
-        position.y += (inputVertex.uv.y - 0.5) * crease * 0.055;
+        // Preserve the page's vertical geometry. The cylinder projection
+        // bends in X/Z; scaling Y would visibly squash lines of text.
     }
 
     // Fixed/front paper sits above the target; the folded back receives a

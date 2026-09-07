@@ -63,9 +63,9 @@ public struct PageTurnConfiguration: Equatable, Sendable {
     public var flingVelocity: CGFloat
 
     public init(
-        edgeHitFraction: CGFloat = 0.12,
-        minimumEdgeHitWidth: CGFloat = 44,
-        maximumEdgeHitWidth: CGFloat = 60,
+        edgeHitFraction: CGFloat = 0.16,
+        minimumEdgeHitWidth: CGFloat = 52,
+        maximumEdgeHitWidth: CGFloat = 72,
         completionProgress: CGFloat = 0.26,
         flingVelocity: CGFloat = 700
     ) {
@@ -81,7 +81,7 @@ public struct PageTurnConfiguration: Equatable, Sendable {
 public enum PageTurnMetrics {
     public static let defaultConfiguration = PageTurnConfiguration()
 
-    /// Returns the width of either edge tap zone, clamped to 44...60pt.
+    /// Returns the width of either edge tap zone, clamped to 52...72pt.
     public static func edgeHitWidth(
         for screenWidth: CGFloat,
         configuration: PageTurnConfiguration = defaultConfiguration
@@ -188,12 +188,13 @@ public final class PageSurface {
     /// must never retain or animate a live WebKit view.
     public let image: UIImage
     public let identity: NavigatorPageSurfaceIdentity
+    public let geometry: NavigatorPageSurfaceGeometry
 
     /// UIKit animators consume detached views, so create a fresh image view
     /// without exposing mutable renderer state.
     public var view: UIImageView {
         let view = UIImageView(image: image)
-        view.contentMode = .scaleToFill
+        view.contentMode = .center
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         view.isAccessibilityElement = false
@@ -204,12 +205,14 @@ public final class PageSurface {
         id: UUID = UUID(),
         direction: PageDirection,
         image: UIImage,
-        identity: NavigatorPageSurfaceIdentity
+        identity: NavigatorPageSurfaceIdentity,
+        geometry: NavigatorPageSurfaceGeometry
     ) {
         self.id = id
         self.direction = direction
         self.image = image
         self.identity = identity
+        self.geometry = geometry
     }
 }
 
@@ -226,6 +229,7 @@ public protocol PageSurfaceProvider: AnyObject {
     /// Gesture handling must only consume this cache; it must never trigger
     /// WebKit navigation, layout, or snapshotting.
     func prewarmAdjacentSurfaces() async
+    func preparedCurrentSurface() -> NavigatorCurrentPageSurface?
     func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface?
     func commit(surface: PageSurface) async -> PageSurfaceCommitResult

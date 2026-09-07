@@ -30,6 +30,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     private let hostView: UIView
     private let metalView: MTKView
     private let fallbackCurrentView: UIView
+    private let fallbackTargetView: UIView
     private let commandQueue: MTLCommandQueue
     private let depthState: MTLDepthStencilState
     private let vertexBuffer: MTLBuffer
@@ -160,6 +161,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         self.hostView = hostView
         self.metalView = metalView
         self.fallbackCurrentView = currentView
+        self.fallbackTargetView = targetView
         self.commandQueue = commandQueue
         self.depthState = depthState
         self.vertexBuffer = vertexBuffer
@@ -198,6 +200,11 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         fallbackCurrentView.layer.masksToBounds = true
         fallbackCurrentView.removeFromSuperview()
         hostView.addSubview(fallbackCurrentView)
+        fallbackTargetView.frame = bounds
+        fallbackTargetView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        fallbackTargetView.isUserInteractionEnabled = false
+        fallbackTargetView.alpha = 0
+        fallbackTargetView.removeFromSuperview()
         metalView.frame = bounds
         metalView.contentScaleFactor = displayScale
         metalView.drawableSize = CGSize(
@@ -246,6 +253,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.delegate = nil
         metalView.removeFromSuperview()
         fallbackCurrentView.removeFromSuperview()
+        fallbackTargetView.removeFromSuperview()
     }
 
     // A temporary zero size is normal while the view is detached or the scene
@@ -380,11 +388,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         stopAnimation()
         if !completing { cancellation?() }
         else if renderFailure || submittedFrameID == 0 {
-            // The immutable current view remains underneath the Metal layer.
-            // A drawable/GPU failure therefore becomes a safe no-animation
-            // commit instead of abandoning the already accepted turn.
-            metalView.isHidden = true
-            completion?(true)
+            animateFadeFallback(completion: completion)
         }
         else {
             pendingFrameID = submittedFrameID
@@ -398,7 +402,30 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         let completion = pendingGPUCompletion
         self.pendingFrameID = nil
         pendingGPUCompletion = nil
-        completion?(true)
+        if renderFailure {
+            animateFadeFallback(completion: completion)
+        } else {
+            completion?(true)
+        }
+    }
+
+    private func animateFadeFallback(completion: ((Bool) -> Void)?) {
+        metalView.isHidden = true
+        if fallbackTargetView.superview == nil {
+            hostView.insertSubview(fallbackTargetView, aboveSubview: fallbackCurrentView)
+        }
+        fallbackTargetView.alpha = 0
+        fallbackCurrentView.alpha = 1
+        UIView.animate(
+            withDuration: 0.12,
+            delay: 0,
+            options: [.beginFromCurrentState, .curveEaseOut, .allowUserInteraction]
+        ) {
+            self.fallbackTargetView.alpha = 1
+            self.fallbackCurrentView.alpha = 0
+        } completion: { finished in
+            completion?(finished)
+        }
     }
 
     private func stopAnimation() {

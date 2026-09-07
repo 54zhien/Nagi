@@ -110,13 +110,16 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         currentContainer.layer.masksToBounds = false
         rootView.addSubview(currentContainer)
 
-        // The prepared target is always the moving sheet and always sits above
-        // the immutable current sheet.  Keeping this ordering identical in
-        // both directions is important: at progress == 0 the target is fully
-        // outside the viewport, while at progress == 1 it is the only sheet
-        // visible.  The live reader is never used as the moving layer.
-        currentContainer.layer.zPosition = 0
-        targetContainer.layer.zPosition = 1
+        switch style {
+        case .cover:
+            // The outgoing current sheet reveals the target behind it.
+            currentContainer.layer.zPosition = 1
+            targetContainer.layer.zPosition = 0
+        case .fade:
+            // The incoming sheet must composite above the fading current one.
+            currentContainer.layer.zPosition = 0
+            targetContainer.layer.zPosition = 1
+        }
 
         targetView.frame = targetContainer.bounds
         targetView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -188,29 +191,28 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     }
 
     private func updateCover() {
-        // Both forward and backward turns use the same physical model: the
-        // target page enters from its edge while the current page remains
-        // pixel-for-pixel fixed underneath.  `completionTranslationX` is the
-        // signed off-screen distance derived from the book direction, so this
-        // also handles RTL without a second set of geometry rules.
-        currentContainer.transform = .identity
-        targetContainer.transform = CGAffineTransform(
-            translationX: completionTranslationX * (1 - progress),
+        // The current sheet is the moving page. The target stays behind it
+        // and closes only a small parallax gap, preserving spatial continuity
+        // without making the incoming text travel a full screen width.
+        currentContainer.transform = CGAffineTransform(
+            translationX: completionTranslationX * progress,
             y: 0
         )
-        currentTintView.alpha = 0
+        targetContainer.transform = CGAffineTransform(
+            translationX: -completionTranslationX * 0.08 * (1 - progress),
+            y: 0
+        )
+        currentTintView.alpha = (isDark ? 0.018 : 0.012) * progress
 
         // Keep the overlay nearly neutral in light mode.  The page shadow is
         // the separation cue; a broad opaque shade is what previously made
         // the curl/cover transition look like a red or black rectangle.
-        targetShadeView.alpha = isDark ? 0.018 * (1 - progress) : 0.012 * (1 - progress)
-        currentContainer.layer.shadowOpacity = 0
+        targetShadeView.alpha = 0
+        targetContainer.layer.shadowOpacity = 0
         setShadow(
-            on: targetContainer,
+            on: currentContainer,
             opacity: 0.20 * (1 - progress),
-            // A page arriving from the right casts its separation shadow to
-            // the left, and vice versa.
-            leading: completionTranslationX > 0
+            leading: completionTranslationX < 0
         )
     }
 
@@ -224,8 +226,10 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         // animate when assigned outside an animation block. When this method
         // is called from `UIViewPropertyAnimator`, the same assignments are
         // captured as the completion animation's endpoints.
-        targetView.alpha = progress
-        currentView.alpha = 1 - progress
+        let targetProgress = min(1, progress / 0.55)
+        let currentProgress = min(1, max(0, (progress - 0.20) / 0.80))
+        targetView.alpha = targetProgress
+        currentView.alpha = 1 - currentProgress
     }
 
     private func setShadow(on container: UIView, opacity: CGFloat, leading: Bool) {

@@ -191,7 +191,8 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         let surface = PageSurface(
             direction: direction,
             image: prepared.image,
-            identity: prepared.identity
+            identity: prepared.identity,
+            geometry: prepared.geometry
         )
         activeSurface = ActiveSurface(
             navigatorSurface: prepared,
@@ -205,6 +206,10 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     func prewarmAdjacentSurfaces() async {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
         await navigator.prewarmAdjacentPageSurfaces()
+    }
+
+    func preparedCurrentSurface() -> NavigatorCurrentPageSurface? {
+        model.navigator?.preparedCurrentPageSurface()
     }
 
     func commit(surface: PageSurface) async -> PageSurfaceCommitResult {
