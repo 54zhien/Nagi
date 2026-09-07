@@ -2,6 +2,27 @@ import SwiftUI
 import UIKit
 
 @MainActor
+private final class PageTurnAnimationGate {
+    private var continuation: CheckedContinuation<Bool, Never>?
+    private var pendingResult: Bool?
+
+    func install(_ continuation: CheckedContinuation<Bool, Never>) {
+        if let pendingResult {
+            continuation.resume(returning: pendingResult)
+        } else {
+            self.continuation = continuation
+        }
+    }
+
+    func resolve(_ result: Bool) {
+        guard pendingResult == nil else { return }
+        pendingResult = result
+        continuation?.resume(returning: result)
+        continuation = nil
+    }
+}
+
+@MainActor
 final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate {
     private let model: ReaderViewModel
     private let readerTransitionCoordinator: ReaderTransitionCoordinator
@@ -33,6 +54,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var panHasStartedTurn = false
     private var isBoundaryResistanceTurn = false
     private var isFallbackNavigationTurn = false
+    private var fallbackNavigationRevision: UInt = 0
     private static let pageSurfaceResolutionBudget: UInt64 = 2_000_000_000
     private static let pageSurfaceRecoveryBudget: UInt64 = 1_200_000_000
     private static let pageSurfaceRecoveryAttempts = 3
@@ -430,6 +452,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return
         }
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return }
+        fallbackNavigationRevision &+= 1
 
         if latestReduceMotion || UIAccessibility.isVoiceOverRunning {
             pageTurnStateMachine.invalidate()
@@ -717,11 +740,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func finishPageTurnAnimation() async -> Bool {
         guard let pageTurnAnimator else { return false }
-        return await withCheckedContinuation { continuation in
-            pageTurnAnimator.animateCompletion { finished in
-                continuation.resume(returning: finished)
+        let gate = PageTurnAnimationGate()
+        return await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                gate.install(continuation)
+                pageTurnAnimator.animateCompletion { finished in
+                    gate.resolve(finished)
+                }
             }
-        }
+        }, onCancel: {
+            Task { @MainActor in gate.resolve(false) }
+        })
     }
 
     private func waitForPageSurfaceReconciliation(
@@ -1055,9 +1084,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         provider: any PageSurfaceProvider
     ) {
         pageTurnTask?.cancel()
+        fallbackNavigationRevision &+= 1
+        let revision = fallbackNavigationRevision
         pageTurnTask = Task { @MainActor [weak self] in
             _ = await provider.navigateWithoutCustomTransition(direction: direction)
-            guard let self, !Task.isCancelled else { return }
+            guard let self, !Task.isCancelled,
+                  revision == self.fallbackNavigationRevision else { return }
             self.invalidatePageTurnCache()
             self.schedulePageTurnPrewarm()
         }
