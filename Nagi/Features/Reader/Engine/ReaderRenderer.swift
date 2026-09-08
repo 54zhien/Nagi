@@ -285,7 +285,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
               let initialActive = activeSurface,
               initialActive.pageSurfaceID == surface.id,
               initialActive.phase == .reconciling else {
-            return .indeterminate
+            return await holdIndeterminateUntilCancelled()
         }
 
         var firstDeadline = deadline
@@ -296,7 +296,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
                   active.phase == .reconciling,
                   active.epoch == initialActive.epoch,
                   active.navigatorSurface === initialActive.navigatorSurface else {
-                return .indeterminate
+                return await holdIndeterminateUntilCancelled()
             }
 
             let now = DispatchTime.now().uptimeNanoseconds
@@ -320,6 +320,13 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
                 guard !Task.isCancelled else { return .indeterminate }
                 try? await Task.sleep(nanoseconds: 80_000_000)
             }
+        }
+        return .indeterminate
+    }
+
+    private func holdIndeterminateUntilCancelled() async -> PageSurfaceCommitResult {
+        while !Task.isCancelled {
+            try? await Task.sleep(nanoseconds: 100_000_000)
         }
         return .indeterminate
     }
