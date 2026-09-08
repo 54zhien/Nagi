@@ -173,6 +173,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             name: UIAccessibility.voiceOverStatusDidChangeNotification,
             object: nil
         )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(applicationDidBecomeActive),
+            name: UIApplication.didBecomeActiveNotification,
+            object: nil
+        )
 
         updateChrome()
         configurePageTurnInteraction()
@@ -256,7 +262,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return
         }
 
-        let viewportChanged = !lastViewportBounds.isNull && lastViewportBounds != bounds
+        let hadViewport = !lastViewportBounds.isNull
+        let viewportChanged = hadViewport && (
+            lastViewportBounds != bounds
+                || lastViewportContentInsets != contentInsets
+                || abs(lastViewportDisplayScale - displayScale) > 0.001
+        )
         lastViewportBounds = bounds
         lastViewportContentInsets = contentInsets
         lastViewportDisplayScale = displayScale
@@ -341,6 +352,13 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     @objc private func voiceOverStatusDidChange() {
         cancelPageTurn(animated: false)
         configurePageTurnInteraction()
+    }
+
+    @objc private func applicationDidBecomeActive() {
+        guard isViewLoaded else { return }
+        cancelPageTurn(animated: false)
+        invalidatePageTurnCache()
+        schedulePageTurnPrewarm()
     }
 
     override func didReceiveMemoryWarning() {
