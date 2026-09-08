@@ -82,22 +82,30 @@ final class PageTurnMetalContext {
         indexCount = indices.count
     }
 
-    func makePreparedTextures(
-        currentImage: UIImage,
-        targetImage: UIImage
-    ) -> PageTurnPreparedTextures? {
-        guard let currentImage = currentImage.cgImage,
-              let targetImage = targetImage.cgImage else { return nil }
+    func makePreparedTexture(image: UIImage) -> MTLTexture? {
+        guard let cgImage = image.cgImage else { return nil }
         let loader = MTKTextureLoader(device: device)
         let options: [MTKTextureLoader.Option: Any] = [
             .SRGB: false,
             .textureUsage: MTLTextureUsage.shaderRead.rawValue,
         ]
-        guard let current = try? loader.newTexture(cgImage: currentImage, options: options),
-              let target = try? loader.newTexture(cgImage: targetImage, options: options) else {
-            return nil
-        }
-        return PageTurnPreparedTextures(current: current, target: target)
+        return try? loader.newTexture(cgImage: cgImage, options: options)
+    }
+
+    func makePreparedTextures(
+        currentTexture: MTLTexture,
+        targetImage: UIImage
+    ) -> PageTurnPreparedTextures? {
+        guard let target = makePreparedTexture(image: targetImage) else { return nil }
+        return PageTurnPreparedTextures(current: currentTexture, target: target)
+    }
+
+    func makePreparedTextures(
+        currentImage: UIImage,
+        targetImage: UIImage
+    ) -> PageTurnPreparedTextures? {
+        guard let current = makePreparedTexture(image: currentImage) else { return nil }
+        return makePreparedTextures(currentTexture: current, targetImage: targetImage)
     }
 
     private static func makeGrid() -> ([Vertex], [UInt32]) {
