@@ -1,4 +1,11 @@
 import Metal
+import MetalKit
+import UIKit
+
+struct PageTurnPreparedTextures {
+    let current: MTLTexture
+    let target: MTLTexture
+}
 
 @MainActor
 final class PageTurnMetalContext {
@@ -73,6 +80,24 @@ final class PageTurnMetalContext {
         self.vertexBuffer = vertexBuffer
         self.indexBuffer = indexBuffer
         indexCount = indices.count
+    }
+
+    func makePreparedTextures(
+        currentImage: UIImage,
+        targetImage: UIImage
+    ) -> PageTurnPreparedTextures? {
+        guard let currentImage = currentImage.cgImage,
+              let targetImage = targetImage.cgImage else { return nil }
+        let loader = MTKTextureLoader(device: device)
+        let options: [MTKTextureLoader.Option: Any] = [
+            .SRGB: false,
+            .textureUsage: MTLTextureUsage.shaderRead.rawValue,
+        ]
+        guard let current = try? loader.newTexture(cgImage: currentImage, options: options),
+              let target = try? loader.newTexture(cgImage: targetImage, options: options) else {
+            return nil
+        }
+        return PageTurnPreparedTextures(current: current, target: target)
     }
 
     private static func makeGrid() -> ([Vertex], [UInt32]) {

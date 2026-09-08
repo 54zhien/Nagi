@@ -188,15 +188,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             return nil
         }
 
-        let surface = PageSurface(
-            direction: direction,
-            image: prepared.image,
-            identity: prepared.identity,
-            originIdentity: prepared.originIdentity,
-            generation: prepared.generation,
-            geometry: prepared.geometry,
-            headerTitle: model.pageHeaderTitle(for: prepared.locator)
-        )
+        let surface = makePageSurface(prepared, direction: direction)
         activeSurface = ActiveSurface(
             navigatorSurface: prepared,
             pageSurfaceID: surface.id,
@@ -215,6 +207,30 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
     func preparedCurrentSurface() -> NavigatorCurrentPageSurface? {
         model.navigator?.preparedCurrentPageSurface()
+    }
+
+    func preparedAdjacentSurface(direction: PageDirection) -> PageSurface? {
+        guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
+        let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
+        guard let prepared = navigator.preparedAdjacentPageSurface(direction: navigatorDirection) else {
+            return nil
+        }
+        return makePageSurface(prepared, direction: direction)
+    }
+
+    private func makePageSurface(
+        _ prepared: NavigatorPageSurface,
+        direction: PageDirection
+    ) -> PageSurface {
+        PageSurface(
+            direction: direction,
+            image: prepared.image,
+            identity: prepared.identity,
+            originIdentity: prepared.originIdentity,
+            generation: prepared.generation,
+            geometry: prepared.geometry,
+            headerTitle: model.pageHeaderTitle(for: prepared.locator)
+        )
     }
 
     func commit(surface: PageSurface) async -> PageSurfaceCommitResult {

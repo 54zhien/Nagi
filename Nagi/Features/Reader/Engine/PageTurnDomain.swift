@@ -5,7 +5,7 @@ import UIKit
 
 /// The logical direction of a page turn. The physical direction is derived
 /// from the book's reading direction by `PageTurnMetrics`.
-public enum PageDirection: String, CaseIterable, Sendable {
+public enum PageDirection: String, CaseIterable, Hashable, Sendable {
     case forward
     case backward
 }
@@ -239,6 +239,7 @@ public protocol PageSurfaceProvider: AnyObject {
     /// WebKit navigation, layout, or snapshotting.
     func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async
     func preparedCurrentSurface() -> NavigatorCurrentPageSurface?
+    func preparedAdjacentSurface(direction: PageDirection) -> PageSurface?
     func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface?
     func commit(surface: PageSurface) async -> PageSurfaceCommitResult

@@ -65,28 +65,24 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     init?(
         context: PageTurnMetalContext?,
         hostView: UIView,
-        currentImage: UIImage,
-        targetImage: UIImage,
+        preparedTextures: PageTurnPreparedTextures?,
         currentView: UIView,
         targetView: UIView,
         completionTranslationX: CGFloat,
         direction: PageDirection,
         isDark: Bool
     ) {
-        guard let context,
-              completionTranslationX.isFinite, completionTranslationX != 0,
-              let currentCGImage = currentImage.cgImage,
-              let targetCGImage = targetImage.cgImage else { return nil }
+        guard let context, let preparedTextures,
+              completionTranslationX.isFinite, completionTranslationX != 0 else { return nil }
 
         let bounds = hostView.bounds.integral
         guard bounds.width > 0, bounds.height > 0 else { return nil }
         let scale = Self.displayScale(for: hostView)
         let radius = Self.cornerRadius(for: hostView, bounds: bounds)
-        guard let targetTexture = Self.makeTexture(device: context.device, image: targetCGImage),
-              let currentTexture = Self.makeTexture(device: context.device, image: currentCGImage),
-              targetTexture.width > 0, targetTexture.height > 0,
-              currentTexture.width > 0, currentTexture.height > 0
-        else { return nil }
+        let targetTexture = preparedTextures.target
+        let currentTexture = preparedTextures.current
+        guard targetTexture.width > 0, targetTexture.height > 0,
+              currentTexture.width > 0, currentTexture.height > 0 else { return nil }
 
         let metalView = MTKView(frame: bounds, device: context.device)
         metalView.colorPixelFormat = .bgra8Unorm
@@ -424,14 +420,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         let fallback = view.layer.cornerRadius
         let radius = configured > 0 ? configured : fallback
         return Float(max(0, min(radius / max(bounds.height, 1), 0.5)))
-    }
-
-    private static func makeTexture(device: MTLDevice, image: CGImage) -> MTLTexture? {
-        let loader = MTKTextureLoader(device: device)
-        let options: [MTKTextureLoader.Option: Any] = [
-            .SRGB: false, .textureUsage: MTLTextureUsage.shaderRead.rawValue
-        ]
-        return try? loader.newTexture(cgImage: image, options: options)
     }
 
 }

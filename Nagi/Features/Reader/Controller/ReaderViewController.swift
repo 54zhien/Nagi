@@ -25,6 +25,12 @@ private final class PageTurnAnimationGate {
 
 @MainActor
 final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate {
+    private struct PreparedCurlPageSet {
+        let currentIdentity: NavigatorPagePositionIdentity
+        let targetIdentity: NavigatorPageSurfaceIdentity
+        let generation: Int
+        let textures: PageTurnPreparedTextures
+    }
     private let model: ReaderViewModel
     private let readerTransitionCoordinator: ReaderTransitionCoordinator
 
@@ -45,7 +51,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var activeTargetImage: UIImage?
     private var activePageSurface: PageSurface?
     private var pageTurnAnimator: (any PageTurnAnimating)?
-    private lazy var pageTurnMetalContext = PageTurnMetalContext()
+    private var pageTurnMetalContext: PageTurnMetalContext?
+    private var preparedCurlPageSets: [PageDirection: PreparedCurlPageSet] = [:]
     private var externalTakeoverTask: Task<Void, Never>?
     private var isExternalTakeoverActive = false
     private var queuedExternalAction: ((ReaderViewController) -> Void)?
@@ -182,6 +189,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         )
 
         updateChrome()
+        // Compile pipelines and build the reusable curl mesh while the reader
+        // is being installed, before a pan can enter the interaction path.
+        pageTurnMetalContext = PageTurnMetalContext()
         configurePageTurnInteraction()
         setNeedsStatusBarAppearanceUpdate()
     }
@@ -473,6 +483,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return false }
         fallbackNavigationRevision &+= 1
+        cancelPageTurnPrewarm()
 
         if latestReduceMotion || UIAccessibility.isVoiceOverRunning {
             pageTurnStateMachine.invalidate()
@@ -593,6 +604,15 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             geometry: surface.geometry,
             headerTitle: surface.headerTitle
         )
+        let preparedCurlTextures: PageTurnPreparedTextures?
+        if let prepared = preparedCurlPageSets.removeValue(forKey: direction),
+           prepared.currentIdentity == currentSurface.identity,
+           prepared.targetIdentity == surface.identity,
+           prepared.generation == surface.generation {
+            preparedCurlTextures = prepared.textures
+        } else {
+            preparedCurlTextures = nil
+        }
         activeTargetImage = surface.image
         let readingDirection = provider.readingDirection
         let destinationX = PageTurnMetrics.completionTranslationX(
@@ -606,8 +626,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 animator = PageTurnCurlAnimator(
                     context: pageTurnMetalContext,
                     hostView: snapshotHostView,
-                    currentImage: currentSurface.image,
-                    targetImage: surface.image,
+                    preparedTextures: preparedCurlTextures,
                     currentView: currentComposite,
                     targetView: targetComposite,
                     completionTranslationX: destinationX,
@@ -1033,8 +1052,15 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             guard !Task.isCancelled, self.pageTurnStateMachine.state == .idle else { return }
             if let currentSurface = provider.preparedCurrentSurface() {
                 self.cachedCurrentSurface = currentSurface
+                self.prepareCurlPageSets(currentSurface: currentSurface, provider: provider)
             }
         }
+    }
+
+    private func cancelPageTurnPrewarm() {
+        pageTurnPrewarmRevision &+= 1
+        pageTurnPrewarmTask?.cancel()
+        pageTurnPrewarmTask = nil
     }
 
     private func needsPageSurfacePrewarm(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
@@ -1054,6 +1080,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pageTurnPrewarmTask?.cancel()
         pageTurnPrewarmTask = nil
         cachedCurrentSurface = nil
+        preparedCurlPageSets.removeAll()
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
     }
 
@@ -1154,6 +1181,59 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             composite.addSubview(header)
         }
         return composite
+    }
+
+    private func makeCurlPageImage(from composite: UIView) -> UIImage {
+        let bounds = snapshotHostView.bounds.integral
+        composite.frame = bounds
+        composite.layoutIfNeeded()
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = view.window?.windowScene?.screen.scale ?? UIScreen.main.scale
+        format.opaque = true
+        return UIGraphicsImageRenderer(bounds: bounds, format: format).image { context in
+            composite.layer.render(in: context.cgContext)
+        }
+    }
+
+    private func prepareCurlPageSets(
+        currentSurface: NavigatorCurrentPageSurface,
+        provider: any PageSurfaceProvider
+    ) {
+        guard model.preferences.pageTransition == .pageCurl,
+              let pageTurnMetalContext else {
+            preparedCurlPageSets.removeAll()
+            return
+        }
+        var prepared: [PageDirection: PreparedCurlPageSet] = [:]
+        for direction in [PageDirection.forward, .backward] {
+            guard let target = provider.preparedAdjacentSurface(direction: direction),
+                  pageSurfaceGeometryIsCompatible(
+                      current: currentSurface,
+                      target: target,
+                      viewportSize: snapshotHostView.bounds.size
+                  ) else { continue }
+            let currentComposite = makeCompositeSurface(
+                contentImage: currentSurface.image,
+                geometry: currentSurface.geometry,
+                headerTitle: latestTitle
+            )
+            let targetComposite = makeCompositeSurface(
+                contentImage: target.image,
+                geometry: target.geometry,
+                headerTitle: target.headerTitle
+            )
+            guard let textures = pageTurnMetalContext.makePreparedTextures(
+                currentImage: makeCurlPageImage(from: currentComposite),
+                targetImage: makeCurlPageImage(from: targetComposite)
+            ) else { continue }
+            prepared[direction] = PreparedCurlPageSet(
+                currentIdentity: currentSurface.identity,
+                targetIdentity: target.identity,
+                generation: target.generation,
+                textures: textures
+            )
+        }
+        preparedCurlPageSets = prepared
     }
 
     private func pageSurfaceGeometryIsCompatible(
