@@ -7,7 +7,7 @@ final class GlassControlView: UIControl {
     private let fillView = UIView()
     private let iconView = UIImageView()
     private let titleLabel = UILabel()
-    private let menuButton = UIButton(type: .system)
+    private let menuButton = UIButton(type: .custom)
     private let highlightLayer = CAGradientLayer()
     private let selectedStrokeLayer = CALayer()
     private let touchDriver = GlassTouchDriver()
@@ -21,7 +21,6 @@ final class GlassControlView: UIControl {
         surfaceView = GlassSurfaceView(frame: .zero)
         super.init(frame: frame)
 
-        // Initialize the performance observer before the first interaction.
         _ = ReaderPerformanceController.shared
 
         touchDriver.control = self
@@ -65,11 +64,23 @@ final class GlassControlView: UIControl {
         titleLabel.accessibilityElementsHidden = true
         addSubview(titleLabel)
 
+        menuButton.configuration = nil
         menuButton.backgroundColor = .clear
+        menuButton.tintColor = .clear
         menuButton.isHidden = true
         menuButton.isUserInteractionEnabled = false
         menuButton.isAccessibilityElement = false
         menuButton.accessibilityElementsHidden = true
+        menuButton.addTarget(
+            self,
+            action: #selector(menuTouchBegan),
+            for: [.touchDown, .touchDragEnter]
+        )
+        menuButton.addTarget(
+            self,
+            action: #selector(menuTouchEnded),
+            for: [.touchUpInside, .touchUpOutside, .touchCancel, .touchDragExit]
+        )
         addSubview(menuButton)
     }
 
@@ -119,6 +130,8 @@ final class GlassControlView: UIControl {
 
         iconView.tintColor = contentColor ?? tintColor ?? .label
         self.isEnabled = isEnabled
+        menuButton.isEnabled = isEnabled
+        menuButton.isUserInteractionEnabled = menuButton.menu != nil && isEnabled
         var traits: UIAccessibilityTraits = isEnabled ? .button : [.button, .notEnabled]
         if isSelected {
             traits.insert(.selected)
@@ -129,6 +142,7 @@ final class GlassControlView: UIControl {
         titleLabel.alpha = contentAlpha
         if !isEnabled {
             highlightLayer.opacity = 0
+            touchDriver.end()
         }
         currentReduceMotion = reduceMotion
         touchDriver.update(reduceMotion: reduceMotion)
@@ -148,11 +162,10 @@ final class GlassControlView: UIControl {
         setNeedsLayout()
     }
 
-    /// Adds a menu without replacing the persistent glass surface.
     func setPrimaryMenu(_ menu: UIMenu?) {
         menuButton.menu = menu
         menuButton.showsMenuAsPrimaryAction = menu != nil
-        menuButton.isUserInteractionEnabled = menu != nil
+        menuButton.isUserInteractionEnabled = menu != nil && isEnabled
         menuButton.isHidden = menu == nil
         menuButton.isAccessibilityElement = menu != nil
         menuButton.accessibilityElementsHidden = menu == nil
@@ -203,6 +216,15 @@ final class GlassControlView: UIControl {
         guard isEnabled else { return false }
         sendActions(for: .primaryActionTriggered)
         return true
+    }
+
+    @objc private func menuTouchBegan() {
+        guard isEnabled else { return }
+        touchDriver.begin(at: CGPoint(x: bounds.midX, y: bounds.midY))
+    }
+
+    @objc private func menuTouchEnded() {
+        touchDriver.end()
     }
 
     func applyTouchBegan(at point: CGPoint, reduceMotion: Bool) {
