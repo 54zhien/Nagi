@@ -204,7 +204,24 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
         let preferred: NavigatorPageDirection = preferredDirection == .forward ? .forward : .backward
 
+        let forwardReadiness = navigator.adjacentPageReadiness(direction: .forward)
+        let backwardReadiness = navigator.adjacentPageReadiness(direction: .backward)
+        let hasCurrentSurface = navigator.preparedCurrentPageSurface() != nil
+        if hasCurrentSurface,
+           prewarmStageIsPublished(forwardReadiness),
+           prewarmStageIsPublished(backwardReadiness) {
+            return
+        }
+
         if pageSurfacePrewarmTask == nil {
+            let hasPublishedNeighbor = prewarmStageIsPublished(forwardReadiness)
+                || prewarmStageIsPublished(backwardReadiness)
+            let hasIncompleteNeighbor = !prewarmStageIsPublished(forwardReadiness)
+                || !prewarmStageIsPublished(backwardReadiness)
+            if hasPublishedNeighbor && (hasIncompleteNeighbor || !hasCurrentSurface) {
+                navigator.invalidateAdjacentPageSurfaces()
+            }
+
             pageSurfacePrewarmRevision &+= 1
             let revision = pageSurfacePrewarmRevision
             let warmTask = Task { @MainActor [weak self] in
