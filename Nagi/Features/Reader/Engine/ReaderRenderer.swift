@@ -275,23 +275,42 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         deadline: UInt64
     ) async -> PageSurfaceCommitResult {
         guard let navigator = model.navigator,
-              let active = activeSurface,
-              active.pageSurfaceID == surface.id,
-              active.phase == .reconciling else {
+              let initialActive = activeSurface,
+              initialActive.pageSurfaceID == surface.id,
+              initialActive.phase == .reconciling else {
             return .indeterminate
         }
-        switch await navigator.reconcileAdjacentPageResult(
-            active.navigatorSurface,
-            deadline: deadline
-        ) {
-        case .committed:
-            activeSurface = nil
-            return .committed
-        case .restored:
-            activeSurface = nil
-            return .restored
-        case .indeterminate: return .indeterminate
+
+        var firstDeadline = deadline
+        while !Task.isCancelled {
+            guard let active = activeSurface,
+                  active.pageSurfaceID == surface.id,
+                  active.phase == .reconciling,
+                  active.epoch == initialActive.epoch,
+                  active.navigatorSurface === initialActive.navigatorSurface else {
+                return .indeterminate
+            }
+
+            let now = DispatchTime.now().uptimeNanoseconds
+            let sliceDeadline = max(firstDeadline, now &+ 750_000_000)
+            firstDeadline = 0
+            switch await navigator.reconcileAdjacentPageResult(
+                active.navigatorSurface,
+                deadline: sliceDeadline
+            ) {
+            case .committed:
+                activeSurface = nil
+                return .committed
+            case .restored:
+                activeSurface = nil
+                return .restored
+            case .indeterminate:
+                guard !Task.isCancelled else { return .indeterminate }
+                await Task.yield()
+                try? await Task.sleep(nanoseconds: 80_000_000)
+            }
         }
+        return .indeterminate
     }
 
     func discardReconciliation(for surface: PageSurface) {
