@@ -333,7 +333,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             }
             if confirmed {
                 activeSurface = nil
-                return initialResult
+                return pageSurfaceCommitResult(from: initialResult)
             }
         }
 
@@ -353,7 +353,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             return .indeterminate
         }
 
-        var pendingTerminal: PageSurfaceCommitResult?
+        var pendingTerminal: NavigatorPageCommitResult?
         while !Task.isCancelled,
               DispatchTime.now().uptimeNanoseconds < deadline {
             guard let active = activeSurface,
@@ -376,7 +376,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             case .committed, .restored:
                 if pendingTerminal == observed {
                     activeSurface = nil
-                    return observed
+                    return pageSurfaceCommitResult(from: observed)
                 }
                 pendingTerminal = observed
                 await Task.yield()
@@ -390,6 +390,19 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             }
         }
         return .indeterminate
+    }
+
+    private func pageSurfaceCommitResult(
+        from result: NavigatorPageCommitResult
+    ) -> PageSurfaceCommitResult {
+        switch result {
+        case .committed:
+            return .committed
+        case .restored:
+            return .restored
+        case .indeterminate:
+            return .indeterminate
+        }
     }
 
     func discardReconciliation(for surface: PageSurface) {
