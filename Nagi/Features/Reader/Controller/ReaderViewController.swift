@@ -63,12 +63,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var pendingPanDidEnd = false
     private var panHasStartedTurn = false
     private var isBoundaryResistanceTurn = false
-    private var isFallbackNavigationTurn = false
     private var fallbackNavigationRevision: UInt = 0
     private static let pageSurfaceResolutionBudget: UInt64 = 2_000_000_000
     private static let pageSurfaceRecoveryBudget: UInt64 = 1_200_000_000
     private static let pageSurfaceRecoveryAttempts = 3
-    private static let pageSurfacePrewarmWaitBudget: UInt64 = 5_000_000_000
     private static let pageSurfacePrewarmRetryDelay: UInt64 = 180_000_000
     private static let pageSurfacePrewarmMaxAttempts = 3
 
@@ -401,10 +399,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return false
         }
 
-        if isCustomPageTurnEnabled {
-            return false
-        }
-
         let peer = isManagedGesture ? otherGestureRecognizer : gestureRecognizer
         guard let peerView = peer.view else { return false }
         return peerView === contentView || peerView.isDescendant(of: contentView)
@@ -415,8 +409,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return true
         }
         guard isCustomPageTurnEnabled else { return false }
+        let translation = pan.translation(in: pan.view)
         let velocity = pan.velocity(in: pan.view)
-        return abs(velocity.x) > abs(velocity.y) && abs(velocity.x) > 20
+        let horizontal = abs(translation.x) > 0.5 ? translation.x : velocity.x
+        let vertical = abs(translation.y) > 0.5 ? translation.y : velocity.y
+        return abs(horizontal) > abs(vertical) * 1.05
     }
 
     private func updateChrome() {
@@ -487,7 +484,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return false }
         fallbackNavigationRevision &+= 1
-        cancelPageTurnPrewarm()
 
         if latestReduceMotion || UIAccessibility.isVoiceOverRunning {
             pageTurnStateMachine.invalidate()
@@ -496,50 +492,58 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
 
         guard let currentSurface = cachedCurrentSurface else {
+            pageTurnStateMachine.invalidate()
+            preferredPrewarmDirection = direction
+            schedulePageTurnPrewarm()
             if !interactive {
-                pageTurnStateMachine.invalidate()
                 navigateWithoutCustomTransition(direction: direction, provider: provider)
                 return true
             }
-            return startFallbackGesture(
-                direction: direction,
-                generation: generation,
-                currentView: UIView()
-            )
+            if pendingPanDidEnd {
+                navigateWithoutCustomTransitionIfGestureCompleted(
+                    direction: direction,
+                    provider: provider
+                )
+                return true
+            }
+            return false
         }
 
         guard let surface = provider.takePreparedAdjacentSurface(direction: direction) else {
             let readiness = provider.adjacentSurfaceReadiness(direction: direction)
-            if !interactive, readiness != .unavailable {
+            if readiness != .unavailable {
                 pageTurnStateMachine.invalidate()
-                navigateWithoutCustomTransition(direction: direction, provider: provider)
-                return true
+                preferredPrewarmDirection = direction
+                schedulePageTurnPrewarm()
+                if !interactive {
+                    navigateWithoutCustomTransition(direction: direction, provider: provider)
+                    return true
+                }
+                if pendingPanDidEnd {
+                    navigateWithoutCustomTransitionIfGestureCompleted(
+                        direction: direction,
+                        provider: provider
+                    )
+                    return true
+                }
+                return false
             }
             let currentView = makeCompositeSurface(
                 contentImage: currentSurface.image,
                 geometry: currentSurface.geometry,
                 headerTitle: latestTitle
             )
-            let fallbackAnimator: any PageTurnAnimating
-            if readiness == .unavailable {
-                let destinationX = PageTurnMetrics.completionTranslationX(
-                    containerWidth: snapshotHostView.bounds.width,
-                    direction: direction,
-                    readingDirection: provider.readingDirection
-                )
-                fallbackAnimator = PageTurnBoundaryAnimator(
-                    hostView: snapshotHostView,
-                    currentView: currentView,
-                    completionTranslationX: destinationX
-                )
-            } else {
-                fallbackAnimator = PageTurnNoAnimationAnimator(
-                    hostView: snapshotHostView,
-                    currentView: currentView
-                )
-            }
-            isBoundaryResistanceTurn = readiness == .unavailable
-            isFallbackNavigationTurn = readiness != .unavailable
+            let destinationX = PageTurnMetrics.completionTranslationX(
+                containerWidth: snapshotHostView.bounds.width,
+                direction: direction,
+                readingDirection: provider.readingDirection
+            )
+            let fallbackAnimator: any PageTurnAnimating = PageTurnBoundaryAnimator(
+                hostView: snapshotHostView,
+                currentView: currentView,
+                completionTranslationX: destinationX
+            )
+            isBoundaryResistanceTurn = true
             activeTurnGeneration = generation
             pendingPanDidEnd = !interactive
             if !interactive {
@@ -575,11 +579,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             cachedCurrentSurface = nil
             clearPreparedCurlCache()
             if interactive {
-                return startFallbackGesture(
-                    direction: direction,
-                    generation: generation,
-                    currentView: UIView()
-                )
+                pageTurnStateMachine.invalidate()
+                preferredPrewarmDirection = direction
+                schedulePageTurnPrewarm()
+                if pendingPanDidEnd {
+                    navigateWithoutCustomTransitionIfGestureCompleted(
+                        direction: direction,
+                        provider: provider
+                    )
+                    return true
+                }
+                return false
             } else {
                 pageTurnStateMachine.invalidate()
                 navigateWithoutCustomTransition(direction: direction, provider: provider)
@@ -611,7 +621,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
            prepared.generation == surface.generation {
             preparedCurlTextures = prepared.textures
         } else {
-            preparedCurlTextures = nil
+            preparedCurlTextures = pageTurnMetalContext?.makePreparedTextures(
+                currentImage: makeCurlPageImage(from: currentComposite),
+                targetImage: makeCurlPageImage(from: targetComposite)
+            )
         }
         activeTargetImage = surface.image
         let readingDirection = provider.readingDirection
@@ -689,28 +702,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         return true
     }
 
-    private func startFallbackGesture(
-        direction: PageDirection,
-        generation: UInt,
-        currentView: UIView
-    ) -> Bool {
-        let animator = PageTurnNoAnimationAnimator(hostView: snapshotHostView, currentView: currentView)
-        isFallbackNavigationTurn = true
-        activeTurnGeneration = generation
-        pageTurnAnimator = animator
-        chromeView.setPageHeaderHiddenForTransition(true)
-        guard animator.install(), pageTurnStateMachine.beginInteractive(generation: generation) else {
-            pageTurnStateMachine.invalidate()
-            cleanupPageTurn(cancelPreparedSurface: false)
-            schedulePageTurnPrewarm()
-            return false
-        }
-        schedulePageTurnPrewarm()
-        updateInteractivePageTurn()
-        finishInteractivePageTurnIfReady()
-        return true
-    }
-
     private func updateInteractivePageTurn() {
         guard let generation = activeTurnGeneration,
               let direction = pageTurnStateMachine.direction,
@@ -741,14 +732,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         switch decision {
         case .complete:
-            if isFallbackNavigationTurn,
-               let provider = model.pageSurfaceProvider {
-                pageTurnStateMachine.invalidate()
-                cleanupPageTurn(cancelPreparedSurface: false)
-                navigateWithoutCustomTransition(direction: direction, provider: provider)
-            } else {
-                animatePageTurnCompletion(generation: generation)
-            }
+            animatePageTurnCompletion(generation: generation)
         case .cancel:
             pageTurnAnimator?.animateCancellation { [weak self] in
                 guard let self else { return }
@@ -1061,7 +1045,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pendingPanDidEnd = false
         panHasStartedTurn = false
         isBoundaryResistanceTurn = false
-        isFallbackNavigationTurn = false
     }
 
     private func startPageTurnFromPanIfNeeded() {
@@ -1114,45 +1097,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
                 self.refreshPreparedPageTurnCacheIfAvailable()
                 let preferredReadiness = provider.adjacentSurfaceReadiness(direction: preferred)
-                guard self.pageSurfacePrewarmIsPublished(preferredReadiness) else {
-                    if attempt + 1 < Self.pageSurfacePrewarmMaxAttempts {
-                        provider.invalidatePreparedSurfaces()
-                        self.cachedCurrentSurface = nil
-                        self.clearPreparedCurlCache()
-                        try? await Task.sleep(nanoseconds: Self.pageSurfacePrewarmRetryDelay)
-                        continue
-                    }
-                    return
-                }
-
-                let opposite: PageDirection = preferred == .forward ? .backward : .forward
-                let deadline = DispatchTime.now().uptimeNanoseconds
-                    &+ Self.pageSurfacePrewarmWaitBudget
-                while !Task.isCancelled,
-                      revision == self.pageTurnPrewarmRevision,
-                      self.pageTurnStateMachine.state == .idle,
-                      DispatchTime.now().uptimeNanoseconds < deadline {
-                    let readiness = provider.adjacentSurfaceReadiness(direction: opposite)
-                    if self.pageSurfacePrewarmIsTerminal(readiness) {
-                        break
-                    }
-                    try? await Task.sleep(nanoseconds: 16_000_000)
-                }
-
-                guard !Task.isCancelled,
-                      revision == self.pageTurnPrewarmRevision,
-                      self.pageTurnStateMachine.state == .idle else { return }
-                self.refreshPreparedPageTurnCacheIfAvailable()
-
-                let oppositeReadiness = provider.adjacentSurfaceReadiness(direction: opposite)
-                if self.pageSurfacePrewarmIsPublished(oppositeReadiness) {
+                if self.pageSurfacePrewarmIsPublished(preferredReadiness) {
                     return
                 }
 
                 if attempt + 1 < Self.pageSurfacePrewarmMaxAttempts {
-                    provider.invalidatePreparedSurfaces()
-                    self.cachedCurrentSurface = nil
-                    self.clearPreparedCurlCache()
                     try? await Task.sleep(nanoseconds: Self.pageSurfacePrewarmRetryDelay)
                 }
             }
@@ -1174,15 +1123,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
     }
 
-    private func pageSurfacePrewarmIsTerminal(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
-        switch readiness {
-        case .ready, .failed, .unavailable:
-            return true
-        case .unknown, .preparing:
-            return false
-        }
-    }
-
     private func pageSurfacePrewarmIsPublished(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
         switch readiness {
         case .ready, .unavailable:
@@ -1194,8 +1134,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func refreshPreparedPageTurnCacheIfAvailable() {
         guard pageTurnStateMachine.state == .idle,
-              let provider = model.pageSurfaceProvider,
-              let currentSurface = provider.preparedCurrentSurface() else { return }
+              let provider = model.pageSurfaceProvider else { return }
+        guard let currentSurface = provider.preparedCurrentSurface() else {
+            cachedCurrentSurface = nil
+            clearPreparedCurlCache()
+            return
+        }
 
         if cachedCurrentSurface?.identity != currentSurface.identity
             || cachedCurrentSurface?.generation != currentSurface.generation {
@@ -1441,9 +1385,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             && equal(current.contentRect.minY, target.contentRect.minY)
             && equal(current.pointSize.width, current.contentRect.width)
             && equal(current.pointSize.height, current.contentRect.height)
-            && current.contentRect.minX >= -tolerance
+            && equal(current.contentRect.minX, 0)
+            && equal(current.contentRect.width, viewportSize.width)
             && current.contentRect.minY >= -tolerance
-            && current.contentRect.maxX <= viewportSize.width + tolerance
             && current.contentRect.maxY <= viewportSize.height + tolerance
     }
 
@@ -1461,6 +1405,26 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             self.invalidatePageTurnCache()
             self.schedulePageTurnPrewarm()
         }
+    }
+
+    private func navigateWithoutCustomTransitionIfGestureCompleted(
+        direction: PageDirection,
+        provider: any PageSurfaceProvider
+    ) {
+        let readingDirection = provider.readingDirection
+        let progress = PageTurnMetrics.progress(
+            forTranslationX: pendingPanTranslationX,
+            containerWidth: snapshotHostView.bounds.width,
+            direction: direction,
+            readingDirection: readingDirection
+        )
+        guard PageTurnMetrics.decision(
+            progress: progress,
+            velocityX: pendingPanVelocityX,
+            direction: direction,
+            readingDirection: readingDirection
+        ) == .complete else { return }
+        navigateWithoutCustomTransition(direction: direction, provider: provider)
     }
 
     private var isDarkPageBackground: Bool {

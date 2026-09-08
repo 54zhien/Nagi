@@ -24,6 +24,7 @@ struct PageTurnRasterizerData {
     float edge;
     float fold;
     float shade;
+    float face;
 };
 
 inline bool insideRoundedPage(float2 uv, constant PageTurnUniforms &uniforms) {
@@ -48,6 +49,7 @@ vertex PageTurnRasterizerData page_turn_fullscreen_vertex(
     output.edge = 0.0;
     output.fold = 0.0;
     output.shade = 1.0;
+    output.face = 1.0;
     return output;
 }
 
@@ -69,46 +71,34 @@ vertex PageTurnRasterizerData page_turn_curl_vertex(
     float progress = clamp(uniforms.progress, 0.0, 1.0);
     float direction = uniforms.direction < 0.0 ? -1.0 : 1.0;
 
-    // The fixed edge stays in place while the opposite edge folds over it.
-    // `edge` is zero at the fixed edge and one at the edge being turned. The
-    // old implementation translated the entire sheet, which made this mode
-    // indistinguishable from cover. This is a cylindrical page turn: only
-    // the band already crossed by the moving crease is bent.
+    // Rotate the sheet around its bound edge while varying the angle across
+    // the page. The global turn keeps the dragged edge under the finger; the
+    // local bend prevents the page from collapsing into a rigid rectangle.
     float edge = direction < 0.0 ? inputVertex.uv.x : 1.0 - inputVertex.uv.x;
-    float foldStart = 1.0 - progress;
-    float folded = progress > 0.0001
-        ? clamp((edge - foldStart) / max(progress, 0.0001), 0.0, 1.0)
-        : 0.0;
-    float foldAngle = folded * 3.14159265;
-    float fold = sin(foldAngle) * step(0.0001, progress);
-    // cos(theta) is the signed depth of the cylindrical sheet. Keep the
-    // visible front/back z ranges ordered while preserving the end points.
-    float cylinderDepth = 0.5 + 0.5 * cos(foldAngle);
-    float crease = exp(-pow((folded - 0.5) / 0.11, 2.0)) * fold;
+    float turnAngle = 3.14159265 * progress;
+    float localBend = 0.42
+        * sin(3.14159265 * progress)
+        * sin(3.14159265 * edge);
+    float pageAngle = turnAngle + localBend;
+    float face = cos(pageAngle);
+    float fold = abs(sin(pageAngle));
+    float fixedX = direction < 0.0 ? -1.0 : 1.0;
+    float outward = -direction;
     float2 position = inputVertex.position;
-    if (folded > 0.0) {
-        // A radius proportional to the crossed band gives a stable silhouette
-        // at both the first and last frames without moving the live reader.
-        float radius = max(0.62, 1.15 * progress);
-        float creaseX = direction < 0.0
-            ? 1.0 - 2.0 * progress
-            : -1.0 + 2.0 * progress;
-        position.x = creaseX + direction * radius * sin(foldAngle);
-        // Preserve the page's vertical geometry. The cylinder projection
-        // bends in X/Z; scaling Y would visibly squash lines of text.
-    }
+    position.x = fixedX + outward * (2.0 * edge) * face;
 
-    // Fixed/front paper sits above the target; the folded back receives a
-    // larger z so projected overlap self-orders deterministically.
+    // The target remains at z=0.05. Curved paper rises above it, with a tiny
+    // side bias to make the front/back boundary deterministic.
     output.position = float4(
         position,
-        uniforms.side > 0.5 ? 0.55 + cylinderDepth * 0.35 : 0.15,
+        0.12 + fold * 0.68 + uniforms.side * 0.001,
         1.0
     );
     output.uv = inputVertex.uv;
     output.edge = edge;
     output.fold = fold;
-    output.shade = 1.0 - fold * (uniforms.isDark > 0.5 ? 0.22 : 0.16);
+    output.shade = 1.0 - fold * (uniforms.isDark > 0.5 ? 0.20 : 0.14);
+    output.face = face;
     return output;
 }
 
@@ -117,18 +107,14 @@ fragment float4 page_turn_curl_fragment(
     constant PageTurnUniforms &uniforms [[buffer(1)]],
     texture2d<float> currentTexture [[texture(0)]]) {
     constexpr sampler pageSampler(filter::linear, address::clamp_to_edge);
-    float progress = clamp(uniforms.progress, 0.0, 1.0);
-    // The front face ends exactly at the moving crease. The target page is
-    // already underneath, so leaving this band transparent exposes it while
-    // the back-face pass paints the turned paper.
-    if (!insideRoundedPage(input.uv, uniforms) || input.edge > 1.0 - progress) {
+    if (!insideRoundedPage(input.uv, uniforms) || input.face < 0.0) {
         discard_fragment();
     }
     float4 color = currentTexture.sample(pageSampler, float2(input.uv.x, 1.0 - input.uv.y));
-    float highlight = exp(-pow((input.edge - (1.0 - progress * 0.5)) / 0.10, 2.0)) * input.fold;
-    float shadow = smoothstep(0.0, 0.30, input.edge) * input.fold * 0.11;
+    float highlight = pow(input.fold, 7.0) * 0.15;
+    float shadow = smoothstep(0.0, 1.0, input.edge) * input.fold * 0.12;
     color.rgb = color.rgb * max(0.0, input.shade - shadow);
-    color.rgb += float3(0.16, 0.15, 0.13) * highlight;
+    color.rgb += float3(highlight);
     color.a = 1.0;
     return color;
 }
@@ -138,27 +124,18 @@ fragment float4 page_turn_curl_back_fragment(
     constant PageTurnUniforms &uniforms [[buffer(1)]],
     texture2d<float> currentTexture [[texture(0)]]) {
     constexpr sampler pageSampler(filter::linear, address::clamp_to_edge);
-    if (!insideRoundedPage(input.uv, uniforms)) { discard_fragment(); }
+    if (!insideRoundedPage(input.uv, uniforms) || input.face >= 0.0) { discard_fragment(); }
 
-    // Only the part that has rolled over is the back of the sheet. Mirroring
-    // the source gives the expected reversed text, while a small alpha and
-    // paper tint keep the content readable in both themes.
-    float turnProgress = clamp(uniforms.progress, 0.0, 1.0);
-    float foldStart = 1.0 - turnProgress;
-    if (input.edge <= foldStart || turnProgress < 0.012) { discard_fragment(); }
-
-    float folded = clamp((input.edge - foldStart) / max(turnProgress, 0.0001), 0.0, 1.0);
-    float2 mirroredUV = float2(1.0 - input.uv.x, input.uv.y);
-    float4 source = currentTexture.sample(pageSampler, float2(mirroredUV.x, 1.0 - mirroredUV.y));
+    // The geometry itself reverses the page in screen space after it crosses
+    // ninety degrees. Sampling the original UV avoids a second, incorrect
+    // mirror and leaves just a restrained hint of ink on the paper back.
+    float4 source = currentTexture.sample(pageSampler, float2(input.uv.x, 1.0 - input.uv.y));
     float3 paperTint = uniforms.isDark > 0.5
         ? float3(0.17, 0.18, 0.19)
         : float3(0.96, 0.95, 0.91);
-    // Keep the reverse side paper-like in both themes. A small amount of the
-    // immutable source texture preserves the page's tone without exposing a
-    // dark/bright opaque rectangle during the turn.
-    float paperGradient = mix(0.74, 0.94, folded);
-    float3 color = mix(paperTint, source.rgb, 0.10) * paperGradient;
-    float creaseShadow = 0.24 * exp(-pow((folded - 0.5) / 0.10, 2.0));
+    float paperGradient = mix(0.78, 0.96, input.edge);
+    float3 color = mix(paperTint, source.rgb, 0.08) * paperGradient;
+    float creaseShadow = 0.22 * pow(input.fold, 6.0);
     color *= 1.0 - creaseShadow;
     return float4(color, 1.0);
 }

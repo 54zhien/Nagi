@@ -63,11 +63,11 @@ public struct PageTurnConfiguration: Equatable, Sendable {
     public var flingVelocity: CGFloat
 
     public init(
-        edgeHitFraction: CGFloat = 0.16,
-        minimumEdgeHitWidth: CGFloat = 52,
-        maximumEdgeHitWidth: CGFloat = 72,
-        completionProgress: CGFloat = 0.26,
-        flingVelocity: CGFloat = 700
+        edgeHitFraction: CGFloat = 0.12,
+        minimumEdgeHitWidth: CGFloat = 44,
+        maximumEdgeHitWidth: CGFloat = 60,
+        completionProgress: CGFloat = 0.24,
+        flingVelocity: CGFloat = 600
     ) {
         self.edgeHitFraction = edgeHitFraction
         self.minimumEdgeHitWidth = minimumEdgeHitWidth
@@ -81,7 +81,7 @@ public struct PageTurnConfiguration: Equatable, Sendable {
 public enum PageTurnMetrics {
     public static let defaultConfiguration = PageTurnConfiguration()
 
-    /// Returns the width of either edge tap zone, clamped to 52...72pt.
+    /// Returns the width of either edge tap zone, clamped to 44...60pt.
     public static func edgeHitWidth(
         for screenWidth: CGFloat,
         configuration: PageTurnConfiguration = defaultConfiguration

@@ -153,6 +153,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         surfaceEpoch &+= 1
         if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
         model.navigator?.invalidateAdjacentPageSurfaces()
+        model.finishPageTurnLocationTransaction(result: nil)
         activeSurface = nil
         model.tearDown()
         model.onStateChange = nil
@@ -183,7 +184,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface? {
-        cancelPageSurfacePrewarm()
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
         let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
         guard let prepared = navigator.takePreparedAdjacentPage(direction: navigatorDirection) else {
@@ -214,14 +214,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
 
         if pageSurfacePrewarmTask == nil {
-            let hasPublishedNeighbor = prewarmStageIsPublished(forwardReadiness)
-                || prewarmStageIsPublished(backwardReadiness)
-            let hasIncompleteNeighbor = !prewarmStageIsPublished(forwardReadiness)
-                || !prewarmStageIsPublished(backwardReadiness)
-            if hasPublishedNeighbor && (hasIncompleteNeighbor || !hasCurrentSurface) {
-                navigator.invalidateAdjacentPageSurfaces()
-            }
-
             pageSurfacePrewarmRevision &+= 1
             let revision = pageSurfacePrewarmRevision
             let warmTask = Task { @MainActor [weak self] in
@@ -304,37 +296,24 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             return .restored
         }
 
+        model.beginPageTurnLocationTransaction(
+            origin: active.navigatorSurface.originIdentity.locator,
+            target: active.navigatorSurface.locator
+        )
         active.phase = .committing
         activeSurface = active
         let initialResult = await navigator.commitAdjacentPageResult(active.navigatorSurface)
         guard active.epoch == surfaceEpoch,
               activeSurface?.pageSurfaceID == surface.id,
               activeSurface?.navigatorSurface === active.navigatorSurface else {
-            return .indeterminate
+            model.finishPageTurnLocationTransaction(result: nil)
+            return pageSurfaceCommitResult(from: initialResult)
         }
 
         if initialResult != .indeterminate {
-            var confirmed = true
-            for _ in 0 ..< 2 {
-                let confirmation = await navigator.reconcileAdjacentPageResult(
-                    active.navigatorSurface,
-                    deadline: DispatchTime.now().uptimeNanoseconds &+ 600_000_000
-                )
-                guard active.epoch == surfaceEpoch,
-                      activeSurface?.pageSurfaceID == surface.id,
-                      activeSurface?.navigatorSurface === active.navigatorSurface else {
-                    return .indeterminate
-                }
-                if confirmation != initialResult {
-                    confirmed = false
-                    break
-                }
-                await Task.yield()
-            }
-            if confirmed {
-                activeSurface = nil
-                return pageSurfaceCommitResult(from: initialResult)
-            }
+            model.finishPageTurnLocationTransaction(result: initialResult)
+            activeSurface = nil
+            return pageSurfaceCommitResult(from: initialResult)
         }
 
         active.phase = .reconciling
@@ -353,7 +332,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             return .indeterminate
         }
 
-        var pendingTerminal: NavigatorPageCommitResult?
         while !Task.isCancelled,
               DispatchTime.now().uptimeNanoseconds < deadline {
             guard let active = activeSurface,
@@ -374,14 +352,10 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
             switch observed {
             case .committed, .restored:
-                if pendingTerminal == observed {
-                    activeSurface = nil
-                    return pageSurfaceCommitResult(from: observed)
-                }
-                pendingTerminal = observed
-                await Task.yield()
+                model.finishPageTurnLocationTransaction(result: observed)
+                activeSurface = nil
+                return pageSurfaceCommitResult(from: observed)
             case .indeterminate:
-                pendingTerminal = nil
                 let sleepStart = DispatchTime.now().uptimeNanoseconds
                 guard sleepStart < deadline, !Task.isCancelled else { return .indeterminate }
                 try? await Task.sleep(
@@ -408,13 +382,22 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     func discardReconciliation(for surface: PageSurface) {
         guard activeSurface?.pageSurfaceID == surface.id,
               activeSurface?.phase == .reconciling else { return }
+        model.finishPageTurnLocationTransaction(result: nil)
         activeSurface = nil
     }
 
     func cancel(surface: PageSurface) {
         guard let active = activeSurface, active.pageSurfaceID == surface.id else { return }
         model.navigator?.cancelAdjacentPage(active.navigatorSurface)
-        if active.phase == .prepared { activeSurface = nil }
+        switch active.phase {
+        case .prepared:
+            activeSurface = nil
+        case .committing:
+            break
+        case .reconciling:
+            model.finishPageTurnLocationTransaction(result: nil)
+            activeSurface = nil
+        }
     }
 
     func navigateWithoutCustomTransition(direction: PageDirection) async -> Bool {
@@ -434,7 +417,12 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
     func invalidatePreparedSurfaces() {
         cancelPageSurfacePrewarm()
-        if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
+        if let activeSurface {
+            model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface)
+            if activeSurface.phase == .reconciling {
+                model.finishPageTurnLocationTransaction(result: nil)
+            }
+        }
         surfaceEpoch &+= 1
         guard let navigator = model.navigator else {
             activeSurface = nil

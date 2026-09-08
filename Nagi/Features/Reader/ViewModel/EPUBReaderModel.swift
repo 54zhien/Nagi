@@ -41,6 +41,12 @@ struct EPUBTOCEntry: Identifiable {
 @MainActor
 @Observable
 final class EPUBReaderModel {
+    private struct PageTurnLocationTransaction {
+        let origin: Locator
+        let target: Locator
+        var deferred: Locator?
+    }
+
     let book: Book
 
     var navigator: EPUBNavigatorViewController?
@@ -107,6 +113,7 @@ final class EPUBReaderModel {
     var onSwipeStart: (() -> Void)?
     var onPageTurnRequested: ((PageDirection) -> Void)?
     var onStateChange: (() -> Void)?
+    @ObservationIgnored private var pageTurnLocationTransaction: PageTurnLocationTransaction?
 
     private var publication: Publication?
     // TXT books use their generated EPUB asset here.
@@ -1108,7 +1115,40 @@ final class EPUBReaderModel {
         }
     }
 
+    func beginPageTurnLocationTransaction(origin: Locator, target: Locator) {
+        pageTurnLocationTransaction = PageTurnLocationTransaction(
+            origin: origin,
+            target: target,
+            deferred: nil
+        )
+    }
+
+    func finishPageTurnLocationTransaction(result: NavigatorPageCommitResult?) {
+        guard let transaction = pageTurnLocationTransaction else { return }
+        pageTurnLocationTransaction = nil
+        let resolved: Locator?
+        switch result {
+        case .committed:
+            resolved = transaction.target
+        case .restored:
+            resolved = transaction.origin
+        case .indeterminate, nil:
+            resolved = transaction.deferred
+        }
+        if let resolved {
+            applyLocation(resolved)
+        }
+    }
+
     private func updateLocation(_ locator: Locator) {
+        if pageTurnLocationTransaction != nil {
+            pageTurnLocationTransaction?.deferred = locator
+            return
+        }
+        applyLocation(locator)
+    }
+
+    private func applyLocation(_ locator: Locator) {
         let locatorTitle = locator.title?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
