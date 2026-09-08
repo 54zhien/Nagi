@@ -147,8 +147,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func tearDown() {
-        // Teardown is terminal: no caller can observe a later reconciliation,
-        // so terminate and discard every old transaction bookkeeping entry.
         surfaceEpoch &+= 1
         if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
         model.navigator?.invalidateAdjacentPageSurfaces()
@@ -248,26 +246,35 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             activeSurface = nil
             return .restored
         }
+
         active.phase = .committing
         activeSurface = active
-        let result = await navigator.commitAdjacentPageResult(active.navigatorSurface)
+        let initialResult = await navigator.commitAdjacentPageResult(active.navigatorSurface)
         guard active.epoch == surfaceEpoch,
               activeSurface?.pageSurfaceID == surface.id,
               activeSurface?.navigatorSurface === active.navigatorSurface else {
             return .indeterminate
         }
-        switch result {
-        case .committed:
-            activeSurface = nil
-            return .committed
-        case .restored:
-            activeSurface = nil
-            return .restored
-        case .indeterminate:
-            active.phase = .reconciling
-            activeSurface = active
-            return .indeterminate
+
+        if initialResult != .indeterminate {
+            let confirmation = await navigator.reconcileAdjacentPageResult(
+                active.navigatorSurface,
+                deadline: DispatchTime.now().uptimeNanoseconds &+ 900_000_000
+            )
+            guard active.epoch == surfaceEpoch,
+                  activeSurface?.pageSurfaceID == surface.id,
+                  activeSurface?.navigatorSurface === active.navigatorSurface else {
+                return .indeterminate
+            }
+            if confirmation == initialResult {
+                activeSurface = nil
+                return initialResult
+            }
         }
+
+        active.phase = .reconciling
+        activeSurface = active
+        return .indeterminate
     }
 
     func reconcile(
@@ -282,6 +289,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
 
         var firstDeadline = deadline
+        var pendingTerminal: PageSurfaceCommitResult?
         while !Task.isCancelled {
             guard let active = activeSurface,
                   active.pageSurfaceID == surface.id,
@@ -294,19 +302,22 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             let now = DispatchTime.now().uptimeNanoseconds
             let sliceDeadline = max(firstDeadline, now &+ 750_000_000)
             firstDeadline = 0
-            switch await navigator.reconcileAdjacentPageResult(
+            let observed = await navigator.reconcileAdjacentPageResult(
                 active.navigatorSurface,
                 deadline: sliceDeadline
-            ) {
-            case .committed:
-                activeSurface = nil
-                return .committed
-            case .restored:
-                activeSurface = nil
-                return .restored
-            case .indeterminate:
-                guard !Task.isCancelled else { return .indeterminate }
+            )
+
+            switch observed {
+            case .committed, .restored:
+                if pendingTerminal == observed {
+                    activeSurface = nil
+                    return observed
+                }
+                pendingTerminal = observed
                 await Task.yield()
+            case .indeterminate:
+                pendingTerminal = nil
+                guard !Task.isCancelled else { return .indeterminate }
                 try? await Task.sleep(nanoseconds: 80_000_000)
             }
         }
@@ -340,9 +351,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func invalidatePreparedSurfaces() {
-        // External ownership changes invalidate the old token immediately.
-        // The old async task is generation/epoch-stale and must not block the
-        // new navigation or layout operation.
         if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
         surfaceEpoch &+= 1
         guard let navigator = model.navigator else {
