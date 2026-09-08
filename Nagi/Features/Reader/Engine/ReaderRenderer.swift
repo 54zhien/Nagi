@@ -202,59 +202,44 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
     func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
-
         let preferred: NavigatorPageDirection = preferredDirection == .forward ? .forward : .backward
-        let opposite: NavigatorPageDirection = preferred == .forward ? .backward : .forward
-        let priority: NavigatorPageDirection
-        if prewarmStageIsPublished(navigator.adjacentPageReadiness(direction: preferred)),
-           prewarmStageNeedsWork(navigator.adjacentPageReadiness(direction: opposite)) {
-            priority = opposite
-        } else {
-            priority = preferred
+
+        if pageSurfacePrewarmTask == nil {
+            pageSurfacePrewarmRevision &+= 1
+            let revision = pageSurfacePrewarmRevision
+            let warmTask = Task { @MainActor [weak self] in
+                guard let self, let navigator = self.model.navigator else { return }
+                await navigator.prewarmAdjacentPageSurfaces(preferredDirection: preferred)
+                let wasCancelled = Task.isCancelled
+                guard revision == self.pageSurfacePrewarmRevision else { return }
+                self.pageSurfacePrewarmTask = nil
+                if !wasCancelled {
+                    self.onStateChange?()
+                }
+            }
+            pageSurfacePrewarmTask = warmTask
         }
 
-        cancelPageSurfacePrewarm()
         let revision = pageSurfacePrewarmRevision
-        let warmTask = Task { @MainActor [weak self] in
-            guard let self, let navigator = self.model.navigator else { return }
-            await navigator.prewarmAdjacentPageSurfaces(preferredDirection: priority)
-        }
-        pageSurfacePrewarmTask = warmTask
-
         let deadline = DispatchTime.now().uptimeNanoseconds &+ 5_000_000_000
         await withTaskCancellationHandler(operation: {
             while !Task.isCancelled,
                   revision == pageSurfacePrewarmRevision,
                   DispatchTime.now().uptimeNanoseconds < deadline {
-                let readiness = navigator.adjacentPageReadiness(direction: priority)
+                let readiness = navigator.adjacentPageReadiness(direction: preferred)
                 if prewarmStageIsTerminal(readiness) {
-                    break
+                    return
                 }
                 try? await Task.sleep(nanoseconds: 16_000_000)
             }
-        }, onCancel: {
-            warmTask.cancel()
+        }, onCancel: { [weak self] in
+            Task { @MainActor in self?.cancelPageSurfacePrewarm() }
         })
 
-        warmTask.cancel()
-        await warmTask.value
         guard revision == pageSurfacePrewarmRevision else { return }
-        pageSurfacePrewarmTask = nil
-        guard !Task.isCancelled else { return }
-
-        let priorityReadiness = navigator.adjacentPageReadiness(direction: priority)
-        let remainingDirection: NavigatorPageDirection = priority == .forward ? .backward : .forward
-        guard prewarmStageIsPublished(priorityReadiness),
-              prewarmStageNeedsWork(navigator.adjacentPageReadiness(direction: remainingDirection)) else {
-            return
-        }
-
-        Task { @MainActor [weak self] in
-            try? await Task.sleep(nanoseconds: 20_000_000)
-            guard let self,
-                  revision == self.pageSurfacePrewarmRevision,
-                  self.pageSurfacePrewarmTask == nil else { return }
-            self.onStateChange?()
+        let readiness = navigator.adjacentPageReadiness(direction: preferred)
+        if !prewarmStageIsPublished(readiness) {
+            cancelPageSurfacePrewarm()
         }
     }
 
@@ -441,15 +426,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         case .ready, .unavailable:
             return true
         case .unknown, .preparing, .failed:
-            return false
-        }
-    }
-
-    private func prewarmStageNeedsWork(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
-        switch readiness {
-        case .unknown, .failed:
-            return true
-        case .preparing, .ready, .unavailable:
             return false
         }
     }
