@@ -40,8 +40,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     /// Content pixels captured while idle. Keeping the source image separate
     /// from the animator's temporary views prevents any live WebKit layer
     /// from being reused during a turn.
-    private var cachedCurrentImage: UIImage?
-    private var cachedCurrentGeometry: NavigatorPageSurfaceGeometry?
+    private var cachedCurrentSurface: NavigatorCurrentPageSurface?
     private var activeTargetImage: UIImage?
     private var activePageSurface: PageSurface?
     private var pageTurnAnimator: (any PageTurnAnimating)?
@@ -291,8 +290,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         cancelPageTurn(animated: false)
         pageTurnPrewarmTask?.cancel()
         pageTurnPrewarmTask = nil
-        cachedCurrentImage = nil
-        cachedCurrentGeometry = nil
+        cachedCurrentSurface = nil
         model.pageSurfaceProvider?.setBuiltInPageTurnInteractionEnabled(true)
         panGestureRecognizer?.removeTarget(nil, action: nil)
         panGestureRecognizer?.delegate = nil
@@ -480,8 +478,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return true
         }
 
-        guard let currentImage = cachedCurrentImage,
-              let currentGeometry = cachedCurrentGeometry else {
+        guard let currentSurface = cachedCurrentSurface else {
             if !interactive {
                 pageTurnStateMachine.invalidate()
                 navigateWithoutCustomTransition(direction: direction, provider: provider)
@@ -506,7 +503,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 navigateWithoutCustomTransition(direction: direction, provider: provider)
                 return true
             }
-            let currentView = makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry)
+            let currentView = makeCompositeSurface(
+                contentImage: currentSurface.image,
+                geometry: currentSurface.geometry
+            )
             let fallbackAnimator: any PageTurnAnimating
             if readiness == .unavailable {
                 let destinationX = PageTurnMetrics.completionTranslationX(
@@ -553,14 +553,13 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
 
         guard pageSurfaceGeometryIsCompatible(
-            currentGeometry,
-            surface.geometry,
+            current: currentSurface,
+            target: surface,
             viewportSize: snapshotHostView.bounds.size
         ) else {
             provider.cancel(surface: surface)
             provider.invalidatePreparedSurfaces()
-            cachedCurrentImage = nil
-            cachedCurrentGeometry = nil
+            cachedCurrentSurface = nil
             if interactive {
                 return startFallbackGesture(
                     direction: direction,
@@ -581,7 +580,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             pendingPanVelocityX = 0
         }
 
-        let currentComposite = makeCompositeSurface(contentImage: currentImage, geometry: currentGeometry)
+        let currentComposite = makeCompositeSurface(
+            contentImage: currentSurface.image,
+            geometry: currentSurface.geometry
+        )
         let targetComposite = makeCompositeSurface(contentImage: surface.image, geometry: surface.geometry)
         activeTargetImage = surface.image
         let readingDirection = provider.readingDirection
@@ -775,12 +777,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
             switch result {
             case .committed:
-                let committedImage = self.activeTargetImage
                 self.activePageSurface = nil
                 _ = self.pageTurnStateMachine.finish(generation: generation)
                 self.cleanupPageTurn(cancelPreparedSurface: false)
-                self.cachedCurrentImage = committedImage
-                self.cachedCurrentGeometry = surface.geometry
+                self.cachedCurrentSurface = nil
                 self.schedulePageTurnPrewarm()
             case .restored:
                 self.activePageSurface = nil
@@ -789,7 +789,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 self.invalidatePageTurnCache()
                 self.schedulePageTurnPrewarm()
             case .indeterminate:
-                let recoveredImage = await self.recoverIndeterminatePageSurface(
+                _ = await self.recoverIndeterminatePageSurface(
                     surface: surface,
                     generation: generation,
                     provider: provider
@@ -800,8 +800,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 self.activePageSurface = nil
                 _ = self.pageTurnStateMachine.finish(generation: generation)
                 self.cleanupPageTurn(cancelPreparedSurface: false)
-                self.cachedCurrentImage = recoveredImage
-                self.cachedCurrentGeometry = nil
+                self.cachedCurrentSurface = nil
                 self.schedulePageTurnPrewarm()
             }
         }
@@ -987,8 +986,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               let provider = model.pageSurfaceProvider,
               snapshotHostView.bounds.width > 0,
               snapshotHostView.bounds.height > 0,
-              cachedCurrentImage == nil
-                || cachedCurrentGeometry == nil
+              cachedCurrentSurface == nil
                 || provider.adjacentSurfaceReadiness(direction: .forward) != .ready
                 || provider.adjacentSurfaceReadiness(direction: .backward) != .ready
         else { return }
@@ -1004,8 +1002,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             self.pageTurnPrewarmTask = nil
             guard !Task.isCancelled, self.pageTurnStateMachine.state == .idle else { return }
             if let currentSurface = provider.preparedCurrentSurface() {
-                self.cachedCurrentImage = currentSurface.image
-                self.cachedCurrentGeometry = currentSurface.geometry
+                self.cachedCurrentSurface = currentSurface
             }
         }
     }
@@ -1017,8 +1014,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pageTurnPrewarmRevision &+= 1
         pageTurnPrewarmTask?.cancel()
         pageTurnPrewarmTask = nil
-        cachedCurrentImage = nil
-        cachedCurrentGeometry = nil
+        cachedCurrentSurface = nil
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
     }
 
@@ -1073,13 +1069,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             guard !Task.isCancelled, self.isExternalTakeoverActive else { return }
             await Task.yield()
             guard !Task.isCancelled, self.isExternalTakeoverActive else { return }
-            let stableImage = self.makeCurrentContentSnapshot()
+            _ = self.makeCurrentContentSnapshot()
             self.isExternalTakeoverActive = false
             self.cleanupPageTurn(cancelPreparedSurface: false)
-            if let stableImage {
-                self.cachedCurrentImage = stableImage
-                self.cachedCurrentGeometry = nil
-            }
+            self.cachedCurrentSurface = nil
             self.externalTakeoverTask = nil
             self.configurePageTurnInteraction()
             self.schedulePageTurnPrewarm()
@@ -1124,10 +1117,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     }
 
     private func pageSurfaceGeometryIsCompatible(
-        _ current: NavigatorPageSurfaceGeometry,
-        _ target: NavigatorPageSurfaceGeometry,
+        current currentSurface: NavigatorCurrentPageSurface,
+        target targetSurface: PageSurface,
         viewportSize: CGSize
     ) -> Bool {
+        guard currentSurface.generation == targetSurface.generation,
+              currentSurface.identity == targetSurface.originIdentity else { return false }
+        let current = currentSurface.geometry
+        let target = targetSurface.geometry
         let tolerance = 0.5
         func equal(_ lhs: CGFloat, _ rhs: CGFloat) -> Bool { abs(lhs - rhs) <= tolerance }
         return equal(current.pointSize.width, target.pointSize.width)

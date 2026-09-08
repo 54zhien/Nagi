@@ -188,6 +188,8 @@ public final class PageSurface {
     /// must never retain or animate a live WebKit view.
     public let image: UIImage
     public let identity: NavigatorPageSurfaceIdentity
+    public let originIdentity: NavigatorPagePositionIdentity
+    public let generation: Int
     public let geometry: NavigatorPageSurfaceGeometry
 
     /// UIKit animators consume detached views, so create a fresh image view
@@ -206,12 +208,16 @@ public final class PageSurface {
         direction: PageDirection,
         image: UIImage,
         identity: NavigatorPageSurfaceIdentity,
+        originIdentity: NavigatorPagePositionIdentity,
+        generation: Int,
         geometry: NavigatorPageSurfaceGeometry
     ) {
         self.id = id
         self.direction = direction
         self.image = image
         self.identity = identity
+        self.originIdentity = originIdentity
+        self.generation = generation
         self.geometry = geometry
     }
 }

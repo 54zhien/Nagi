@@ -192,6 +192,8 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             direction: direction,
             image: prepared.image,
             identity: prepared.identity,
+            originIdentity: prepared.originIdentity,
+            generation: prepared.generation,
             geometry: prepared.geometry
         )
         activeSurface = ActiveSurface(
