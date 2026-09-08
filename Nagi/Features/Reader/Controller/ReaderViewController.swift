@@ -37,6 +37,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var pageTurnTask: Task<Void, Never>?
     private var pageTurnPrewarmTask: Task<Void, Never>?
     private var pageTurnPrewarmRevision: UInt = 0
+    private var preferredPrewarmDirection: PageDirection = .forward
     /// Content pixels captured while idle. Keeping the source image separate
     /// from the animator's temporary views prevents any live WebKit layer
     /// from being reused during a turn.
@@ -781,6 +782,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
             switch result {
             case .committed:
+                self.preferredPrewarmDirection = surface.direction
                 self.activePageSurface = nil
                 _ = self.pageTurnStateMachine.finish(generation: generation)
                 self.cleanupPageTurn(cancelPreparedSurface: false)
@@ -991,8 +993,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               snapshotHostView.bounds.width > 0,
               snapshotHostView.bounds.height > 0,
               cachedCurrentSurface == nil
-                || provider.adjacentSurfaceReadiness(direction: .forward) != .ready
-                || provider.adjacentSurfaceReadiness(direction: .backward) != .ready
+                || needsPageSurfacePrewarm(provider.adjacentSurfaceReadiness(direction: .forward))
+                || needsPageSurfacePrewarm(provider.adjacentSurfaceReadiness(direction: .backward))
         else { return }
 
         pageTurnPrewarmTask?.cancel()
@@ -1001,13 +1003,22 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pageTurnPrewarmTask = Task { @MainActor [weak self, weak provider] in
             await Task.yield()
             guard let self, let provider, !Task.isCancelled else { return }
-            await provider.prewarmAdjacentSurfaces()
+            await provider.prewarmAdjacentSurfaces(preferredDirection: self.preferredPrewarmDirection)
             guard revision == self.pageTurnPrewarmRevision else { return }
             self.pageTurnPrewarmTask = nil
             guard !Task.isCancelled, self.pageTurnStateMachine.state == .idle else { return }
             if let currentSurface = provider.preparedCurrentSurface() {
                 self.cachedCurrentSurface = currentSurface
             }
+        }
+    }
+
+    private func needsPageSurfacePrewarm(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
+        switch readiness {
+        case .unknown, .failed:
+            return true
+        case .ready, .preparing, .unavailable:
+            return false
         }
     }
 

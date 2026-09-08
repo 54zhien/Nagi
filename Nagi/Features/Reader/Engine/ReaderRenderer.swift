@@ -205,9 +205,11 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         return surface
     }
 
-    func prewarmAdjacentSurfaces() async {
+    func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
-        await navigator.prewarmAdjacentPageSurfaces()
+        await navigator.prewarmAdjacentPageSurfaces(
+            preferredDirection: preferredDirection == .forward ? .forward : .backward
+        )
     }
 
     func preparedCurrentSurface() -> NavigatorCurrentPageSurface? {

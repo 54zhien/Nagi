@@ -234,7 +234,7 @@ public protocol PageSurfaceProvider: AnyObject {
     /// Populates detached adjacent-page snapshots while the reader is settled.
     /// Gesture handling must only consume this cache; it must never trigger
     /// WebKit navigation, layout, or snapshotting.
-    func prewarmAdjacentSurfaces() async
+    func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async
     func preparedCurrentSurface() -> NavigatorCurrentPageSurface?
     func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface?
