@@ -10,11 +10,6 @@ import UIKit
 /// updates only change uniforms and submit an already-created mesh.
 @MainActor
 final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
-    private struct Vertex {
-        var position: SIMD2<Float>
-        var uv: SIMD2<Float>
-    }
-
     // Must match PageTurnUniforms in PageTurnCurlShaders.metal.
     private struct Uniforms {
         var progress: Float
@@ -68,78 +63,32 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     private var pendingGPUCompletion: ((Bool) -> Void)?
 
     init?(
+        context: PageTurnMetalContext?,
         hostView: UIView,
+        currentImage: UIImage,
+        targetImage: UIImage,
         currentView: UIView,
         targetView: UIView,
         completionTranslationX: CGFloat,
         direction: PageDirection,
         isDark: Bool
     ) {
-        guard completionTranslationX.isFinite, completionTranslationX != 0,
-              let device = MTLCreateSystemDefaultDevice(),
-              let commandQueue = device.makeCommandQueue(),
-              let library = device.makeDefaultLibrary(),
-              let fullscreenVertex = library.makeFunction(name: "page_turn_fullscreen_vertex"),
-              let targetFunction = library.makeFunction(name: "page_turn_target_fragment"),
-              let curlVertexFunction = library.makeFunction(name: "page_turn_curl_vertex"),
-              let curlFragmentFunction = library.makeFunction(name: "page_turn_curl_fragment"),
-              let backFragmentFunction = library.makeFunction(name: "page_turn_curl_back_fragment")
-        else { return nil }
+        guard let context,
+              completionTranslationX.isFinite, completionTranslationX != 0,
+              let currentCGImage = currentImage.cgImage,
+              let targetCGImage = targetImage.cgImage else { return nil }
 
         let bounds = hostView.bounds.integral
         guard bounds.width > 0, bounds.height > 0 else { return nil }
         let scale = Self.displayScale(for: hostView)
         let radius = Self.cornerRadius(for: hostView, bounds: bounds)
-        let (vertices, indices) = Self.makeGrid()
-
-        guard let targetImage = Self.snapshotImage(for: targetView, scale: scale),
-              let currentImage = Self.snapshotImage(for: currentView, scale: scale),
-              let targetTexture = Self.makeTexture(device: device, image: targetImage),
-              let currentTexture = Self.makeTexture(device: device, image: currentImage),
+        guard let targetTexture = Self.makeTexture(device: context.device, image: targetCGImage),
+              let currentTexture = Self.makeTexture(device: context.device, image: currentCGImage),
               targetTexture.width > 0, targetTexture.height > 0,
-              currentTexture.width > 0, currentTexture.height > 0,
-              let vertexBuffer = Self.makeBuffer(device: device, values: vertices),
-              let indexBuffer = Self.makeBuffer(device: device, values: indices)
+              currentTexture.width > 0, currentTexture.height > 0
         else { return nil }
 
-        let targetDescriptor = MTLRenderPipelineDescriptor()
-        targetDescriptor.vertexFunction = fullscreenVertex
-        targetDescriptor.fragmentFunction = targetFunction
-        targetDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-
-        let curlDescriptor = MTLRenderPipelineDescriptor()
-        curlDescriptor.vertexFunction = curlVertexFunction
-        curlDescriptor.fragmentFunction = curlFragmentFunction
-        curlDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        curlDescriptor.colorAttachments[0].isBlendingEnabled = true
-        curlDescriptor.colorAttachments[0].rgbBlendOperation = .add
-        curlDescriptor.colorAttachments[0].alphaBlendOperation = .add
-        curlDescriptor.colorAttachments[0].sourceRGBBlendFactor = .sourceAlpha
-        curlDescriptor.colorAttachments[0].sourceAlphaBlendFactor = .sourceAlpha
-        curlDescriptor.colorAttachments[0].destinationRGBBlendFactor = .oneMinusSourceAlpha
-        curlDescriptor.colorAttachments[0].destinationAlphaBlendFactor = .oneMinusSourceAlpha
-        let backDescriptor = MTLRenderPipelineDescriptor()
-        backDescriptor.vertexFunction = curlVertexFunction
-        backDescriptor.fragmentFunction = backFragmentFunction
-        backDescriptor.colorAttachments[0].pixelFormat = .bgra8Unorm
-        // The back face is an opaque paper sample. Disabling blending makes
-        // its projected overlap deterministic instead of relying on
-        // alpha-ordering that can vary between GPU families.
-
-        targetDescriptor.depthAttachmentPixelFormat = .depth32Float
-        curlDescriptor.depthAttachmentPixelFormat = .depth32Float
-        backDescriptor.depthAttachmentPixelFormat = .depth32Float
-        let depthDescriptor = MTLDepthStencilDescriptor()
-        depthDescriptor.depthCompareFunction = .greater
-        depthDescriptor.isDepthWriteEnabled = true
-
-        guard let depthState = device.makeDepthStencilState(descriptor: depthDescriptor),
-              let targetPipeline = try? device.makeRenderPipelineState(descriptor: targetDescriptor),
-              let curlPipeline = try? device.makeRenderPipelineState(descriptor: curlDescriptor),
-              let backPipeline = try? device.makeRenderPipelineState(descriptor: backDescriptor)
-        else { return nil }
-
-        let metalView = MTKView(frame: bounds, device: device)
+        let metalView = MTKView(frame: bounds, device: context.device)
         metalView.colorPixelFormat = .bgra8Unorm
         metalView.framebufferOnly = true
         metalView.isPaused = true
@@ -162,16 +111,16 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         self.metalView = metalView
         self.fallbackCurrentView = currentView
         self.fallbackTargetView = targetView
-        self.commandQueue = commandQueue
-        self.depthState = depthState
-        self.vertexBuffer = vertexBuffer
-        self.indexBuffer = indexBuffer
-        self.indexCount = indices.count
+        self.commandQueue = context.commandQueue
+        self.depthState = context.depthState
+        self.vertexBuffer = context.vertexBuffer
+        self.indexBuffer = context.indexBuffer
+        self.indexCount = context.indexCount
         self.targetTexture = targetTexture
         self.currentTexture = currentTexture
-        self.targetPipeline = targetPipeline
-        self.curlPipeline = curlPipeline
-        self.backPipeline = backPipeline
+        self.targetPipeline = context.targetPipeline
+        self.curlPipeline = context.curlPipeline
+        self.backPipeline = context.backPipeline
         self.completionTranslationX = completionTranslationX
         self.pageDirection = direction
         self.isDark = isDark
@@ -456,17 +405,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         return Float(max(0, min(radius / max(bounds.height, 1), 0.5)))
     }
 
-    private static func snapshotImage(for view: UIView, scale: CGFloat) -> CGImage? {
-        let bounds = view.bounds.integral
-        guard bounds.width > 0, bounds.height > 0 else { return nil }
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = scale
-        format.opaque = false
-        return UIGraphicsImageRenderer(bounds: bounds, format: format).image {
-            view.layer.render(in: $0.cgContext)
-        }.cgImage
-    }
-
     private static func makeTexture(device: MTLDevice, image: CGImage) -> MTLTexture? {
         let loader = MTKTextureLoader(device: device)
         let options: [MTKTextureLoader.Option: Any] = [
@@ -475,38 +413,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         return try? loader.newTexture(cgImage: image, options: options)
     }
 
-    private static func makeGrid() -> ([Vertex], [UInt32]) {
-        let columns = 64, rows = 64
-        var vertices: [Vertex] = []
-        vertices.reserveCapacity((columns + 1) * (rows + 1))
-        for row in 0 ... rows {
-            let v = Float(row) / Float(rows)
-            for column in 0 ... columns {
-                let u = Float(column) / Float(columns)
-                vertices.append(Vertex(position: SIMD2<Float>(u * 2 - 1, 1 - v * 2), uv: SIMD2<Float>(u, v)))
-            }
-        }
-        var indices: [UInt32] = []
-        indices.reserveCapacity(columns * rows * 6)
-        let stride = columns + 1
-        for row in 0 ..< rows {
-            for column in 0 ..< columns {
-                let topLeft = UInt32(row * stride + column)
-                let topRight = topLeft + 1
-                let bottomLeft = UInt32((row + 1) * stride + column)
-                let bottomRight = bottomLeft + 1
-                indices += [topLeft, bottomLeft, topRight, topRight, bottomLeft, bottomRight]
-            }
-        }
-        return (vertices, indices)
-    }
-
-    private static func makeBuffer<T>(device: MTLDevice, values: [T]) -> MTLBuffer? {
-        values.withUnsafeBytes { rawBuffer in
-            guard let baseAddress = rawBuffer.baseAddress else { return nil }
-            return device.makeBuffer(bytes: baseAddress, length: rawBuffer.count, options: [])
-        }
-    }
 }
 
 /// Safe terminal path for a curl renderer that cannot be constructed (for

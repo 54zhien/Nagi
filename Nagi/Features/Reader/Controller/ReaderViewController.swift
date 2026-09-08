@@ -44,6 +44,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var activeTargetImage: UIImage?
     private var activePageSurface: PageSurface?
     private var pageTurnAnimator: (any PageTurnAnimating)?
+    private lazy var pageTurnMetalContext = PageTurnMetalContext()
     private var externalTakeoverTask: Task<Void, Never>?
     private var isExternalTakeoverActive = false
     private var queuedExternalAction: ((ReaderViewController) -> Void)?
@@ -596,7 +597,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         switch model.preferences.pageTransition {
             case .pageCurl:
                 animator = PageTurnCurlAnimator(
+                    context: pageTurnMetalContext,
                     hostView: snapshotHostView,
+                    currentImage: currentSurface.image,
+                    targetImage: surface.image,
                     currentView: currentComposite,
                     targetView: targetComposite,
                     completionTranslationX: destinationX,

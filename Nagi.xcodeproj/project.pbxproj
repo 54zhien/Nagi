@@ -81,6 +81,7 @@
 		4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000098 /* PageTurnVisualAnimator.swift */; };
 		4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000099 /* PageTurnCurlAnimator.swift */; };
 		4A000000000000000000009A /* PageTurnCurlShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009A /* PageTurnCurlShaders.metal */; };
+		4A000000000000000000009B /* PageTurnMetalContext.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009B /* PageTurnMetalContext.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -155,6 +156,7 @@
 		3A0000000000000000000098 /* PageTurnVisualAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnVisualAnimator.swift; sourceTree = "<group>"; };
 		3A0000000000000000000099 /* PageTurnCurlAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnCurlAnimator.swift; sourceTree = "<group>"; };
 		3A000000000000000000009A /* PageTurnCurlShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PageTurnCurlShaders.metal; sourceTree = "<group>"; };
+		3A000000000000000000009B /* PageTurnMetalContext.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnMetalContext.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -340,6 +342,7 @@
 				3A0000000000000000000098 /* PageTurnVisualAnimator.swift */,
 				3A0000000000000000000099 /* PageTurnCurlAnimator.swift */,
 				3A000000000000000000009A /* PageTurnCurlShaders.metal */,
+				3A000000000000000000009B /* PageTurnMetalContext.swift */,
 				3A0000000000000000000079 /* ReaderArchitecture.swift */,
 				3A000000000000000000007A /* ReaderRenderer.swift */,
 			);
@@ -665,6 +668,7 @@
 				4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */,
 				4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */,
 				4A000000000000000000009A /* PageTurnCurlShaders.metal in Sources */,
+				4A000000000000000000009B /* PageTurnMetalContext.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -758,7 +762,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 165;
+				CURRENT_PROJECT_VERSION = 166;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -784,7 +788,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 165;
+				CURRENT_PROJECT_VERSION = 166;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
