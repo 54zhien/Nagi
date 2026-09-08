@@ -20,6 +20,8 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
     private var activeSurface: ActiveSurface?
     private var surfaceEpoch: UInt64 = 0
+    private var pageSurfacePrewarmTask: Task<Void, Never>?
+    private var pageSurfacePrewarmRevision: UInt = 0
 
     var onStateChange: (() -> Void)?
 
@@ -147,6 +149,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func tearDown() {
+        cancelPageSurfacePrewarm()
         surfaceEpoch &+= 1
         if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
         model.navigator?.invalidateAdjacentPageSurfaces()
@@ -180,6 +183,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface? {
+        cancelPageSurfacePrewarm()
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
         let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
         guard let prepared = navigator.takePreparedAdjacentPage(direction: navigatorDirection) else {
@@ -198,9 +202,60 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
     func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
-        await navigator.prewarmAdjacentPageSurfaces(
-            preferredDirection: preferredDirection == .forward ? .forward : .backward
-        )
+
+        let preferred: NavigatorPageDirection = preferredDirection == .forward ? .forward : .backward
+        let opposite: NavigatorPageDirection = preferred == .forward ? .backward : .forward
+        let priority: NavigatorPageDirection
+        if prewarmStageIsPublished(navigator.adjacentPageReadiness(direction: preferred)),
+           prewarmStageNeedsWork(navigator.adjacentPageReadiness(direction: opposite)) {
+            priority = opposite
+        } else {
+            priority = preferred
+        }
+
+        cancelPageSurfacePrewarm()
+        let revision = pageSurfacePrewarmRevision
+        let warmTask = Task { @MainActor [weak self] in
+            guard let self, let navigator = self.model.navigator else { return }
+            await navigator.prewarmAdjacentPageSurfaces(preferredDirection: priority)
+        }
+        pageSurfacePrewarmTask = warmTask
+
+        let deadline = DispatchTime.now().uptimeNanoseconds &+ 5_000_000_000
+        await withTaskCancellationHandler(operation: {
+            while !Task.isCancelled,
+                  revision == pageSurfacePrewarmRevision,
+                  DispatchTime.now().uptimeNanoseconds < deadline {
+                let readiness = navigator.adjacentPageReadiness(direction: priority)
+                if prewarmStageIsTerminal(readiness) {
+                    break
+                }
+                try? await Task.sleep(nanoseconds: 16_000_000)
+            }
+        }, onCancel: {
+            warmTask.cancel()
+        })
+
+        warmTask.cancel()
+        await warmTask.value
+        guard revision == pageSurfacePrewarmRevision else { return }
+        pageSurfacePrewarmTask = nil
+        guard !Task.isCancelled else { return }
+
+        let priorityReadiness = navigator.adjacentPageReadiness(direction: priority)
+        let remainingDirection: NavigatorPageDirection = priority == .forward ? .backward : .forward
+        guard prewarmStageIsPublished(priorityReadiness),
+              prewarmStageNeedsWork(navigator.adjacentPageReadiness(direction: remainingDirection)) else {
+            return
+        }
+
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            guard let self,
+                  revision == self.pageSurfacePrewarmRevision,
+                  self.pageSurfacePrewarmTask == nil else { return }
+            self.onStateChange?()
+        }
     }
 
     func preparedCurrentSurface() -> NavigatorCurrentPageSurface? {
@@ -285,23 +340,23 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
               let initialActive = activeSurface,
               initialActive.pageSurfaceID == surface.id,
               initialActive.phase == .reconciling else {
-            return await holdIndeterminateUntilCancelled()
+            return .indeterminate
         }
 
-        var firstDeadline = deadline
         var pendingTerminal: PageSurfaceCommitResult?
-        while !Task.isCancelled {
+        while !Task.isCancelled,
+              DispatchTime.now().uptimeNanoseconds < deadline {
             guard let active = activeSurface,
                   active.pageSurfaceID == surface.id,
                   active.phase == .reconciling,
                   active.epoch == initialActive.epoch,
                   active.navigatorSurface === initialActive.navigatorSurface else {
-                return await holdIndeterminateUntilCancelled()
+                return .indeterminate
             }
 
             let now = DispatchTime.now().uptimeNanoseconds
-            let sliceDeadline = max(firstDeadline, now &+ 750_000_000)
-            firstDeadline = 0
+            guard now < deadline else { break }
+            let sliceDeadline = min(deadline, now &+ 750_000_000)
             let observed = await navigator.reconcileAdjacentPageResult(
                 active.navigatorSurface,
                 deadline: sliceDeadline
@@ -317,16 +372,12 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
                 await Task.yield()
             case .indeterminate:
                 pendingTerminal = nil
-                guard !Task.isCancelled else { return .indeterminate }
-                try? await Task.sleep(nanoseconds: 80_000_000)
+                let sleepStart = DispatchTime.now().uptimeNanoseconds
+                guard sleepStart < deadline, !Task.isCancelled else { return .indeterminate }
+                try? await Task.sleep(
+                    nanoseconds: min(80_000_000, deadline - sleepStart)
+                )
             }
-        }
-        return .indeterminate
-    }
-
-    private func holdIndeterminateUntilCancelled() async -> PageSurfaceCommitResult {
-        while !Task.isCancelled {
-            try? await Task.sleep(nanoseconds: 100_000_000)
         }
         return .indeterminate
     }
@@ -344,6 +395,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func navigateWithoutCustomTransition(direction: PageDirection) async -> Bool {
+        cancelPageSurfacePrewarm()
         guard let navigator = model.navigator else { return false }
         switch direction {
         case .forward:
@@ -358,6 +410,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func invalidatePreparedSurfaces() {
+        cancelPageSurfacePrewarm()
         if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
         surfaceEpoch &+= 1
         guard let navigator = model.navigator else {
@@ -366,5 +419,38 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
         navigator.invalidateAdjacentPageSurfaces()
         activeSurface = nil
+    }
+
+    private func cancelPageSurfacePrewarm() {
+        pageSurfacePrewarmRevision &+= 1
+        pageSurfacePrewarmTask?.cancel()
+        pageSurfacePrewarmTask = nil
+    }
+
+    private func prewarmStageIsTerminal(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
+        switch readiness {
+        case .ready, .failed, .unavailable:
+            return true
+        case .unknown, .preparing:
+            return false
+        }
+    }
+
+    private func prewarmStageIsPublished(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
+        switch readiness {
+        case .ready, .unavailable:
+            return true
+        case .unknown, .preparing, .failed:
+            return false
+        }
+    }
+
+    private func prewarmStageNeedsWork(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
+        switch readiness {
+        case .unknown, .failed:
+            return true
+        case .preparing, .ready, .unavailable:
+            return false
+        }
     }
 }
