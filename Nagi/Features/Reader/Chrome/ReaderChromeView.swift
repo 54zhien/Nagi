@@ -200,12 +200,23 @@ final class ReaderChromeView: UIView {
     /// Returns a detached copy of the moving page header in another view's
     /// coordinate space. Fixed reader controls are deliberately excluded.
     func makePageHeaderSnapshot(in coordinateView: UIView) -> UIView? {
+        makePageHeaderSnapshot(title: titleLabel.text, in: coordinateView)
+    }
+
+    func makePageHeaderSnapshot(title: String?, in coordinateView: UIView) -> UIView? {
         layoutIfNeeded()
-        guard !titleLabel.isHidden, titleLabel.bounds.width > 0, titleLabel.bounds.height > 0,
-              let snapshot = titleLabel.snapshotView(afterScreenUpdates: false) else {
+        guard !titleLabel.isHidden, let title, !title.isEmpty,
+              titleLabel.bounds.width > 0, titleLabel.bounds.height > 0 else {
             return nil
         }
-        snapshot.frame = coordinateView.convert(titleLabel.bounds, from: titleLabel)
+        let snapshot = UILabel(frame: coordinateView.convert(titleLabel.bounds, from: titleLabel))
+        snapshot.text = title
+        snapshot.font = titleLabel.font
+        snapshot.textColor = titleLabel.textColor
+        snapshot.textAlignment = titleLabel.textAlignment
+        snapshot.lineBreakMode = titleLabel.lineBreakMode
+        snapshot.numberOfLines = titleLabel.numberOfLines
+        snapshot.backgroundColor = .clear
         snapshot.isUserInteractionEnabled = false
         snapshot.accessibilityElementsHidden = true
         snapshot.isAccessibilityElement = false

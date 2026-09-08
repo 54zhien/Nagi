@@ -61,6 +61,14 @@ final class EPUBReaderModel {
         }?.id
     }
 
+    func pageHeaderTitle(for locator: Locator) -> String? {
+        guard showBookTitleInPageHeader else { return nil }
+        let resource = normalizedResourceHref(locator.href.path)
+        return tableOfContents.first {
+            normalizedResourceHref($0.link.href) == resource
+        }?.title ?? title
+    }
+
     var fontSizeLevel: Int { didSet { preferencesDidChange() } }
     var fontFamily: ReaderFontFamily { didSet { preferencesDidChange() } }
     var boldText: Bool { didSet { preferencesDidChange() } }

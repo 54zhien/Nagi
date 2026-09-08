@@ -9,6 +9,7 @@ protocol PageTurnAnimating: AnyObject {
     func update(progress: CGFloat)
     func animateCompletion(completion: @escaping (Bool) -> Void)
     func animateCancellation(completion: @escaping () -> Void)
+    func animateRestoration(completion: @escaping () -> Void)
     func remove()
 }
 
@@ -144,7 +145,7 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
 
         currentTintView.frame = currentContainer.bounds
         currentTintView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        currentTintView.backgroundColor = .black
+        currentTintView.backgroundColor = isDark ? .white : .black
         currentTintView.alpha = 0
         currentTintView.isUserInteractionEnabled = false
         currentTintView.layer.cornerCurve = .continuous
@@ -185,6 +186,14 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         }
     }
 
+    func animateRestoration(completion: @escaping () -> Void) {
+        animate(to: 0, duration: 0.16) { [weak self] position in
+            guard position == .end else { return }
+            self?.progress = 0
+            completion()
+        }
+    }
+
     func remove() {
         invalidateAnimation()
         rootView.removeFromSuperview()
@@ -202,7 +211,7 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
             translationX: -completionTranslationX * 0.08 * (1 - progress),
             y: 0
         )
-        currentTintView.alpha = (isDark ? 0.018 : 0.012) * progress
+        currentTintView.alpha = (isDark ? 0.035 : 0.012) * progress
 
         // Keep the overlay nearly neutral in light mode.  The page shadow is
         // the separation cue; a broad opaque shade is what previously made
@@ -347,6 +356,10 @@ final class PageTurnBoundaryAnimator: PageTurnAnimating {
         }
         self.animator = animator
         animator.startAnimation()
+    }
+
+    func animateRestoration(completion: @escaping () -> Void) {
+        animateCancellation(completion: completion)
     }
 
     func remove() {

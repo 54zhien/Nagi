@@ -194,7 +194,8 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             identity: prepared.identity,
             originIdentity: prepared.originIdentity,
             generation: prepared.generation,
-            geometry: prepared.geometry
+            geometry: prepared.geometry,
+            headerTitle: model.pageHeaderTitle(for: prepared.locator)
         )
         activeSurface = ActiveSurface(
             navigatorSurface: prepared,

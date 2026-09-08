@@ -191,6 +191,7 @@ public final class PageSurface {
     public let originIdentity: NavigatorPagePositionIdentity
     public let generation: Int
     public let geometry: NavigatorPageSurfaceGeometry
+    public let headerTitle: String?
 
     /// UIKit animators consume detached views, so create a fresh image view
     /// without exposing mutable renderer state.
@@ -210,7 +211,8 @@ public final class PageSurface {
         identity: NavigatorPageSurfaceIdentity,
         originIdentity: NavigatorPagePositionIdentity,
         generation: Int,
-        geometry: NavigatorPageSurfaceGeometry
+        geometry: NavigatorPageSurfaceGeometry,
+        headerTitle: String?
     ) {
         self.id = id
         self.direction = direction
@@ -219,6 +221,7 @@ public final class PageSurface {
         self.originIdentity = originIdentity
         self.generation = generation
         self.geometry = geometry
+        self.headerTitle = headerTitle
     }
 }
 

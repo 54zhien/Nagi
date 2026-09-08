@@ -507,7 +507,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             }
             let currentView = makeCompositeSurface(
                 contentImage: currentSurface.image,
-                geometry: currentSurface.geometry
+                geometry: currentSurface.geometry,
+                headerTitle: latestTitle
             )
             let fallbackAnimator: any PageTurnAnimating
             if readiness == .unavailable {
@@ -584,9 +585,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         let currentComposite = makeCompositeSurface(
             contentImage: currentSurface.image,
-            geometry: currentSurface.geometry
+            geometry: currentSurface.geometry,
+            headerTitle: latestTitle
         )
-        let targetComposite = makeCompositeSurface(contentImage: surface.image, geometry: surface.geometry)
+        let targetComposite = makeCompositeSurface(
+            contentImage: surface.image,
+            geometry: surface.geometry,
+            headerTitle: surface.headerTitle
+        )
         activeTargetImage = surface.image
         let readingDirection = provider.readingDirection
         let destinationX = PageTurnMetrics.completionTranslationX(
@@ -789,6 +795,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 self.cachedCurrentSurface = nil
                 self.schedulePageTurnPrewarm()
             case .restored:
+                await self.finishPageTurnRestoration()
+                guard !Task.isCancelled,
+                      self.pageTurnStateMachine.accepts(generation) else { return }
                 self.activePageSurface = nil
                 _ = self.pageTurnStateMachine.finish(generation: generation)
                 self.cleanupPageTurn(cancelPreparedSurface: false)
@@ -820,6 +829,21 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 gate.install(continuation)
                 pageTurnAnimator.animateCompletion { finished in
                     gate.resolve(finished)
+                }
+            }
+        }, onCancel: {
+            Task { @MainActor in gate.resolve(false) }
+        })
+    }
+
+    private func finishPageTurnRestoration() async {
+        guard let pageTurnAnimator else { return }
+        let gate = PageTurnAnimationGate()
+        _ = await withTaskCancellationHandler(operation: {
+            await withCheckedContinuation { continuation in
+                gate.install(continuation)
+                pageTurnAnimator.animateRestoration {
+                    gate.resolve(true)
                 }
             }
         }, onCancel: {
@@ -1111,7 +1135,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func makeCompositeSurface(
         contentImage: UIImage,
-        geometry: NavigatorPageSurfaceGeometry
+        geometry: NavigatorPageSurfaceGeometry,
+        headerTitle: String?
     ) -> UIView {
         let composite = UIView(frame: snapshotHostView.bounds)
         composite.backgroundColor = latestReaderBackground
@@ -1125,7 +1150,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         content.frame = geometry.contentRect
         content.isUserInteractionEnabled = false
         composite.addSubview(content)
-        if let header = chromeView.makePageHeaderSnapshot(in: snapshotHostView) {
+        if let header = chromeView.makePageHeaderSnapshot(title: headerTitle, in: snapshotHostView) {
             composite.addSubview(header)
         }
         return composite

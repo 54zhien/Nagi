@@ -193,6 +193,27 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         )
     }
 
+    func animateRestoration(completion: @escaping () -> Void) {
+        animationRevision &+= 1
+        stopAnimation()
+        metalView.isHidden = true
+        if fallbackTargetView.superview == nil {
+            hostView.insertSubview(fallbackTargetView, aboveSubview: fallbackCurrentView)
+        }
+        fallbackCurrentView.alpha = 0
+        fallbackTargetView.alpha = 1
+        UIView.animate(
+            withDuration: 0.12,
+            delay: 0,
+            options: [.curveEaseOut, .beginFromCurrentState, .allowUserInteraction]
+        ) { [weak self] in
+            self?.fallbackCurrentView.alpha = 1
+            self?.fallbackTargetView.alpha = 0
+        } completion: { _ in
+            completion()
+        }
+    }
+
     func remove() {
         animationRevision &+= 1
         stopAnimation()
@@ -468,6 +489,10 @@ final class PageTurnNoAnimationAnimator: PageTurnAnimating {
             guard let self, self.callbackToken == token else { return }
             completion()
         }
+    }
+
+    func animateRestoration(completion: @escaping () -> Void) {
+        animateCancellation(completion: completion)
     }
 
     func remove() {
