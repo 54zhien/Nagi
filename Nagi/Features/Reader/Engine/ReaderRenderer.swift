@@ -297,16 +297,24 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
 
         if initialResult != .indeterminate {
-            let confirmation = await navigator.reconcileAdjacentPageResult(
-                active.navigatorSurface,
-                deadline: DispatchTime.now().uptimeNanoseconds &+ 900_000_000
-            )
-            guard active.epoch == surfaceEpoch,
-                  activeSurface?.pageSurfaceID == surface.id,
-                  activeSurface?.navigatorSurface === active.navigatorSurface else {
-                return .indeterminate
+            var confirmed = true
+            for _ in 0 ..< 2 {
+                let confirmation = await navigator.reconcileAdjacentPageResult(
+                    active.navigatorSurface,
+                    deadline: DispatchTime.now().uptimeNanoseconds &+ 600_000_000
+                )
+                guard active.epoch == surfaceEpoch,
+                      activeSurface?.pageSurfaceID == surface.id,
+                      activeSurface?.navigatorSurface === active.navigatorSurface else {
+                    return .indeterminate
+                }
+                if confirmation != initialResult {
+                    confirmed = false
+                    break
+                }
+                await Task.yield()
             }
-            if confirmation == initialResult {
+            if confirmed {
                 activeSurface = nil
                 return initialResult
             }
