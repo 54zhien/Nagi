@@ -810,9 +810,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
             completion?(true)
             return
         }
-        let direction = activePageSurface.map {
-            pageCurlNavigationDirection(for: $0.direction) == .forward ? .reverse : .forward
-        } ?? .reverse
+        let direction: UIPageViewController.NavigationDirection = activePageSurface.map {
+            pageCurlNavigationDirection(for: $0.direction) == .forward
+                ? UIPageViewController.NavigationDirection.reverse
+                : UIPageViewController.NavigationDirection.forward
+        } ?? UIPageViewController.NavigationDirection.reverse
         pageViewController.setViewControllers(
             [contentHostController],
             direction: direction,
@@ -1089,7 +1091,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
             // The target snapshot is the visual source of truth until the
             // animation has ended. Commit Readium only after that point so a
             // late WebView restore/repaint cannot flash the previous page.
-            let finished = animationAlreadyFinished || await self.finishPageTurnAnimation()
+            let finished: Bool
+            if animationAlreadyFinished {
+                finished = true
+            } else {
+                finished = await self.finishPageTurnAnimation()
+            }
             guard !Task.isCancelled else { return }
             guard self.pageTurnStateMachine.accepts(generation) else {
                 self.finishQueuedExternalTakeover()
