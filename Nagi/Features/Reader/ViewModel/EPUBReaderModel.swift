@@ -42,6 +42,7 @@ struct EPUBTOCEntry: Identifiable {
 @Observable
 final class EPUBReaderModel {
     private struct PageTurnLocationTransaction {
+        let id: UUID
         let origin: Locator
         let target: Locator
         var deferred: Locator?
@@ -1115,16 +1116,24 @@ final class EPUBReaderModel {
         }
     }
 
-    func beginPageTurnLocationTransaction(origin: Locator, target: Locator) {
+    @discardableResult
+    func beginPageTurnLocationTransaction(origin: Locator, target: Locator) -> UUID {
+        let id = UUID()
         pageTurnLocationTransaction = PageTurnLocationTransaction(
+            id: id,
             origin: origin,
             target: target,
             deferred: nil
         )
+        return id
     }
 
-    func finishPageTurnLocationTransaction(result: NavigatorPageCommitResult?) {
-        guard let transaction = pageTurnLocationTransaction else { return }
+    func finishPageTurnLocationTransaction(
+        id: UUID,
+        result: NavigatorPageCommitResult?
+    ) {
+        guard let transaction = pageTurnLocationTransaction,
+              transaction.id == id else { return }
         pageTurnLocationTransaction = nil
         let resolved: Locator?
         switch result {
@@ -1138,6 +1147,10 @@ final class EPUBReaderModel {
         if let resolved {
             applyLocation(resolved)
         }
+    }
+
+    func cancelPageTurnLocationTransaction() {
+        pageTurnLocationTransaction = nil
     }
 
     private func updateLocation(_ locator: Locator) {

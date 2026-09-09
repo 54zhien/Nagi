@@ -10,6 +10,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         let pageSurfaceID: UUID
         let epoch: UInt64
         var phase: Phase
+        var transactionID: UUID?
 
         enum Phase: Equatable {
             case prepared
@@ -162,7 +163,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         surfaceEpoch &+= 1
         if let activeSurface { model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface) }
         model.navigator?.invalidateAdjacentPageSurfaces()
-        model.finishPageTurnLocationTransaction(result: nil)
+        model.cancelPageTurnLocationTransaction()
         activeSurface = nil
         model.tearDown()
         model.onStateChange = nil
@@ -204,7 +205,8 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             navigatorSurface: prepared,
             pageSurfaceID: surface.id,
             epoch: surfaceEpoch,
-            phase: .prepared
+            phase: .prepared,
+            transactionID: nil
         )
         return surface
     }
@@ -305,17 +307,18 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             return .restored
         }
 
-        model.beginPageTurnLocationTransaction(
+        let transactionID = model.beginPageTurnLocationTransaction(
             origin: active.navigatorSurface.originIdentity.locator,
             target: active.navigatorSurface.locator
         )
         active.phase = .committing
+        active.transactionID = transactionID
         activeSurface = active
         let initialResult = await navigator.commitAdjacentPageResult(active.navigatorSurface)
         guard active.epoch == surfaceEpoch,
               activeSurface?.pageSurfaceID == surface.id,
               activeSurface?.navigatorSurface === active.navigatorSurface else {
-            model.finishPageTurnLocationTransaction(result: nil)
+            model.finishPageTurnLocationTransaction(id: transactionID, result: nil)
             if activeSurface?.pageSurfaceID == surface.id {
                 activeSurface = nil
             }
@@ -323,7 +326,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
 
         if initialResult != .indeterminate {
-            model.finishPageTurnLocationTransaction(result: initialResult)
+            model.finishPageTurnLocationTransaction(id: transactionID, result: initialResult)
             activeSurface = nil
             return pageSurfaceCommitResult(from: initialResult)
         }
@@ -340,7 +343,8 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         guard let navigator = model.navigator,
               let initialActive = activeSurface,
               initialActive.pageSurfaceID == surface.id,
-              initialActive.phase == .reconciling else {
+              initialActive.phase == .reconciling,
+              let transactionID = initialActive.transactionID else {
             return .indeterminate
         }
 
@@ -350,7 +354,9 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
                   active.pageSurfaceID == surface.id,
                   active.phase == .reconciling,
                   active.epoch == initialActive.epoch,
+                  active.transactionID == transactionID,
                   active.navigatorSurface === initialActive.navigatorSurface else {
+                model.finishPageTurnLocationTransaction(id: transactionID, result: nil)
                 return .indeterminate
             }
 
@@ -364,7 +370,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
 
             switch observed {
             case .committed, .restored:
-                model.finishPageTurnLocationTransaction(result: observed)
+                model.finishPageTurnLocationTransaction(id: transactionID, result: observed)
                 activeSurface = nil
                 return pageSurfaceCommitResult(from: observed)
             case .indeterminate:
@@ -394,7 +400,9 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     func discardReconciliation(for surface: PageSurface) {
         guard activeSurface?.pageSurfaceID == surface.id,
               activeSurface?.phase == .reconciling else { return }
-        model.finishPageTurnLocationTransaction(result: nil)
+        if let transactionID = activeSurface?.transactionID {
+            model.finishPageTurnLocationTransaction(id: transactionID, result: nil)
+        }
         activeSurface = nil
     }
 
@@ -410,7 +418,9 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             // async call returns, even when cancellation asks it to restore.
             break
         case .reconciling:
-            model.finishPageTurnLocationTransaction(result: nil)
+            if let transactionID = active.transactionID {
+                model.finishPageTurnLocationTransaction(id: transactionID, result: nil)
+            }
             activeSurface = nil
         }
     }
@@ -434,8 +444,9 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         cancelPageSurfacePrewarm()
         if let activeSurface {
             model.navigator?.cancelAdjacentPage(activeSurface.navigatorSurface)
-            if activeSurface.phase == .reconciling {
-                model.finishPageTurnLocationTransaction(result: nil)
+            if activeSurface.phase == .reconciling,
+               let transactionID = activeSurface.transactionID {
+                model.finishPageTurnLocationTransaction(id: transactionID, result: nil)
             }
         }
         surfaceEpoch &+= 1

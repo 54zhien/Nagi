@@ -22,6 +22,8 @@
 	<true/>
 	<key>NSAccentColorName</key>
 	<string>AccentColor</string>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

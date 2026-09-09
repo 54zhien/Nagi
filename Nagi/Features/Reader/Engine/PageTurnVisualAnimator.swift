@@ -211,7 +211,8 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
             translationX: -completionTranslationX * 0.08 * (1 - progress),
             y: 0
         )
-        currentTintView.alpha = (isDark ? 0.035 : 0.012) * progress
+        let separation = CGFloat(sin(Double.pi * Double(progress)))
+        currentTintView.alpha = (isDark ? 0.035 : 0.012) * separation
 
         // Keep the overlay nearly neutral in light mode.  The page shadow is
         // the separation cue; a broad opaque shade is what previously made
@@ -220,7 +221,7 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         targetContainer.layer.shadowOpacity = 0
         setShadow(
             on: currentContainer,
-            opacity: 0.20 * (1 - progress),
+            opacity: 0.20 * separation,
             leading: completionTranslationX < 0
         )
     }
@@ -235,10 +236,9 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         // animate when assigned outside an animation block. When this method
         // is called from `UIViewPropertyAnimator`, the same assignments are
         // captured as the completion animation's endpoints.
-        let targetProgress = min(1, progress / 0.55)
-        let currentProgress = min(1, max(0, (progress - 0.20) / 0.80))
-        targetView.alpha = targetProgress
-        currentView.alpha = 1 - currentProgress
+        let easedProgress = progress * progress * (3 - 2 * progress)
+        targetView.alpha = easedProgress
+        currentView.alpha = 1 - easedProgress
     }
 
     private func setShadow(on container: UIView, opacity: CGFloat, leading: Bool) {
@@ -312,6 +312,7 @@ final class PageTurnBoundaryAnimator: PageTurnAnimating {
     private let currentView: UIView
     private let completionTranslationX: CGFloat
     private var animator: UIViewPropertyAnimator?
+    private var animationRevision: UInt = 0
     private(set) var progress: CGFloat = 0
 
     init(hostView: UIView, currentView: UIView, completionTranslationX: CGFloat) {
@@ -346,12 +347,17 @@ final class PageTurnBoundaryAnimator: PageTurnAnimating {
     }
 
     func animateCancellation(completion: @escaping () -> Void) {
+        animationRevision &+= 1
+        let revision = animationRevision
         animator?.stopAnimation(true)
-        let animator = UIViewPropertyAnimator(duration: 0.18, dampingRatio: 0.82) { [weak self] in
+        let duration = 0.18 * max(0.2, Double(progress))
+        let animator = UIViewPropertyAnimator(duration: duration, dampingRatio: 0.82) { [weak self] in
             self?.currentView.transform = .identity
         }
         animator.addCompletion { [weak self] _ in
-            self?.progress = 0
+            guard let self, revision == self.animationRevision else { return }
+            self.animator = nil
+            self.progress = 0
             completion()
         }
         self.animator = animator
@@ -363,6 +369,7 @@ final class PageTurnBoundaryAnimator: PageTurnAnimating {
     }
 
     func remove() {
+        animationRevision &+= 1
         animator?.stopAnimation(true)
         animator = nil
         currentView.transform = .identity
