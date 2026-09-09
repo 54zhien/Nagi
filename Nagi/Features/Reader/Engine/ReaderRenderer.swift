@@ -307,6 +307,9 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
               activeSurface?.pageSurfaceID == surface.id,
               activeSurface?.navigatorSurface === active.navigatorSurface else {
             model.finishPageTurnLocationTransaction(result: nil)
+            if activeSurface?.pageSurfaceID == surface.id {
+                activeSurface = nil
+            }
             return pageSurfaceCommitResult(from: initialResult)
         }
 
@@ -393,6 +396,9 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         case .prepared:
             activeSurface = nil
         case .committing:
+            // The navigator commit is still the transaction owner. Keep the
+            // surface and deferred locator transaction alive until that
+            // async call returns, even when cancellation asks it to restore.
             break
         case .reconciling:
             model.finishPageTurnLocationTransaction(result: nil)
@@ -425,11 +431,15 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
         surfaceEpoch &+= 1
         guard let navigator = model.navigator else {
-            activeSurface = nil
+            if activeSurface?.phase != .committing {
+                activeSurface = nil
+            }
             return
         }
         navigator.invalidateAdjacentPageSurfaces()
-        activeSurface = nil
+        if activeSurface?.phase != .committing {
+            activeSurface = nil
+        }
     }
 
     private func cancelPageSurfacePrewarm() {

@@ -197,7 +197,8 @@ public final class PageSurface {
     /// without exposing mutable renderer state.
     public var view: UIImageView {
         let view = UIImageView(image: image)
-        view.contentMode = .center
+        view.contentMode = .scaleAspectFit
+        view.clipsToBounds = true
         view.isUserInteractionEnabled = false
         view.accessibilityElementsHidden = true
         view.isAccessibilityElement = false
