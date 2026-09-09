@@ -232,8 +232,12 @@ public protocol PageSurfaceProvider: AnyObject {
     var readingDirection: PageTurnReadingDirection { get }
     /// True whenever the navigator is currently backed by the
     /// publication-wide vertical continuous renderer, including an
-    /// accessibility- or writing-mode-forced scroll presentation.
+    /// accessibility-forced scroll presentation.
     var usesContinuousScroll: Bool { get }
+    /// True only when the active Readium presentation can provide stable,
+    /// discrete pages for the custom snapshot transition pipeline. Vertical
+    /// writing remains a native horizontal scroll presentation.
+    var supportsCustomPageTurns: Bool { get }
     /// True only while the renderer has an active navigator capable of
     /// accepting a prepared surface. A provider object can exist during the
     /// reader's loading phase, so object existence alone is insufficient.

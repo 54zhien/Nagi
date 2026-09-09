@@ -58,6 +58,11 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         model.navigator?.isContinuousScrollEnabled == true
     }
 
+    var supportsCustomPageTurns: Bool {
+        guard let navigator = model.navigator else { return false }
+        return !navigator.presentation.scroll
+    }
+
     func load() async {
         model.onStateChange = { [weak self] in self?.onStateChange?() }
         await model.loadIfNeeded()

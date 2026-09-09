@@ -469,6 +469,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
             && !isExternalTakeoverActive
             && model.pageSurfaceProvider?.isPageSurfaceProviderReady == true
             && model.pageSurfaceProvider?.usesContinuousScroll == false
+            && model.pageSurfaceProvider?.supportsCustomPageTurns == true
     }
 
     private var isCustomPageTurnCandidateEnabled: Bool {
@@ -478,6 +479,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
             && !isExternalTakeoverActive
             && model.pageSurfaceProvider?.isPageSurfaceProviderReady == true
             && model.pageSurfaceProvider?.usesContinuousScroll == false
+            && model.pageSurfaceProvider?.supportsCustomPageTurns == true
     }
 
     /// Reports whether the complete two-sided cache has finished warming.
@@ -836,6 +838,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
         guard !provider.usesContinuousScroll else {
             handleContentToggle()
             return false
+        }
+        guard provider.supportsCustomPageTurns else {
+            guard !interactive else { return false }
+            navigateWithoutCustomTransition(direction: direction, provider: provider)
+            return true
         }
         guard model.preferences.pageTransition != .scroll else {
             // Fixed-layout EPUBs cannot join the publication-wide vertical
