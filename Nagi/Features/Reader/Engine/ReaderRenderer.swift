@@ -54,6 +54,10 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         model.navigator?.pageReadingProgression == .rtl ? .rightToLeft : .leftToRight
     }
 
+    var usesContinuousScroll: Bool {
+        model.navigator?.isContinuousScrollEnabled == true
+    }
+
     func load() async {
         model.onStateChange = { [weak self] in self?.onStateChange?() }
         await model.loadIfNeeded()
@@ -276,7 +280,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             originIdentity: prepared.originIdentity,
             generation: prepared.generation,
             geometry: prepared.geometry,
-            headerTitle: model.pageHeaderTitle(for: prepared.locator)
+            headerTitle: model.pageHeaderTitle()
         )
     }
 

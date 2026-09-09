@@ -468,7 +468,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
             && !UIAccessibility.isVoiceOverRunning
             && !isExternalTakeoverActive
             && model.pageSurfaceProvider?.isPageSurfaceProviderReady == true
-            && pageTurnSurfacesArePublished
+            && model.pageSurfaceProvider?.usesContinuousScroll == false
     }
 
     private var isCustomPageTurnCandidateEnabled: Bool {
@@ -477,11 +477,13 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
             && !UIAccessibility.isVoiceOverRunning
             && !isExternalTakeoverActive
             && model.pageSurfaceProvider?.isPageSurfaceProviderReady == true
+            && model.pageSurfaceProvider?.usesContinuousScroll == false
     }
 
-    /// A custom gesture must never start while a surface is still being
-    /// prepared. Readium's native interaction remains enabled during that
-    /// window, so a slow first turn is still usable.
+    /// Reports whether the complete two-sided cache has finished warming.
+    /// Gesture ownership no longer depends on this value: otherwise Readium's
+    /// ordinary smooth swipe can replace the mode the reader selected merely
+    /// because the opposite direction is still preparing.
     private var pageTurnSurfacesArePublished: Bool {
         guard let currentSurface = cachedCurrentSurface,
               pageSurfaceGeometryIsCompatibleWithViewport(
@@ -730,6 +732,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
         }
 
         if finished && completed {
+            // UIKit has finished the visible curl, but the immutable target
+            // remains on screen while Readium commits and paints it. Do not
+            // let a second curl recognizer consume touches in that window.
+            setPageCurlInternalInteractionEnabled(false)
             guard pageTurnStateMachine.finish(with: .complete, generation: generation) else {
                 pageTurnStateMachine.invalidate()
                 cleanupPageTurn(cancelPreparedSurface: true)
@@ -827,9 +833,15 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate,
     private func startPageTurn(direction: PageDirection, interactive: Bool) -> Bool {
         guard !isExternalTakeoverActive else { return false }
         guard let provider = model.pageSurfaceProvider else { return false }
-        guard model.preferences.pageTransition != .scroll else {
+        guard !provider.usesContinuousScroll else {
             handleContentToggle()
             return false
+        }
+        guard model.preferences.pageTransition != .scroll else {
+            // Fixed-layout EPUBs cannot join the publication-wide vertical
+            // scroll. Keep their paginated fallback operable for edge taps.
+            navigateWithoutCustomTransition(direction: direction, provider: provider)
+            return true
         }
         guard let generation = pageTurnStateMachine.prepare(direction: direction) else { return false }
         fallbackNavigationRevision &+= 1

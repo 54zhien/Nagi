@@ -67,12 +67,9 @@ final class EPUBReaderModel {
         }?.id
     }
 
-    func pageHeaderTitle(for locator: Locator) -> String? {
+    func pageHeaderTitle() -> String? {
         guard showBookTitleInPageHeader else { return nil }
-        let resource = normalizedResourceHref(locator.href.path)
-        return tableOfContents.first {
-            normalizedResourceHref($0.link.href) == resource
-        }?.title ?? title
+        return title
     }
 
     var fontSizeLevel: Int { didSet { preferencesDidChange() } }
@@ -590,7 +587,10 @@ final class EPUBReaderModel {
             pageMargins: ReaderLayoutMetrics.pageMarginFactor(for: pageMargins),
             paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
             publisherStyles: publisherStyles,
-            scroll: pageTransition == .scroll,
+            // Fixed-layout EPUBs cannot participate in the outer continuous
+            // document scroll. Leave them paginated instead of disabling both
+            // their inner and outer page-turn gestures.
+            scroll: pageTransition == .scroll && isReflowable,
             spread: .auto,
             textColor: ReadiumNavigator.Color(
                 uiColor: effectiveTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance)
@@ -1260,8 +1260,12 @@ private func normalizedResourceHref(_ href: String) -> String {
 
 extension EPUBReaderModel: EPUBNavigatorDelegate {
     func navigator(_ navigator: VisualNavigator, presentationDidChange presentation: VisualNavigatorPresentation) {
+        _ = presentation
         applyVisibleReaderBaseAppearance()
         refreshVisibleReaderOverrides()
+        // ReaderViewController must re-evaluate gesture ownership after the
+        // asynchronous paginated/continuous presentation switch settles.
+        onStateChange?()
     }
 
     func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
@@ -1309,7 +1313,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
 
         switch PageTurnMetrics.edgeHit(atX: point.x, screenWidth: width) {
         case .left:
-            if pageTransition == .scroll {
+            if self.navigator?.isContinuousScrollEnabled == true {
                 onToggleControls?()
             } else {
                 let readingDirection: PageTurnReadingDirection = self.navigator?.pageReadingProgression == .rtl
@@ -1320,7 +1324,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
                 )
             }
         case .right:
-            if pageTransition == .scroll {
+            if self.navigator?.isContinuousScrollEnabled == true {
                 onToggleControls?()
             } else {
                 let readingDirection: PageTurnReadingDirection = self.navigator?.pageReadingProgression == .rtl

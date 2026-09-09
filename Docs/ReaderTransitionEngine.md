@@ -40,8 +40,9 @@ Current and adjacent page pixels come from the same Readium WebKit snapshot path
 - The center region only toggles reader controls.
 - Horizontal drag is interactive in paginated modes and disabled in continuous scrolling.
 - A turn completes above 24% progress or with a sufficiently directional fast fling; otherwise it cancels.
-- Until the current, previous, and next surfaces are all published, Readium keeps ownership of its built-in interaction. Custom page turns never begin from a partially warmed cache.
-- Reduce Motion, VoiceOver, transient surface failures, memory pressure, and invalidated layout use Readium's built-in navigation or a non-animated fallback.
+- Once the renderer is ready, slide, curl, and fade retain ownership of horizontal gestures. A turn consumes only a geometry-matched current surface and the requested adjacent direction; the opposite side may still be preparing. Readium's ordinary smooth paginated swipe does not take over while one side is warming.
+- Reduce Motion and VoiceOver may use Readium's built-in navigation. Transient surface failures, memory pressure, and invalidated layout use a non-animated fallback and immediately restart prewarming.
+- Continuous vertical scrolling is used for reflowable EPUB/TXT content. Fixed-layout EPUBs remain operable through paginated navigation when the scroll preference is selected.
 - Rotation, safe-area changes, display-scale changes, typography changes, and theme changes cancel the active turn and invalidate all cached surfaces.
 
 ## Validation gates
