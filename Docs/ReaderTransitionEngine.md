@@ -42,7 +42,7 @@ Current and adjacent page pixels come from the same Readium WebKit snapshot path
 - A turn completes above 24% progress or with a sufficiently directional fast fling; otherwise it cancels.
 - Once the renderer is ready, slide, curl, and fade retain ownership of horizontal gestures. A turn consumes only a geometry-matched current surface and the requested adjacent direction; the opposite side may still be preparing. Readium's ordinary smooth paginated swipe does not take over while one side is warming.
 - Reduce Motion and VoiceOver may use Readium's built-in navigation. Transient surface failures, memory pressure, and invalidated layout use a non-animated fallback and immediately restart prewarming.
-- Continuous vertical scrolling is used for reflowable EPUB/TXT content. Fixed-layout EPUBs remain operable through paginated navigation when the scroll preference is selected.
+- Continuous vertical scrolling is used for horizontal reflowable EPUB/TXT content. Fixed-layout EPUBs remain operable through paginated navigation, while vertical-writing EPUBs retain their native horizontal presentation when the scroll preference is selected.
 - Rotation, safe-area changes, display-scale changes, typography changes, and theme changes cancel the active turn and invalidate all cached surfaces.
 
 ## Validation gates
