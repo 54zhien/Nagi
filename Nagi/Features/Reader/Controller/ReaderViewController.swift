@@ -728,20 +728,20 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             ), let targetImage = makeCompositeImage(
                 from: targetComposite,
                 scale: surface.geometry.scale
-            ) else {
+            ) {
+                animator = PageTurnCurlAnimator(
+                    hostView: snapshotHostView,
+                    currentImage: currentImage,
+                    targetImage: targetImage,
+                    completionTranslationX: destinationX,
+                    isDark: isDarkPageBackground
+                )
+            } else {
                 animator = PageTurnVisualAnimator(
                     style: .cover,
                     hostView: snapshotHostView,
                     currentView: currentComposite,
                     targetView: targetComposite,
-                    completionTranslationX: destinationX,
-                    isDark: isDarkPageBackground
-                )
-            } else {
-                animator = PageTurnCurlAnimator(
-                    hostView: snapshotHostView,
-                    currentImage: currentImage,
-                    targetImage: targetImage,
                     completionTranslationX: destinationX,
                     isDark: isDarkPageBackground
                 )
