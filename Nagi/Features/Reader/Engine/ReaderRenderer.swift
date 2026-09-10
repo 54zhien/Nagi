@@ -23,6 +23,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     private var surfaceEpoch: UInt64 = 0
     private var pageSurfacePrewarmTask: Task<Void, Never>?
     private var pageSurfacePrewarmRevision: UInt = 0
+    private static let pageSurfacePrewarmWaitBudget: UInt64 = 1_500_000_000
 
     var onStateChange: (() -> Void)?
 
@@ -212,15 +213,22 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async {
+        await prewarmAdjacentSurfaces(
+            preferredDirection: preferredDirection,
+            deadline: DispatchTime.now().uptimeNanoseconds
+                &+ Self.pageSurfacePrewarmWaitBudget
+        )
+    }
+
+    func prewarmAdjacentSurfaces(
+        preferredDirection: PageDirection,
+        deadline: UInt64
+    ) async {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return }
         let preferred: NavigatorPageDirection = preferredDirection == .forward ? .forward : .backward
 
-        let forwardReadiness = navigator.adjacentPageReadiness(direction: .forward)
-        let backwardReadiness = navigator.adjacentPageReadiness(direction: .backward)
-        let hasCurrentSurface = navigator.preparedCurrentPageSurface() != nil
-        if hasCurrentSurface,
-           prewarmStageIsPublished(forwardReadiness),
-           prewarmStageIsPublished(backwardReadiness) {
+        if navigator.preparedCurrentPageSurface() != nil,
+           prewarmStageIsPublished(navigator.adjacentPageReadiness(direction: preferred)) {
             return
         }
 
@@ -228,11 +236,16 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
             pageSurfacePrewarmRevision &+= 1
             let revision = pageSurfacePrewarmRevision
             let warmTask = Task { @MainActor [weak self] in
-                guard let self, let navigator = self.model.navigator else { return }
+                guard let self else { return }
+                defer {
+                    if revision == self.pageSurfacePrewarmRevision {
+                        self.pageSurfacePrewarmTask = nil
+                    }
+                }
+                guard let navigator = self.model.navigator else { return }
                 await navigator.prewarmAdjacentPageSurfaces(preferredDirection: preferred)
                 let wasCancelled = Task.isCancelled
                 guard revision == self.pageSurfacePrewarmRevision else { return }
-                self.pageSurfacePrewarmTask = nil
                 if !wasCancelled {
                     self.onStateChange?()
                 }
@@ -241,25 +254,24 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
 
         let revision = pageSurfacePrewarmRevision
-        let deadline = DispatchTime.now().uptimeNanoseconds &+ 5_000_000_000
-        await withTaskCancellationHandler(operation: {
-            while !Task.isCancelled,
-                  revision == pageSurfacePrewarmRevision,
-                  DispatchTime.now().uptimeNanoseconds < deadline {
-                let readiness = navigator.adjacentPageReadiness(direction: preferred)
-                if prewarmStageIsTerminal(readiness) {
-                    return
-                }
-                try? await Task.sleep(nanoseconds: 16_000_000)
+        let now = DispatchTime.now().uptimeNanoseconds
+        let waitDeadline = min(
+            deadline,
+            now &+ Self.pageSurfacePrewarmWaitBudget
+        )
+        while !Task.isCancelled,
+              revision == pageSurfacePrewarmRevision,
+              DispatchTime.now().uptimeNanoseconds < waitDeadline {
+            let readiness = navigator.adjacentPageReadiness(direction: preferred)
+            if navigator.preparedCurrentPageSurface() != nil,
+               prewarmStageIsPublished(readiness) {
+                return
             }
-        }, onCancel: { [weak self] in
-            Task { @MainActor in self?.cancelPageSurfacePrewarm() }
-        })
-
-        guard revision == pageSurfacePrewarmRevision else { return }
-        let readiness = navigator.adjacentPageReadiness(direction: preferred)
-        if !prewarmStageIsPublished(readiness) {
-            cancelPageSurfacePrewarm()
+            let sleepStart = DispatchTime.now().uptimeNanoseconds
+            guard sleepStart < waitDeadline else { return }
+            try? await Task.sleep(
+                nanoseconds: min(16_000_000, waitDeadline - sleepStart)
+            )
         }
     }
 
@@ -437,7 +449,7 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     }
 
     func setBuiltInPageTurnInteractionEnabled(_ enabled: Bool) {
-        model.navigator?.isUserPageTurnInteractionEnabled = enabled
+        model.setNativePageTurnInteractionEnabled(enabled)
     }
 
     func invalidatePreparedSurfaces() {
@@ -466,15 +478,6 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         pageSurfacePrewarmRevision &+= 1
         pageSurfacePrewarmTask?.cancel()
         pageSurfacePrewarmTask = nil
-    }
-
-    private func prewarmStageIsTerminal(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
-        switch readiness {
-        case .ready, .failed, .unavailable:
-            return true
-        case .unknown, .preparing:
-            return false
-        }
     }
 
     private func prewarmStageIsPublished(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {

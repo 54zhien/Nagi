@@ -128,6 +128,11 @@ final class EPUBReaderModel {
     private var previewResourceHref: String?
     private var hasLoaded = false
     private var suppressPreferenceUpdates = false
+    // Keep the host's native page-turn policy across the async navigator
+    // creation window. ReaderControllerRepresentable can disable Readium
+    // before the navigator exists; applying only to `navigator` would lose
+    // that first-open policy.
+    private var nativePageTurnInteractionEnabled = true
 
     private var systemIsDark = false
     private var viewportSize = CGSize.zero
@@ -278,6 +283,7 @@ final class EPUBReaderModel {
                 self?.onSwipeStart?()
                 return false
             }))
+            navigator.isUserPageTurnInteractionEnabled = nativePageTurnInteractionEnabled
             self.navigator = navigator
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
@@ -366,6 +372,11 @@ final class EPUBReaderModel {
         systemIsDark = isDark
         guard appearanceMode == .system else { return }
         schedulePreferencesCommit(kind: .theme, commitBehavior: .immediate)
+    }
+
+    func setNativePageTurnInteractionEnabled(_ enabled: Bool) {
+        nativePageTurnInteractionEnabled = enabled
+        navigator?.isUserPageTurnInteractionEnabled = enabled
     }
 
     func apply(preset: ReaderThemePreset) {

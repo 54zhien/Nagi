@@ -72,6 +72,18 @@ public struct PageTurnConfiguration: Equatable, Sendable {
 public enum PageTurnMetrics {
     public static let defaultConfiguration = PageTurnConfiguration()
 
+    public static func isHorizontalIntent(translation: CGPoint, velocity: CGPoint) -> Bool {
+        guard translation.x.isFinite, translation.y.isFinite,
+              velocity.x.isFinite, velocity.y.isFinite else { return false }
+        // Compare both axes in the same units. Mixing one translation axis
+        // with the other velocity axis rejects nearly horizontal swipes.
+        let vector = max(abs(translation.x), abs(translation.y)) > 0.5
+            ? translation : velocity
+        guard vector.x.isFinite, vector.y.isFinite,
+              max(abs(vector.x), abs(vector.y)) >= 4 else { return false }
+        return abs(vector.x) >= abs(vector.y) * 1.02
+    }
+
     /// Returns the width of either edge tap zone, clamped to 44...60pt.
     public static func edgeHitWidth(
         for screenWidth: CGFloat,
@@ -225,7 +237,7 @@ public protocol PageSurfaceProvider: AnyObject {
     /// Populates detached adjacent-page snapshots while the reader is settled.
     /// Gesture handling must only consume this cache; it must never trigger
     /// WebKit navigation, layout, or snapshotting.
-    func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async
+    func prewarmAdjacentSurfaces(preferredDirection: PageDirection, deadline: UInt64) async
     func preparedCurrentSurface() -> NavigatorCurrentPageSurface?
     func preparedAdjacentSurface(direction: PageDirection) -> PageSurface?
     func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness
@@ -240,6 +252,15 @@ public protocol PageSurfaceProvider: AnyObject {
     func navigateWithoutCustomTransition(direction: PageDirection) async -> Bool
     func setBuiltInPageTurnInteractionEnabled(_ enabled: Bool)
     func invalidatePreparedSurfaces()
+}
+
+extension PageSurfaceProvider {
+    func prewarmAdjacentSurfaces(preferredDirection: PageDirection) async {
+        await prewarmAdjacentSurfaces(
+            preferredDirection: preferredDirection,
+            deadline: DispatchTime.now().uptimeNanoseconds &+ 1_500_000_000
+        )
+    }
 }
 
 /// Main-thread state machine for coordinating surfaces, animation, and the

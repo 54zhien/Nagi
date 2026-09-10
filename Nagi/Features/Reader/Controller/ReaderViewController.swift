@@ -55,6 +55,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var pendingPanVelocityX: CGFloat = 0
     private var pendingPanVelocityY: CGFloat = 0
     private var pendingPanDidEnd = false
+    private var isTrackingPageTurnPan = false
     private var panHasStartedTurn = false
     private var isBoundaryResistanceTurn = false
     private var isSurfaceRaceResistanceTurn = false
@@ -65,7 +66,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private static let pageSurfaceRecoveryAttempts = 3
     private static let pageSurfacePrewarmRetryDelay: UInt64 = 180_000_000
     private static let pageSurfacePrewarmMaxAttempts = 3
-    private static let pendingProgrammaticPageTurnMaxAttempts = 12
+    private static let pendingProgrammaticPageTurnBudget: UInt64 = 2_000_000_000
     private static let pageTurnAnimationTimeout: UInt64 = 1_000_000_000
 
     private var latestStateRevision = 0
@@ -350,7 +351,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         switch gesture.state {
         case .began:
-            guard customPageTurnPreferenceIsActive else { return }
+            guard customPageTurnPreferenceIsActive,
+                  pageTurnStateMachine.state == .idle else { return }
+            cancelPendingProgrammaticPageTurn()
+            isTrackingPageTurnPan = true
             pendingPanTranslationX = translation.x
             pendingPanTranslationY = translation.y
             pendingPanVelocityX = velocity.x
@@ -359,6 +363,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             panHasStartedTurn = false
 
         case .changed:
+            guard isTrackingPageTurnPan else { return }
             pendingPanTranslationX = translation.x
             pendingPanTranslationY = translation.y
             pendingPanVelocityX = velocity.x
@@ -367,6 +372,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             updateInteractivePageTurn()
 
         case .ended:
+            guard isTrackingPageTurnPan else { return }
+            isTrackingPageTurnPan = false
             pendingPanTranslationX = translation.x
             pendingPanTranslationY = translation.y
             pendingPanVelocityX = velocity.x
@@ -376,6 +383,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             finishInteractivePageTurnIfReady()
 
         case .cancelled, .failed:
+            guard isTrackingPageTurnPan else { return }
+            isTrackingPageTurnPan = false
             cancelPageTurn(animated: pageTurnStateMachine.state == .interactive)
 
         default:
@@ -414,14 +423,11 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         guard gestureRecognizer === panGestureRecognizer, let pan = gestureRecognizer as? UIPanGestureRecognizer else {
             return true
         }
-        guard customPageTurnPreferenceIsActive else { return false }
+        guard customPageTurnPreferenceIsActive,
+              pageTurnStateMachine.state == .idle else { return false }
         let translation = pan.translation(in: pan.view)
         let velocity = pan.velocity(in: pan.view)
-        let horizontal = abs(translation.x) > 0.5 ? translation.x : velocity.x
-        let vertical = abs(translation.y) > 0.5 ? translation.y : velocity.y
-
-        guard max(abs(horizontal), abs(vertical)) >= 4 else { return false }
-        return abs(horizontal) >= abs(vertical) * 1.02
+        return PageTurnMetrics.isHorizontalIntent(translation: translation, velocity: velocity)
     }
 
     private func updateChrome() {
@@ -516,10 +522,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             return
         }
         if pageTurnStateMachine.state != .idle || pendingProgrammaticPageTurnTask != nil {
-            let keepsCustomGesture = customPageTurnPreferenceIsActive
-                && (pageTurnStateMachine.state == .preparing
-                    || pageTurnStateMachine.state == .interactive)
-            setPanGestureEnabled(keepsCustomGesture)
+            // Readiness callbacks must not cancel an in-flight pan. New pans
+            // are admitted by gestureRecognizerShouldBegin, not by toggling
+            // the recognizer while UIKit is dispatching its current gesture.
+            setPanGestureEnabled(customPageTurnPreferenceIsActive)
             model.pageSurfaceProvider?.setBuiltInPageTurnInteractionEnabled(false)
             return
         }
@@ -553,7 +559,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         interactive: Bool,
         allowsDeferredProgrammaticRetry: Bool = true
     ) -> Bool {
-        guard !isExternalTakeoverActive else { return false }
+        guard !isExternalTakeoverActive,
+              pageTurnStateMachine.state == .idle else { return false }
         guard let provider = model.pageSurfaceProvider else { return false }
         if pendingProgrammaticPageTurnTask != nil {
             cancelPendingProgrammaticPageTurn()
@@ -836,20 +843,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         )
         if isSurfaceRaceResistanceTurn {
             guard pageTurnStateMachine.finish(with: .cancel, generation: generation) else { return }
-            let shouldNavigate = gestureDecision == .complete
-            pageTurnAnimator?.animateCancellation { [weak self] in
-                guard let self else { return }
-                guard self.pageTurnStateMachine.accepts(generation),
-                      self.pageTurnStateMachine.state == .cancelling,
-                      self.pageTurnStateMachine.finishCancellation(generation: generation) else { return }
-                let provider = self.model.pageSurfaceProvider
-                self.cleanupPageTurn(cancelPreparedSurface: false)
-                if shouldNavigate, let provider {
-                    self.queueProgrammaticPageTurn(direction: direction, provider: provider)
-                } else {
-                    self.schedulePageTurnPrewarm()
-                }
-            }
+            animatePageTurnCancellation(
+                generation: generation,
+                queuedDirection: gestureDecision == .complete ? direction : nil
+            )
             return
         }
 
@@ -860,14 +857,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         case .complete:
             animatePageTurnCompletion(generation: generation)
         case .cancel:
-            pageTurnAnimator?.animateCancellation { [weak self] in
-                guard let self else { return }
-                guard self.pageTurnStateMachine.accepts(generation),
-                      self.pageTurnStateMachine.state == .cancelling,
-                      self.pageTurnStateMachine.finishCancellation(generation: generation) else { return }
-                self.cleanupPageTurn(cancelPreparedSurface: true)
-                self.schedulePageTurnPrewarm()
-            }
+            animatePageTurnCancellation(generation: generation)
         }
     }
 
@@ -880,13 +870,15 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         pageTurnTask = Task { @MainActor [weak self] in
             guard let self else { return }
+            // Takeover can arrive during the final paint/restoration awaits,
+            // after commit has already returned. Every exit must release it.
+            defer { self.finishQueuedExternalTakeover() }
             // The target snapshot is the visual source of truth until the
             // animation has ended. Commit Readium only after that point so a
             // late WebView restore/repaint cannot flash the previous page.
             var finished = await self.finishPageTurnAnimation()
             guard !Task.isCancelled else { return }
             guard self.pageTurnStateMachine.accepts(generation) else {
-                self.finishQueuedExternalTakeover()
                 return
             }
             if !finished {
@@ -900,6 +892,8 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     return
                 }
                 finished = await self.finishPageTurnAnimation()
+                guard !Task.isCancelled,
+                      self.pageTurnStateMachine.accepts(generation) else { return }
                 guard finished else {
                     self.pageTurnStateMachine.invalidate()
                     self.preferredPrewarmDirection = surface.direction
@@ -930,7 +924,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
             guard !Task.isCancelled else { return }
             guard self.pageTurnStateMachine.accepts(generation) else {
-                self.finishQueuedExternalTakeover()
                 return
             }
             switch result {
@@ -965,7 +958,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     provider: provider
                 ) else {
                     self.abortCommittingPageTurn()
-                    self.finishQueuedExternalTakeover()
                     return
                 }
                 guard !Task.isCancelled,
@@ -1001,6 +993,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func finishPageTurnAnimation() async -> Bool {
         guard let pageTurnAnimator else { return false }
+        return await waitForPageTurnAnimation { completion in
+            pageTurnAnimator.animateCompletion(completion: completion)
+        }
+    }
+
+    private func waitForPageTurnAnimation(
+        _ animate: (@escaping (Bool) -> Void) -> Void
+    ) async -> Bool {
         let gate = PageTurnAnimationGate()
         let timeoutTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: Self.pageTurnAnimationTimeout)
@@ -1010,9 +1010,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         let result = await withTaskCancellationHandler(operation: {
             await withCheckedContinuation { continuation in
                 gate.install(continuation)
-                pageTurnAnimator.animateCompletion { finished in
-                    gate.resolve(finished)
-                }
+                animate { gate.resolve($0) }
             }
         }, onCancel: {
             Task { @MainActor in gate.resolve(false) }
@@ -1055,23 +1053,34 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func finishPageTurnRestoration() async {
         guard let pageTurnAnimator else { return }
-        let gate = PageTurnAnimationGate()
-        let timeoutTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: Self.pageTurnAnimationTimeout)
-            guard !Task.isCancelled else { return }
-            gate.resolve(false)
+        _ = await waitForPageTurnAnimation { completion in
+            pageTurnAnimator.animateRestoration { completion(true) }
         }
-        _ = await withTaskCancellationHandler(operation: {
-            await withCheckedContinuation { continuation in
-                gate.install(continuation)
-                pageTurnAnimator.animateRestoration {
-                    gate.resolve(true)
+    }
+
+    private func animatePageTurnCancellation(
+        generation: UInt,
+        queuedDirection: PageDirection? = nil
+    ) {
+        pageTurnTask?.cancel()
+        pageTurnTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            if let animator = self.pageTurnAnimator {
+                _ = await self.waitForPageTurnAnimation { completion in
+                    animator.animateCancellation { completion(true) }
                 }
             }
-        }, onCancel: {
-            Task { @MainActor in gate.resolve(false) }
-        })
-        timeoutTask.cancel()
+            guard !Task.isCancelled,
+                  self.pageTurnStateMachine.accepts(generation),
+                  self.pageTurnStateMachine.finishCancellation(generation: generation) else { return }
+            let provider = self.model.pageSurfaceProvider
+            self.cleanupPageTurn(cancelPreparedSurface: true)
+            if let queuedDirection, let provider {
+                self.queueProgrammaticPageTurn(direction: queuedDirection, provider: provider)
+            } else {
+                self.schedulePageTurnPrewarm()
+            }
+        }
     }
 
     private func waitForPageSurfaceReconciliation(
@@ -1213,14 +1222,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         if animated, pageTurnStateMachine.state == .interactive,
            let generation = activeTurnGeneration {
             _ = pageTurnStateMachine.finish(with: .cancel, generation: generation)
-            pageTurnAnimator?.animateCancellation { [weak self] in
-                guard let self else { return }
-                guard self.pageTurnStateMachine.accepts(generation),
-                      self.pageTurnStateMachine.state == .cancelling,
-                      self.pageTurnStateMachine.finishCancellation(generation: generation) else { return }
-                self.cleanupPageTurn(cancelPreparedSurface: true)
-                self.schedulePageTurnPrewarm()
-            }
+            animatePageTurnCancellation(generation: generation)
             return
         }
 
@@ -1248,6 +1250,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pendingPanVelocityX = 0
         pendingPanVelocityY = 0
         pendingPanDidEnd = false
+        isTrackingPageTurnPan = false
         panHasStartedTurn = false
         isBoundaryResistanceTurn = false
         isSurfaceRaceResistanceTurn = false
@@ -1394,11 +1397,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         provider: any PageSurfaceProvider
     ) {
         cancelPendingProgrammaticPageTurn()
-        cancelPageTurnPrewarm()
         preferredPrewarmDirection = direction
         pendingProgrammaticPageTurnRevision &+= 1
         let revision = pendingProgrammaticPageTurnRevision
         let selectedTransition = model.preferences.pageTransition
+        let deadline = DispatchTime.now().uptimeNanoseconds
+            &+ Self.pendingProgrammaticPageTurnBudget
 
         pendingProgrammaticPageTurnTask = Task { @MainActor [weak self, weak provider] in
             guard let self, let provider else { return }
@@ -1410,7 +1414,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 }
             }
 
-            for attempt in 0 ..< Self.pendingProgrammaticPageTurnMaxAttempts {
+            while DispatchTime.now().uptimeNanoseconds < deadline {
                 guard !Task.isCancelled,
                       revision == self.pendingProgrammaticPageTurnRevision,
                       self.pageTurnStateMachine.state == .idle,
@@ -1420,13 +1424,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 guard provider.isPageSurfaceProviderReady,
                       !provider.usesContinuousScroll,
                       provider.supportsCustomPageTurns else {
-                    if attempt + 1 < Self.pendingProgrammaticPageTurnMaxAttempts {
-                        try? await Task.sleep(nanoseconds: Self.pageSurfacePrewarmRetryDelay)
-                    }
+                    try? await Task.sleep(nanoseconds: Self.pageSurfacePrewarmRetryDelay)
                     continue
                 }
 
-                await provider.prewarmAdjacentSurfaces(preferredDirection: direction)
+                await provider.prewarmAdjacentSurfaces(
+                    preferredDirection: direction,
+                    deadline: deadline
+                )
                 guard !Task.isCancelled,
                       revision == self.pendingProgrammaticPageTurnRevision,
                       self.pageTurnStateMachine.state == .idle else { return }
@@ -1446,9 +1451,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                     return
                 }
 
-                if attempt + 1 < Self.pendingProgrammaticPageTurnMaxAttempts {
-                    try? await Task.sleep(nanoseconds: Self.pageSurfacePrewarmRetryDelay)
-                }
+                try? await Task.sleep(nanoseconds: Self.pageSurfacePrewarmRetryDelay)
             }
         }
         configurePageTurnInteraction()
@@ -1482,9 +1485,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func invalidatePageTurnCache() {
         guard pageTurnStateMachine.state != .committing else { return }
-        pageTurnPrewarmRevision &+= 1
-        pageTurnPrewarmTask?.cancel()
-        pageTurnPrewarmTask = nil
+        cancelPageTurnPrewarm()
         cachedCurrentSurface = nil
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
         configurePageTurnInteraction()
@@ -1518,7 +1519,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     }
 
     private func finishQueuedExternalTakeover() {
-        guard isExternalTakeoverActive else { return }
+        guard isExternalTakeoverActive, externalTakeoverTask == nil else { return }
         let action = queuedExternalAction
         queuedExternalAction = nil
         action?(self)

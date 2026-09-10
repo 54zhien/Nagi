@@ -64,7 +64,11 @@ final class ReaderMutationScheduler<Value> {
         commitTask?.cancel()
         commitTask = nil
         pendingValue = nil
-        resumeWaiters(with: committedGeneration)
+        let waiters = commitWaiters
+        commitWaiters.removeAll()
+        for waiter in waiters {
+            waiter.continuation.resume(returning: committedGeneration)
+        }
     }
 
     private func scheduleCommit() {
