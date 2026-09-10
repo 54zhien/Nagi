@@ -27,20 +27,11 @@ public enum PageTurnState: String, Sendable {
     case completing
     case cancelling
     case committing
-    case fallback
 }
 
 public enum PageTurnDecision: String, Sendable {
     case complete
     case cancel
-}
-
-public enum PageTurnFallbackReason: String, Sendable {
-    case surfaceUnavailable
-    case snapshotFailed
-    case memoryPressure
-    case layoutInvalidated
-    case unsupportedContent
 }
 
 /// Outcome of committing a detached page surface. `indeterminate` is a
@@ -193,18 +184,6 @@ public final class PageSurface {
     public let geometry: NavigatorPageSurfaceGeometry
     public let headerTitle: String?
 
-    /// UIKit animators consume detached views, so create a fresh image view
-    /// without exposing mutable renderer state.
-    public var view: UIImageView {
-        let view = UIImageView(image: image)
-        view.contentMode = .scaleAspectFit
-        view.clipsToBounds = true
-        view.isUserInteractionEnabled = false
-        view.accessibilityElementsHidden = true
-        view.isAccessibilityElement = false
-        return view
-    }
-
     public init(
         id: UUID = UUID(),
         direction: PageDirection,
@@ -319,20 +298,10 @@ public final class PageTurnStateMachine {
         return true
     }
 
-    @discardableResult
-    public func enterFallback(
-        _ reason: PageTurnFallbackReason,
-        generation: UInt
-    ) -> Bool {
-        guard accepts(generation), state != .idle else { return false }
-        state = .fallback
-        return true
-    }
-
-    /// Ends a successful locator commit or fallback animation.
+    /// Ends a successful locator commit.
     @discardableResult
     public func finish(generation: UInt) -> Bool {
-        guard accepts(generation), state == .committing || state == .fallback else { return false }
+        guard accepts(generation), state == .committing else { return false }
         resetToIdle()
         return true
     }

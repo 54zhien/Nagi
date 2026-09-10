@@ -35,9 +35,7 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     private let currentContainer = UIView()
     private let targetView: UIView
     private let currentView: UIView
-    private let targetShadeView = UIView()
     private let currentTintView = UIView()
-    private let direction: PageDirection
     private let completionTranslationX: CGFloat
     private let isDark: Bool
 
@@ -51,7 +49,6 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         hostView: UIView,
         currentView: UIView,
         targetView: UIView,
-        direction: PageDirection,
         completionTranslationX: CGFloat,
         isDark: Bool
     ) {
@@ -59,7 +56,6 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         self.hostView = hostView
         self.currentView = currentView
         self.targetView = targetView
-        self.direction = direction
         self.completionTranslationX = completionTranslationX
         self.isDark = isDark
     }
@@ -133,15 +129,6 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         currentView.layer.cornerCurve = .continuous
         currentView.layer.masksToBounds = true
         currentContainer.addSubview(currentView)
-
-        targetShadeView.frame = targetContainer.bounds
-        targetShadeView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        targetShadeView.backgroundColor = .black
-        targetShadeView.alpha = 0
-        targetShadeView.isUserInteractionEnabled = false
-        targetShadeView.layer.cornerCurve = .continuous
-        targetShadeView.layer.masksToBounds = true
-        targetContainer.addSubview(targetShadeView)
 
         currentTintView.frame = currentContainer.bounds
         currentTintView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -217,7 +204,6 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         // Keep the overlay nearly neutral in light mode.  The page shadow is
         // the separation cue; a broad opaque shade is what previously made
         // the curl/cover transition look like a red or black rectangle.
-        targetShadeView.alpha = 0
         targetContainer.layer.shadowOpacity = 0
         setShadow(
             on: currentContainer,
@@ -291,7 +277,6 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         currentContainer.layer.cornerRadius = radius
         targetView.layer.cornerRadius = radius
         currentView.layer.cornerRadius = radius
-        targetShadeView.layer.cornerRadius = radius
         currentTintView.layer.cornerRadius = radius
     }
 
