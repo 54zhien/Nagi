@@ -96,6 +96,7 @@
 		4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */; };
 		4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FF /* EPUBResourcePath.swift */; };
 		4A00000000000000000000D2 /* ReadiumSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D2 /* ReadiumSession.swift */; };
+		4A00000000000000000000D3 /* ReadiumNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D3 /* ReadiumNavigationController.swift */; };
 		4A00000000000000000000D1 /* EPUBResourcePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D1 /* EPUBResourcePathTests.swift */; };
 
 /* Begin PBXFileReference section */
@@ -186,6 +187,7 @@
 		3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceCoordinator.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FF /* EPUBResourcePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePath.swift; sourceTree = "<group>"; };
 		3A00000000000000000000D2 /* ReadiumSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumSession.swift; sourceTree = "<group>"; };
+		3A00000000000000000000D3 /* ReadiumNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigationController.swift; sourceTree = "<group>"; };
 		3A00000000000000000000D1 /* EPUBResourcePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePathTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -550,6 +552,7 @@
 			isa = PBXGroup;
 			children = (
 				3A00000000000000000000FF /* EPUBResourcePath.swift */,
+				3A00000000000000000000D3 /* ReadiumNavigationController.swift */,
 			);
 			path = Navigation;
 			sourceTree = "<group>";
@@ -796,6 +799,7 @@
 				4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */,
 				4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */,
 				4A00000000000000000000D2 /* ReadiumSession.swift in Sources */,
+				4A00000000000000000000D3 /* ReadiumNavigationController.swift in Sources */,
 				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

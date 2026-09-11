@@ -28,18 +28,12 @@ final class EPUBReaderModel {
     var errorMessage: String?
     var title: String
     var chapterTitle = ""
-    private(set) var currentReadingHref: String?
-    private(set) var currentLocatorJSON: String?
-    var progress = 0.0
-    var tableOfContents: [EPUBTOCEntry] = []
+    var currentReadingHref: String? { navigation.currentHref }
+    var currentLocatorJSON: String? { navigation.currentLocatorJSON }
+    var progress: Double { navigation.progress }
+    var tableOfContents: [EPUBTOCEntry] { navigation.tableOfContents }
 
-    var currentTOCEntryID: String? {
-        guard let currentReadingHref else { return nil }
-        let currentResource = EPUBResourcePath.normalize(currentReadingHref)
-        return tableOfContents.first {
-            EPUBResourcePath.normalize($0.link.href) == currentResource
-        }?.id
-    }
+    var currentTOCEntryID: String? { navigation.currentTOCEntryID }
 
     func pageHeaderTitle() -> String? {
         guard showBookTitleInPageHeader else { return nil }
@@ -82,6 +76,8 @@ final class EPUBReaderModel {
 
     @ObservationIgnored
     private let session = ReadiumSession()
+    @ObservationIgnored
+    private let navigation = ReadiumNavigationController()
     private var publication: Publication? { session.publication }
     // TXT books use their generated EPUB asset here.
     private var activePublicationURL: URL? { session.publicationURL }
@@ -109,14 +105,18 @@ final class EPUBReaderModel {
         self.book = book
         title = book.title
         chapterTitle = book.currentChapterTitle ?? ""
+        let restoredLocatorJSON: String?
         if let locatorJSON = book.readerLocatorJSON,
            let locator = try? Locator(jsonString: locatorJSON) {
-            currentLocatorJSON = try? locator.jsonString()
+            restoredLocatorJSON = try? locator.jsonString()
         } else {
             // Ignore malformed or old locator data.
-            currentLocatorJSON = nil
+            restoredLocatorJSON = nil
         }
-        progress = min(max(book.progressPercent, 0), 1)
+        navigation.restore(
+            locatorJSON: restoredLocatorJSON,
+            progress: book.progressPercent
+        )
 
         // Preferences come from the shared store; the legacy `reader.epub.*`
         // keys are only ever read once, by the store's migration.
@@ -144,10 +144,10 @@ final class EPUBReaderModel {
         }
         if book.format == .txt, progress > 0 {
             // Restore progress from TXT records created before Readium.
-            currentLocatorJSON = nil
+            navigation.clearLocatorJSON()
             return await publication.locate(progression: progress)
         }
-        currentLocatorJSON = nil
+        navigation.clearLocatorJSON()
         return nil
     }
 
@@ -192,12 +192,13 @@ final class EPUBReaderModel {
                 self?.refreshVisibleReaderOverrides(generation: generation)
             }
             documentStyler.attach(navigator)
+            navigation.attach(navigator)
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
             hasLoaded = true
 
             if currentReadingHref == nil, initialLocation == nil {
-                currentReadingHref = publication.readingOrder.first?.href
+                navigation.seedCurrentHref(publication.readingOrder.first?.href)
             }
             loadPreviewIfNeeded()
 
@@ -265,8 +266,7 @@ final class EPUBReaderModel {
     }
 
     func go(to entry: EPUBTOCEntry) {
-        guard let navigator else { return }
-        Task { await navigator.go(to: entry.link, options: .animated) }
+        navigation.go(to: entry)
     }
 
     func updateSystemAppearance(isDark: Bool) {
@@ -348,24 +348,7 @@ final class EPUBReaderModel {
     }
 
     private func loadTableOfContents(from publication: Publication) async {
-        let links = (try? await publication.tableOfContents().get()) ?? []
-        var entries: [EPUBTOCEntry] = []
-
-        func append(_ links: [ReadiumShared.Link], depth: Int) {
-            for (index, link) in links.enumerated() {
-                let fallback = link.href.split(separator: "/").last.map(String.init) ?? "未命名章节"
-                entries.append(EPUBTOCEntry(
-                    id: "\(depth)-\(index)-\(link.href)",
-                    title: link.title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? fallback,
-                    depth: depth,
-                    link: link
-                ))
-                append(link.children, depth: depth + 1)
-            }
-        }
-
-        append(links.isEmpty ? publication.readingOrder : links, depth: 0)
-        tableOfContents = entries
+        await navigation.loadTableOfContents(from: publication)
         synchronizeStoredChapterMetadata()
     }
 
@@ -562,40 +545,30 @@ final class EPUBReaderModel {
     }
 
     private func applyLocation(_ locator: Locator) {
-        let locatorTitle = locator.title?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .nilIfEmpty
-        let nextHref = locator.href.path
-        let chapterChanged = currentReadingHref.map {
-            EPUBResourcePath.normalize($0) != EPUBResourcePath.normalize(nextHref)
-        } ?? true
-        chapterTitle = locatorTitle ?? chapterTitle
-        if locatorTitle == nil, chapterChanged {
+        let update = navigation.apply(locator: locator)
+
+        chapterTitle = update.locatorTitle ?? chapterTitle
+        if update.locatorTitle == nil, update.chapterChanged {
             chapterTitle = ""
         }
-        currentReadingHref = nextHref
-        if let totalProgression = locator.locations.totalProgression {
-            progress = min(max(totalProgression, 0), 1)
-        }
         loadPreviewIfNeeded()
-        if let locatorJSON = try? locator.jsonString() {
-            currentLocatorJSON = locatorJSON
+        if let locatorJSON = update.locatorJSON {
             book.readerLocatorJSON = locatorJSON
         }
-        synchronizeStoredChapterMetadata(preferredTitle: locatorTitle)
-        book.progressPercent = progress
+        synchronizeStoredChapterMetadata(preferredTitle: update.locatorTitle)
+        book.progressPercent = navigation.progress
         book.lastReadAt = .now
         onStateChange?()
     }
 
     private func synchronizeStoredChapterMetadata(preferredTitle: String? = nil) {
-        if let currentIndex = currentTOCIndex {
+        if let currentIndex = navigation.currentTOCIndex {
             book.currentChapterIndex = currentIndex
             let normalizedTitle = chapterTitle.trimmingCharacters(in: .whitespacesAndNewlines)
             if let preferredTitle {
                 chapterTitle = preferredTitle
             } else if normalizedTitle.isEmpty {
-                chapterTitle = tableOfContents[currentIndex].title
+                chapterTitle = navigation.tableOfContents[currentIndex].title
             }
         } else if let preferredTitle {
             chapterTitle = preferredTitle
@@ -605,13 +578,6 @@ final class EPUBReaderModel {
         book.currentChapterTitle = normalizedTitle.isEmpty ? nil : normalizedTitle
     }
 
-    private var currentTOCIndex: Int? {
-        guard let currentReadingHref else { return nil }
-        let currentResource = EPUBResourcePath.normalize(currentReadingHref)
-        return tableOfContents.firstIndex {
-            EPUBResourcePath.normalize($0.link.href) == currentResource
-        }
-    }
 }
 
 extension EPUBReaderModel {
@@ -729,6 +695,6 @@ extension EPUBReaderModel: ReadiumNavigatorDelegateHost {
     }
 }
 
-private extension String {
+extension String {
     var nilIfEmpty: String? { isEmpty ? nil : self }
 }
