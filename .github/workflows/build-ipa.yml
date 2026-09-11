@@ -30,6 +30,30 @@ jobs:
             -project Nagi.xcodeproj \
             -scheme Nagi
 
+      - name: Run unit tests
+        run: |
+          SIMULATOR=$(xcrun simctl list devices available --json | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          for runtime in sorted(devices):
+              if 'iOS' not in runtime:
+                  continue
+              for device in devices[runtime]:
+                  if device['name'].startswith('iPhone'):
+                      print(device['name'])
+                      sys.exit(0)
+          sys.exit('no iPhone simulator available')
+          ")
+          echo "Using simulator: $SIMULATOR"
+          xcodebuild test \
+            -project Nagi.xcodeproj \
+            -scheme Nagi \
+            -destination "platform=iOS Simulator,name=$SIMULATOR" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
       - name: Build (unsigned)
         run: |
           xcodebuild \

@@ -82,6 +82,10 @@
 		4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000098 /* PageTurnVisualAnimator.swift */; };
 		4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000099 /* PageTurnCurlAnimator.swift */; };
 /* End PBXBuildFile section */
+		4A00000000000000000000F2 /* ReaderPreferencesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F3 /* ReaderPreferencesTests.swift */; };
+		4A00000000000000000000F3 /* ReaderDomainBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F4 /* ReaderDomainBaselineTests.swift */; };
+		4A00000000000000000000F4 /* BookFileLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F5 /* BookFileLocatorTests.swift */; };
+		4A00000000000000000000F5 /* TXTParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F6 /* TXTParserTests.swift */; };
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* NagiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiApp.swift; sourceTree = "<group>"; };
@@ -156,6 +160,11 @@
 		3A0000000000000000000098 /* PageTurnVisualAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnVisualAnimator.swift; sourceTree = "<group>"; };
 		3A0000000000000000000099 /* PageTurnCurlAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnCurlAnimator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+		3A00000000000000000000F2 /* NagiTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NagiTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		3A00000000000000000000F3 /* ReaderPreferencesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPreferencesTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000F4 /* ReaderDomainBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderDomainBaselineTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000F5 /* BookFileLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookFileLocatorTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000F6 /* TXTParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTParserTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A0000000000000000000003 /* Frameworks */ = {
@@ -170,12 +179,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
+		5A00000000000000000000F3 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 
 /* Begin PBXGroup section */
 		2A0000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
 				2A0000000000000000000002 /* Nagi */,
+				2A00000000000000000000F2 /* NagiTests */,
 				2A0000000000000000000009 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -470,11 +487,23 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000007 /* Nagi.app */,
+				3A00000000000000000000F2 /* NagiTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
+		2A00000000000000000000F2 /* NagiTests */ = {
+			isa = PBXGroup;
+			children = (
+				3A00000000000000000000F3 /* ReaderPreferencesTests.swift */,
+				3A00000000000000000000F4 /* ReaderDomainBaselineTests.swift */,
+				3A00000000000000000000F5 /* BookFileLocatorTests.swift */,
+				3A00000000000000000000F6 /* TXTParserTests.swift */,
+			);
+			path = NagiTests;
+			sourceTree = "<group>";
+		};
 
 /* Begin PBXNativeTarget section */
 		1A0000000000000000000002 /* Nagi */ = {
@@ -501,6 +530,24 @@
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
+		1A00000000000000000000F2 /* NagiTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1A00000000000000000000F3 /* Build configuration list for PBXNativeTarget "NagiTests" */;
+			buildPhases = (
+				5A00000000000000000000F2 /* Sources */,
+				5A00000000000000000000F3 /* Frameworks */,
+				5A00000000000000000000F4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7A00000000000000000000F2 /* PBXTargetDependency */,
+			);
+			name = NagiTests;
+			productName = NagiTests;
+			productReference = 3A00000000000000000000F2 /* NagiTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 
 /* Begin PBXProject section */
 		1A0000000000000000000001 /* Project object */ = {
@@ -512,6 +559,10 @@
 				TargetAttributes = {
 					1A0000000000000000000002 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					1A00000000000000000000F2 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 1A0000000000000000000002;
 					};
 				};
 			};
@@ -533,6 +584,7 @@
 			projectRoot = "";
 			targets = (
 				1A0000000000000000000002 /* Nagi */,
+				1A00000000000000000000F2 /* NagiTests */,
 			);
 		};
 /* End PBXProject section */
@@ -594,6 +646,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+		5A00000000000000000000F4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 
 /* Begin PBXSourcesBuildPhase section */
 		5A0000000000000000000001 /* Sources */ = {
@@ -669,6 +728,35 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+		5A00000000000000000000F2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4A00000000000000000000F2 /* ReaderPreferencesTests.swift in Sources */,
+				4A00000000000000000000F3 /* ReaderDomainBaselineTests.swift in Sources */,
+				4A00000000000000000000F4 /* BookFileLocatorTests.swift in Sources */,
+				4A00000000000000000000F5 /* TXTParserTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+
+/* Begin PBXContainerItemProxy section */
+		8A00000000000000000000F2 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 1A0000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 1A0000000000000000000002;
+			remoteInfo = Nagi;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		7A00000000000000000000F2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 1A0000000000000000000002 /* Nagi */;
+			targetProxy = 8A00000000000000000000F2 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1A0000000000000000000005 /* Debug */ = {
@@ -803,6 +891,48 @@
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
+		1A00000000000000000000F4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+									"$(inherited)",
+									"@executable_path/Frameworks",
+									"@loader_path/Frameworks",
+								);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.NagiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nagi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nagi";
+			};
+			name = Debug;
+		};
+		1A00000000000000000000F5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+									"$(inherited)",
+									"@executable_path/Frameworks",
+									"@loader_path/Frameworks",
+								);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.NagiTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Nagi.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Nagi";
+			};
+			name = Release;
+		};
 
 /* Begin XCConfigurationList section */
 		1A0000000000000000000003 /* Build configuration list for PBXProject "Nagi" */ = {
@@ -824,6 +954,15 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+		1A00000000000000000000F3 /* Build configuration list for PBXNativeTarget "NagiTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1A00000000000000000000F4 /* Debug */,
+				1A00000000000000000000F5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 	};
 	rootObject = 1A0000000000000000000001 /* Project object */;
 }
