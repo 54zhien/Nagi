@@ -80,6 +80,12 @@
 		4A0000000000000000000097 /* PageTurnDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000097 /* PageTurnDomain.swift */; };
 		4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000098 /* PageTurnVisualAnimator.swift */; };
 		4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000099 /* PageTurnCurlAnimator.swift */; };
+		4A000000000000000000009A /* CurlTextureCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009A /* CurlTextureCache.swift */; };
+		4A000000000000000000009B /* PageCurlMesh.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009B /* PageCurlMesh.swift */; };
+		4A000000000000000000009C /* PageCurlMetalResources.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009C /* PageCurlMetalResources.swift */; };
+		4A000000000000000000009D /* PageCurlRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009D /* PageCurlRenderer.swift */; };
+		4A000000000000000000009E /* PageCurlShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009E /* PageCurlShaders.metal */; };
+		4A000000000000000000009F /* PageTurnCoreImageCurlAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009F /* PageTurnCoreImageCurlAnimator.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -153,6 +159,12 @@
 		3A0000000000000000000097 /* PageTurnDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnDomain.swift; sourceTree = "<group>"; };
 		3A0000000000000000000098 /* PageTurnVisualAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnVisualAnimator.swift; sourceTree = "<group>"; };
 		3A0000000000000000000099 /* PageTurnCurlAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnCurlAnimator.swift; sourceTree = "<group>"; };
+		3A000000000000000000009A /* CurlTextureCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurlTextureCache.swift; sourceTree = "<group>"; };
+		3A000000000000000000009B /* PageCurlMesh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCurlMesh.swift; sourceTree = "<group>"; };
+		3A000000000000000000009C /* PageCurlMetalResources.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCurlMetalResources.swift; sourceTree = "<group>"; };
+		3A000000000000000000009D /* PageCurlRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCurlRenderer.swift; sourceTree = "<group>"; };
+		3A000000000000000000009E /* PageCurlShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PageCurlShaders.metal; sourceTree = "<group>"; };
+		3A000000000000000000009F /* PageTurnCoreImageCurlAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnCoreImageCurlAnimator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -337,6 +349,12 @@
 				3A0000000000000000000097 /* PageTurnDomain.swift */,
 				3A0000000000000000000098 /* PageTurnVisualAnimator.swift */,
 				3A0000000000000000000099 /* PageTurnCurlAnimator.swift */,
+				3A000000000000000000009A /* CurlTextureCache.swift */,
+				3A000000000000000000009B /* PageCurlMesh.swift */,
+				3A000000000000000000009C /* PageCurlMetalResources.swift */,
+				3A000000000000000000009D /* PageCurlRenderer.swift */,
+				3A000000000000000000009E /* PageCurlShaders.metal */,
+				3A000000000000000000009F /* PageTurnCoreImageCurlAnimator.swift */,
 				3A0000000000000000000079 /* ReaderArchitecture.swift */,
 				3A000000000000000000007A /* ReaderRenderer.swift */,
 			);
@@ -661,6 +679,12 @@
 				4A0000000000000000000097 /* PageTurnDomain.swift in Sources */,
 				4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */,
 				4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */,
+				4A000000000000000000009A /* CurlTextureCache.swift in Sources */,
+				4A000000000000000000009B /* PageCurlMesh.swift in Sources */,
+				4A000000000000000000009C /* PageCurlMetalResources.swift in Sources */,
+				4A000000000000000000009D /* PageCurlRenderer.swift in Sources */,
+				4A000000000000000000009E /* PageCurlShaders.metal in Sources */,
+				4A000000000000000000009F /* PageTurnCoreImageCurlAnimator.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -41,6 +41,9 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var pendingProgrammaticPageTurnRevision: UInt = 0
     private var preferredPrewarmDirection: PageDirection = .forward
     private var cachedCurrentSurface: NavigatorCurrentPageSurface?
+    /// Page textures rasterised and uploaded while the reader was idle, so a
+    /// curl gesture only ever looks one up.
+    private let curlTextureCache = CurlTextureCache()
     private var activePageSurface: PageSurface?
     private var activeCurrentComposite: UIView?
     private var activeTargetComposite: UIView?
@@ -533,7 +536,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         let customPreferenceIsActive = customPageTurnPreferenceIsActive
         let ownsPageTurns = shouldOwnPaginatedPageTurns
         if ownsPageTurns, model.preferences.pageTransition == .pageCurl {
-            PageTurnCurlAnimator.preparePipelineIfNeeded()
+            switch model.preferences.curlEngine {
+            case .coreImage:
+                PageTurnCoreImageCurlAnimator.preparePipelineIfNeeded()
+            case .metal:
+                PageTurnCurlAnimator.preparePipelineIfNeeded()
+            }
         }
         // A selected custom transition owns the entire hand-off window. The
         // native pager stays disabled while surfaces are warming or a new
@@ -729,30 +737,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         var animator: any PageTurnAnimating
         switch model.preferences.pageTransition {
         case .pageCurl:
-            if let currentImage = makeCompositeImage(
-                from: currentComposite,
-                scale: currentSurface.geometry.scale
-            ), let targetImage = makeCompositeImage(
-                from: targetComposite,
-                scale: surface.geometry.scale
-            ) {
-                animator = PageTurnCurlAnimator(
-                    hostView: snapshotHostView,
-                    currentImage: currentImage,
-                    targetImage: targetImage,
-                    completionTranslationX: destinationX,
-                    isDark: isDarkPageBackground
-                )
-            } else {
-                animator = PageTurnVisualAnimator(
-                    style: .cover,
-                    hostView: snapshotHostView,
-                    currentView: currentComposite,
-                    targetView: targetComposite,
-                    completionTranslationX: destinationX,
-                    isDark: isDarkPageBackground
-                )
-            }
+            animator = makeCurlAnimator(
+                currentSurface: currentSurface,
+                targetSurface: surface,
+                currentComposite: currentComposite,
+                targetComposite: targetComposite,
+                destinationX: destinationX
+            ) ?? makeCoverAnimator(
+                currentView: currentComposite,
+                targetView: targetComposite,
+                destinationX: destinationX
+            )
         case .fade:
             animator = PageTurnVisualAnimator(
                 style: .fade,
@@ -779,13 +774,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         var animatorInstalled = animator.install()
         if !animatorInstalled, model.preferences.pageTransition == .pageCurl {
             animator.remove()
-            animator = PageTurnVisualAnimator(
-                style: .cover,
-                hostView: snapshotHostView,
+            animator = makeCoverAnimator(
                 currentView: currentComposite,
                 targetView: targetComposite,
-                completionTranslationX: destinationX,
-                isDark: isDarkPageBackground
+                destinationX: destinationX
             )
             pageTurnAnimator = animator
             animatorInstalled = animator.install()
@@ -1481,12 +1473,168 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
 
         cachedCurrentSurface = currentSurface
+        warmCurlTexturesIfNeeded(currentSurface: currentSurface, provider: provider)
+    }
+
+    /// Rasterises and uploads the three pages the curl may need, while the
+    /// reader is settled.
+    ///
+    /// This is the whole point of the Metal path: converting a page into a
+    /// texture is the expensive half, and doing it on the first `.changed` of a
+    /// pan is what made the curl feel late. Once the textures are here, the
+    /// gesture path contains no rasterising, no layer rendering and no upload.
+    ///
+    /// Peeking (`preparedAdjacentSurface`) rather than consuming, so the
+    /// surfaces themselves stay available for the gesture that follows.
+    private func warmCurlTexturesIfNeeded(
+        currentSurface: NavigatorCurrentPageSurface,
+        provider: PageSurfaceProvider
+    ) {
+        guard shouldOwnPaginatedPageTurns,
+              model.preferences.pageTransition == .pageCurl,
+              model.preferences.curlEngine == .metal,
+              let resources = PageCurlMetalResources.shared else { return }
+
+        storeCurlTexture(
+            image: currentSurface.image,
+            geometry: currentSurface.geometry,
+            headerTitle: latestTitle,
+            identity: currentSurface.identity,
+            resources: resources
+        )
+
+        for direction in [PageDirection.forward, .backward] {
+            guard let surface = provider.preparedAdjacentSurface(direction: direction) else {
+                continue
+            }
+            storeCurlTexture(
+                image: surface.image,
+                geometry: surface.geometry,
+                headerTitle: surface.headerTitle,
+                identity: surface.originIdentity,
+                resources: resources
+            )
+        }
+    }
+
+    private func storeCurlTexture(
+        image: UIImage,
+        geometry: NavigatorPageSurfaceGeometry,
+        headerTitle: String?,
+        identity: NavigatorPagePositionIdentity,
+        resources: PageCurlMetalResources
+    ) {
+        guard curlTextureCache.texture(for: identity, matching: geometry) == nil else {
+            return
+        }
+
+        let composite = makeCompositeSurface(
+            contentImage: image,
+            geometry: geometry,
+            headerTitle: headerTitle
+        )
+        guard let compositeImage = makeCompositeImage(from: composite, scale: geometry.scale),
+              let texture = CurlTextureCache.makeTexture(
+                  from: compositeImage,
+                  device: resources.device
+              ) else {
+            return
+        }
+        curlTextureCache.store(texture, geometry: geometry, for: identity)
+    }
+
+    private func makeCoverAnimator(
+        currentView: UIView,
+        targetView: UIView,
+        destinationX: CGFloat
+    ) -> any PageTurnAnimating {
+        PageTurnVisualAnimator(
+            style: .cover,
+            hostView: snapshotHostView,
+            currentView: currentView,
+            targetView: targetView,
+            completionTranslationX: destinationX,
+            isDark: isDarkPageBackground
+        )
+    }
+
+    /// Returns nil when neither curl engine can produce a frame, so the caller
+    /// can fall back to the cover transition.
+    private func makeCurlAnimator(
+        currentSurface: NavigatorCurrentPageSurface,
+        targetSurface: PageSurface,
+        currentComposite: UIView,
+        targetComposite: UIView,
+        destinationX: CGFloat
+    ) -> (any PageTurnAnimating)? {
+        switch model.preferences.curlEngine {
+        case .coreImage:
+            guard let currentImage = makeCompositeImage(
+                from: currentComposite,
+                scale: currentSurface.geometry.scale
+            ), let targetImage = makeCompositeImage(
+                from: targetComposite,
+                scale: targetSurface.geometry.scale
+            ) else {
+                return nil
+            }
+            return PageTurnCoreImageCurlAnimator(
+                hostView: snapshotHostView,
+                currentImage: currentImage,
+                targetImage: targetImage,
+                completionTranslationX: destinationX,
+                isDark: isDarkPageBackground
+            )
+
+        case .metal:
+            // Preferred: both textures were uploaded while the reader was
+            // idle, so this branch does no rasterising and no upload.
+            if let currentTexture = curlTextureCache.texture(
+                for: currentSurface.identity,
+                matching: currentSurface.geometry
+            ), let targetTexture = curlTextureCache.texture(
+                for: targetSurface.originIdentity,
+                matching: targetSurface.geometry
+            ) {
+                return PageTurnCurlAnimator(
+                    hostView: snapshotHostView,
+                    currentTexture: currentTexture,
+                    targetTexture: targetTexture,
+                    completionTranslationX: destinationX,
+                    isDark: isDarkPageBackground
+                )
+            }
+
+            // Cache miss: prewarming either had not finished or was invalidated
+            // by a viewport change. Rasterise here so the gesture still gets a
+            // curl — this is the old behaviour, not a new cost.
+            guard let currentImage = makeCompositeImage(
+                from: currentComposite,
+                scale: currentSurface.geometry.scale
+            ), let targetImage = makeCompositeImage(
+                from: targetComposite,
+                scale: targetSurface.geometry.scale
+            ) else {
+                return nil
+            }
+            return PageTurnCurlAnimator(
+                hostView: snapshotHostView,
+                currentImage: currentImage,
+                targetImage: targetImage,
+                completionTranslationX: destinationX,
+                isDark: isDarkPageBackground
+            )
+        }
     }
 
     private func invalidatePageTurnCache() {
         guard pageTurnStateMachine.state != .committing else { return }
         cancelPageTurnPrewarm()
         cachedCurrentSurface = nil
+        // The uploaded textures describe the same surfaces this invalidates, so
+        // they have to go together — otherwise a rotated viewport could be
+        // served a texture rasterised at the old size.
+        curlTextureCache.removeAll()
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
         configurePageTurnInteraction()
     }

@@ -216,6 +216,25 @@ enum ReaderLayoutMetrics {
     }
 }
 
+/// Which renderer draws the reader's `.pageCurl` transition.
+///
+/// Kept as a preference rather than a compile-time flag so the two engines can
+/// be compared on device without rebuilding, and so the Core Image curl stays
+/// reachable as a fallback while the Metal one is being validated.
+enum ReaderCurlEngine: String, CaseIterable, Identifiable, Codable, Sendable, Hashable {
+    case coreImage
+    case metal
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .coreImage: return "经典"
+        case .metal: return "自研 Metal"
+        }
+    }
+}
+
 struct ReaderPreferences: Codable, Equatable, Sendable {
     var fontSizeLevel: Int
     var fontSizeScale: Double { ReaderFontSize.scale(for: fontSizeLevel) }
@@ -236,6 +255,8 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
     var appearanceMode: ReaderAppearanceMode
     var pageTransition: ReaderPageTransition
     var showBookTitleInPageHeader: Bool
+    /// Only consulted when `pageTransition == .pageCurl`.
+    var curlEngine: ReaderCurlEngine
 
     init(
         fontSizeLevel: Int = ReaderFontSize.defaultLevel,
@@ -251,7 +272,8 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         themePreset: ReaderThemePreset = .original,
         appearanceMode: ReaderAppearanceMode = .system,
         pageTransition: ReaderPageTransition = .slide,
-        showBookTitleInPageHeader: Bool = false
+        showBookTitleInPageHeader: Bool = false,
+        curlEngine: ReaderCurlEngine = .coreImage
     ) {
         self.fontSizeLevel = ReaderFontSize.clampedLevel(fontSizeLevel)
         self.fontFamily = fontFamily
@@ -267,6 +289,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         self.appearanceMode = appearanceMode
         self.pageTransition = pageTransition
         self.showBookTitleInPageHeader = showBookTitleInPageHeader
+        self.curlEngine = curlEngine
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -286,6 +309,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         case appearanceMode
         case pageTransition
         case showBookTitleInPageHeader
+        case curlEngine
     }
 
     private static let currentStorageVersion = 5
@@ -328,7 +352,8 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
             themePreset: try container.decodeIfPresent(ReaderThemePreset.self, forKey: .themePreset) ?? .original,
             appearanceMode: try container.decodeIfPresent(ReaderAppearanceMode.self, forKey: .appearanceMode) ?? .system,
             pageTransition: try container.decodeIfPresent(ReaderPageTransition.self, forKey: .pageTransition) ?? .slide,
-            showBookTitleInPageHeader: try container.decodeIfPresent(Bool.self, forKey: .showBookTitleInPageHeader) ?? false
+            showBookTitleInPageHeader: try container.decodeIfPresent(Bool.self, forKey: .showBookTitleInPageHeader) ?? false,
+            curlEngine: try container.decodeIfPresent(ReaderCurlEngine.self, forKey: .curlEngine) ?? .coreImage
         )
     }
 
@@ -349,6 +374,7 @@ struct ReaderPreferences: Codable, Equatable, Sendable {
         try container.encode(appearanceMode, forKey: .appearanceMode)
         try container.encode(pageTransition, forKey: .pageTransition)
         try container.encode(showBookTitleInPageHeader, forKey: .showBookTitleInPageHeader)
+        try container.encode(curlEngine, forKey: .curlEngine)
     }
 }
 
@@ -705,6 +731,13 @@ final class ReaderViewModel {
     func setPageTransition(_ transition: ReaderPageTransition) {
         setPreference(
             { $0.pageTransition = transition },
+            commitBehavior: .immediate
+        )
+    }
+
+    func setCurlEngine(_ engine: ReaderCurlEngine) {
+        setPreference(
+            { $0.curlEngine = engine },
             commitBehavior: .immediate
         )
     }

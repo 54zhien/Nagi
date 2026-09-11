@@ -1,20 +1,24 @@
+import CoreImage
+import CoreImage.CIFilterBuiltins
 import Metal
 import MetalKit
 import QuartzCore
 import UIKit
 
-/// A GPU-backed interactive page curl driven by a deforming sheet mesh.
+/// A GPU-backed interactive page curl for already prepared page images.
 ///
-/// The paper is a static grid; every frame only changes a 32-byte uniform
-/// struct (progress, fold direction, radius, lighting) and the vertex shader
-/// re-evaluates the curvature on the GPU. Nothing per frame touches the CPU
-/// bitmaps: both page textures are uploaded before the gesture starts, either
-/// by `CurlTextureCache` in the preferred path or, as a fallback, here in
-/// `install()`.
-///
-/// Readium navigation and locator commits stay outside this visual animator.
+/// The reader prepares both images before installing this object. Once the
+/// view is installed, a frame only changes the filter's time and asks Core
+/// Image to render the existing image graph into the Metal drawable. Readium
+/// navigation and locator commits remain outside this visual animator.
 @MainActor
-final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
+final class PageTurnCoreImageCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
+    private struct MetalResources {
+        let device: MTLDevice
+        let commandQueue: MTLCommandQueue
+        let context: CIContext
+    }
+
     private struct Settlement {
         let revision: UInt
         let start: CGFloat
@@ -25,29 +29,32 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         let success: Bool
     }
 
-    /// Bend radius as a fraction of the page width. Tuning knob, not a
-    /// constraint: the vertex shader tapers it to zero at both ends of the
-    /// gesture so the sheet settles flat.
-    private static let curlRadius: Float = 0.18
-
     private let hostView: UIView
-    /// Fallback inputs, used only when no pre-uploaded texture was supplied.
-    private let sourceCurrentImage: UIImage?
-    private let sourceTargetImage: UIImage?
-    private let preuploadedCurrentTexture: MTLTexture?
-    private let preuploadedTargetTexture: MTLTexture?
+    private let sourceCurrentImage: CIImage?
+    private let sourceTargetImage: CIImage?
     private let isDark: Bool
-    private let foldSign: Float
+    private let mirroredDirection: Bool
     private let translationIsValid: Bool
+    private let colorSpace = CGColorSpaceCreateDeviceRGB()
 
+    private static let sharedMetalResources: MetalResources? = {
+        guard let device = MTLCreateSystemDefaultDevice(),
+              let commandQueue = device.makeCommandQueue() else { return nil }
+        let context = CIContext(mtlDevice: device, options: [
+            .priorityRequestLow: false,
+            .cacheIntermediates: false
+        ])
+        return MetalResources(device: device, commandQueue: commandQueue, context: context)
+    }()
     private static var didAttemptPipelineWarmup = false
     private static var hasWarmedPipeline = false
 
     private var metalView: MTKView?
     private var commandQueue: MTLCommandQueue?
-    private var renderer: PageCurlRenderer?
-    private var currentTexture: MTLTexture?
-    private var targetTexture: MTLTexture?
+    private var ciContext: CIContext?
+    private var pageCurlFilter: (CIFilter & CIPageCurlWithShadowTransition)?
+    private var preparedExtent: CGRect = .zero
+    private var mirroredOutput = false
     private var installed = false
     private var displayLink: CADisplayLink?
     private var settlement: Settlement?
@@ -58,28 +65,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
     private(set) var progress: CGFloat = 0
 
-    /// Preferred path: the host already uploaded both pages while the reader
-    /// was idle, so a gesture does no rasterising and no texture upload.
-    init(
-        hostView: UIView,
-        currentTexture: MTLTexture,
-        targetTexture: MTLTexture,
-        completionTranslationX: CGFloat,
-        isDark: Bool
-    ) {
-        self.hostView = hostView
-        sourceCurrentImage = nil
-        sourceTargetImage = nil
-        preuploadedCurrentTexture = currentTexture
-        preuploadedTargetTexture = targetTexture
-        self.isDark = isDark
-        foldSign = Self.foldSign(for: completionTranslationX)
-        translationIsValid = Self.translationIsValid(completionTranslationX)
-        super.init()
-    }
-
-    /// Fallback path, kept so a cache miss degrades to a slower curl instead of
-    /// losing the transition. Uploads both pages inside `install()`.
     init(
         hostView: UIView,
         currentImage: UIImage,
@@ -88,28 +73,52 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         isDark: Bool
     ) {
         self.hostView = hostView
-        sourceCurrentImage = currentImage
-        sourceTargetImage = targetImage
-        preuploadedCurrentTexture = nil
-        preuploadedTargetTexture = nil
+        sourceCurrentImage = CIImage(image: currentImage)
+        sourceTargetImage = CIImage(image: targetImage)
         self.isDark = isDark
-        foldSign = Self.foldSign(for: completionTranslationX)
-        translationIsValid = Self.translationIsValid(completionTranslationX)
+        mirroredDirection = completionTranslationX < 0
+        translationIsValid = completionTranslationX.isFinite
+            && abs(completionTranslationX) > 0.001
         super.init()
     }
 
-    /// Builds the Metal resources before the first gesture so that a gesture
-    /// never pays for pipeline creation.
-    ///
-    /// The shader library ships precompiled in the app bundle, so unlike the
-    /// old Core Image path there is no runtime shader compilation to warm —
-    /// this only forces the lazy `shared` build to happen now. When the shader
-    /// is missing from the app target `shared` stays nil and the reader keeps
-    /// using the Core Image curl.
+    /// Compiles the Core Image page-curl pipeline before the first gesture.
+    /// The render is intentionally tiny and runs only once per process.
     static func preparePipelineIfNeeded() {
-        guard !didAttemptPipelineWarmup else { return }
+        guard !hasWarmedPipeline, !didAttemptPipelineWarmup else { return }
         didAttemptPipelineWarmup = true
-        hasWarmedPipeline = PageCurlMetalResources.shared != nil
+        guard let resources = sharedMetalResources else { return }
+        let extent = CGRect(x: 0, y: 0, width: 64, height: 64)
+        let current = CIImage(color: CIColor(red: 0.96, green: 0.96, blue: 0.96))
+            .cropped(to: extent)
+        let target = CIImage(color: CIColor(red: 0.90, green: 0.90, blue: 0.90))
+            .cropped(to: extent)
+        let filter = makeFilter(
+            currentImage: current,
+            targetImage: target,
+            extent: extent,
+            isDark: false
+        )
+        filter.time = 0.5
+        guard let output = filter.outputImage?.cropped(to: extent) else { return }
+        hasWarmedPipeline = resources.context.createCGImage(output, from: extent) != nil
+    }
+
+    init(
+        hostView: UIView,
+        currentImage: CIImage,
+        targetImage: CIImage,
+        completionTranslationX: CGFloat,
+        isDark: Bool
+    ) {
+        self.hostView = hostView
+        sourceCurrentImage = currentImage
+        sourceTargetImage = targetImage
+        self.isDark = isDark
+        mirroredDirection = completionTranslationX < 0
+        translationIsValid = completionTranslationX.isFinite
+            && abs(completionTranslationX) > 0.001
+        super.init()
     }
 
     @discardableResult
@@ -122,7 +131,13 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         guard translationIsValid,
               bounds.width > 0, bounds.height > 0,
               bounds.width.isFinite, bounds.height.isFinite,
-              let resources = PageCurlMetalResources.shared else {
+              let sourceCurrentImage,
+              let sourceTargetImage,
+              sourceCurrentImage.extent.width > 0,
+              sourceCurrentImage.extent.height > 0,
+              sourceTargetImage.extent.width > 0,
+              sourceTargetImage.extent.height > 0,
+              let resources = Self.sharedMetalResources else {
             return false
         }
 
@@ -136,8 +151,28 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
             return false
         }
 
-        guard let currentTexture = resolveCurrentTexture(resources: resources),
-              let targetTexture = resolveTargetTexture(resources: resources) else {
+        let extent = CGRect(origin: .zero, size: drawableSize)
+        guard let currentImage = Self.prepare(sourceCurrentImage, for: extent),
+              let targetImage = Self.prepare(sourceTargetImage, for: extent) else {
+            return false
+        }
+
+        let shouldMirror = mirroredDirection
+        let filteredCurrentImage = shouldMirror
+            ? Self.mirror(currentImage, in: extent)
+            : currentImage
+        let filteredTargetImage = shouldMirror
+            ? Self.mirror(targetImage, in: extent)
+            : targetImage
+
+        let filter = Self.makeFilter(
+            currentImage: filteredCurrentImage,
+            targetImage: filteredTargetImage,
+            extent: extent,
+            isDark: isDark
+        )
+
+        guard filter.outputImage != nil else {
             return false
         }
 
@@ -148,8 +183,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.contentMode = .scaleToFill
         metalView.contentScaleFactor = scale
         metalView.drawableSize = drawableSize
-        metalView.colorPixelFormat = PageCurlMetalResources.colorPixelFormat
-        metalView.depthStencilPixelFormat = PageCurlMetalResources.depthPixelFormat
+        metalView.colorPixelFormat = .bgra8Unorm
         metalView.framebufferOnly = false
         metalView.enableSetNeedsDisplay = false
         metalView.isPaused = true
@@ -166,14 +200,16 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         metalView.isAccessibilityElement = false
 
         commandQueue = resources.commandQueue
-        renderer = PageCurlRenderer(resources: resources)
-        self.currentTexture = currentTexture
-        self.targetTexture = targetTexture
+        ciContext = resources.context
+        pageCurlFilter = filter
+        preparedExtent = extent
+        mirroredOutput = shouldMirror
         self.metalView = metalView
         installed = true
         progress = 0
 
         hostView.addSubview(metalView)
+        setFilterTime(0)
         guard renderFrame() else {
             remove()
             return false
@@ -185,6 +221,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     func update(progress rawProgress: CGFloat) {
         progress = Self.clamp(rawProgress)
         guard installed else { return }
+        setFilterTime(progress)
         requestRender()
     }
 
@@ -228,31 +265,26 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     func draw(in view: MTKView) {
         guard installed,
               view === metalView,
+              let drawable = view.currentDrawable,
               let commandBuffer = commandQueue?.makeCommandBuffer(),
-              let renderer,
-              let currentTexture,
-              let targetTexture else {
+              let context = ciContext,
+              let filter = pageCurlFilter,
+              let outputImage = filter.outputImage else {
             resolvePendingFrameCompletion(false)
             return
         }
 
-        let size = view.drawableSize
-        guard size.width > 0, size.height > 0 else {
-            resolvePendingFrameCompletion(false)
-            return
-        }
-
-        guard renderer.encode(
-            in: view,
-            currentTexture: currentTexture,
-            targetTexture: targetTexture,
-            uniforms: makeUniforms(drawableSize: size),
-            commandBuffer: commandBuffer
-        ) else {
-            resolvePendingFrameCompletion(false)
-            return
-        }
-
+        let image = mirroredOutput
+            ? Self.mirror(outputImage, in: preparedExtent)
+            : outputImage.cropped(to: preparedExtent)
+        let bounds = CGRect(origin: .zero, size: view.drawableSize)
+        context.render(
+            image,
+            to: drawable.texture,
+            commandBuffer: commandBuffer,
+            bounds: bounds,
+            colorSpace: colorSpace
+        )
         if let completion = pendingFrameCompletion {
             pendingFrameCompletion = nil
             commandBuffer.addCompletedHandler { commandBuffer in
@@ -263,10 +295,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
                 }
             }
         }
-        guard let drawable = view.currentDrawable else {
-            resolvePendingFrameCompletion(false)
-            return
-        }
         commandBuffer.present(drawable)
         commandBuffer.commit()
         lastRenderSucceeded = true
@@ -276,21 +304,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         guard view === metalView, size.width > 0, size.height > 0 else { return }
         // A geometry change invalidates this animator. The reader must prepare
         // a new pair of page surfaces before installing another one.
-    }
-
-    // MARK: - Uniforms
-
-    private func makeUniforms(drawableSize: CGSize) -> PageCurlUniforms {
-        var uniforms = PageCurlUniforms()
-        uniforms.progress = Float(Self.clamp(progress))
-        uniforms.foldSign = foldSign
-        uniforms.aspect = Float(drawableSize.width / max(drawableSize.height, 1))
-        uniforms.curlRadius = Self.curlRadius
-        uniforms.shadowStrength = isDark ? 0.30 : 0.24
-        uniforms.highlightStrength = isDark ? 0.06 : 0.10
-        uniforms.paperTint = 0.35
-        uniforms.isDark = isDark ? 1 : 0
-        return uniforms
     }
 
     // MARK: - Display-link settlement
@@ -309,6 +322,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
         guard abs(target - start) > 0.0001, duration.isFinite, duration > 0 else {
             progress = target
+            setFilterTime(target)
             _ = renderFrame { rendered in
                 completion(success && target >= 1 - 0.0001 && rendered)
             }
@@ -381,6 +395,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
             let value = settlement.start
                 + (settlement.end - settlement.start) * CGFloat(easedProgress)
             progress = value
+            setFilterTime(value)
 
             guard linearProgress >= 1 else {
                 _ = renderFrame()
@@ -405,21 +420,12 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         displayLink.isPaused = true
     }
 
-    // MARK: - Textures
+    // MARK: - Core Image preparation
 
-    private func resolveCurrentTexture(resources: PageCurlMetalResources) -> MTLTexture? {
-        if let preuploadedCurrentTexture { return preuploadedCurrentTexture }
-        guard let sourceCurrentImage else { return nil }
-        return CurlTextureCache.makeTexture(from: sourceCurrentImage, device: resources.device)
+    private func setFilterTime(_ value: CGFloat) {
+        guard let pageCurlFilter else { return }
+        pageCurlFilter.time = Float(Self.clamp(value))
     }
-
-    private func resolveTargetTexture(resources: PageCurlMetalResources) -> MTLTexture? {
-        if let preuploadedTargetTexture { return preuploadedTargetTexture }
-        guard let sourceTargetImage else { return nil }
-        return CurlTextureCache.makeTexture(from: sourceTargetImage, device: resources.device)
-    }
-
-    // MARK: - Frame rendering
 
     @discardableResult
     private func renderFrame(completion: ((Bool) -> Void)? = nil) -> Bool {
@@ -442,17 +448,57 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         completion?(succeeded)
     }
 
-    // MARK: - Helpers
+    private static func prepare(_ image: CIImage, for extent: CGRect) -> CIImage? {
+        let sourceExtent = image.extent.standardized
+        guard sourceExtent.width > 0, sourceExtent.height > 0,
+              sourceExtent.width.isFinite, sourceExtent.height.isFinite else {
+            return nil
+        }
 
-    /// `completionTranslationX < 0` means the sheet travels left, so the moving
-    /// edge is the right one. The shader folds on that edge instead of the old
-    /// approach of mirroring both input images.
-    private static func foldSign(for completionTranslationX: CGFloat) -> Float {
-        completionTranslationX < 0 ? 1 : -1
+        let normalized = image.transformed(by: CGAffineTransform(
+            translationX: -sourceExtent.minX,
+            y: -sourceExtent.minY
+        ))
+        let scale = max(extent.width / sourceExtent.width, extent.height / sourceExtent.height)
+        guard scale.isFinite, scale > 0 else { return nil }
+
+        let scaled = normalized.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
+        let scaledExtent = scaled.extent
+        let offsetX = (extent.width - scaledExtent.width) * 0.5
+        let offsetY = (extent.height - scaledExtent.height) * 0.5
+        let positioned = scaled.transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
+        return positioned.clampedToExtent().cropped(to: extent)
     }
 
-    private static func translationIsValid(_ completionTranslationX: CGFloat) -> Bool {
-        completionTranslationX.isFinite && abs(completionTranslationX) > 0.001
+    private static func mirror(_ image: CIImage, in extent: CGRect) -> CIImage {
+        let transform = CGAffineTransform(scaleX: -1, y: 1)
+            .translatedBy(x: -extent.width, y: 0)
+        return image.transformed(by: transform).cropped(to: extent)
+    }
+
+    private static func makeFilter(
+        currentImage: CIImage,
+        targetImage: CIImage,
+        extent: CGRect,
+        isDark: Bool
+    ) -> CIFilter & CIPageCurlWithShadowTransition {
+        let filter = CIFilter.pageCurlWithShadowTransition()
+        filter.inputImage = currentImage
+        filter.targetImage = targetImage
+        // The source page is also the physical back of the turning sheet. The
+        // filter mirrors it onto the back face without any per-frame upload.
+        filter.backsideImage = currentImage
+        filter.extent = extent
+        filter.time = 0
+        filter.angle = 0
+        filter.radius = Float(max(32, min(extent.width * 0.72, 420)))
+        filter.shadowAmount = isDark ? 0.30 : 0.24
+        filter.shadowExtent = extent.insetBy(
+            dx: extent.width * 0.04,
+            dy: extent.height * 0.04
+        )
+        filter.shadowSize = Float(max(6, min(extent.width * 0.012, 14)))
+        return filter
     }
 
     private static func clamp(_ value: CGFloat) -> CGFloat {
@@ -484,11 +530,11 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
     private func resetRenderingResources() {
         installed = false
-        renderer?.releaseDrawables()
-        renderer = nil
-        currentTexture = nil
-        targetTexture = nil
+        pageCurlFilter = nil
+        ciContext = nil
         commandQueue = nil
+        preparedExtent = .zero
+        mirroredOutput = false
         lastRenderSucceeded = false
     }
 }
