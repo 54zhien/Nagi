@@ -81,6 +81,12 @@ final class PageCurlRenderer {
         //    page is a real surface and the fragment stage shades it.
         encoder.setRenderPipelineState(resources.meshPipeline)
         encoder.setDepthStencilState(resources.depthState)
+        // Culling stays off — the back of the turning sheet is a real surface
+        // the fragment stage shades — but the winding still has to be declared:
+        // the mesh is counter-clockwise and Metal defaults to clockwise, so
+        // without this `[[front_facing]]` reports the opposite of the truth and
+        // the page renders with its back-face shading.
+        encoder.setFrontFacing(.counterClockwise)
         encoder.setCullMode(.none)
         encoder.setVertexBuffer(resources.mesh.vertexBuffer, offset: 0, index: 0)
         encoder.setVertexBytes(

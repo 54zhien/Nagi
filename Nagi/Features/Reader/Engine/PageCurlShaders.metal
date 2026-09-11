@@ -37,8 +37,10 @@ struct PageCurlUniforms {
 };
 
 struct PageCurlVertex {
-    /// Normalized page space: x runs 0 at the moving edge to 1 at the spine,
-    /// y runs 0 at the top to 1 at the bottom.
+    /// Normalized page space, always left to right: x runs 0 at the left edge
+    /// to 1 at the right, y runs 0 at the top to 1 at the bottom. The vertex
+    /// stage converts this to the moving-edge-relative space `curlDeform`
+    /// works in; see the comment there.
     float2 position;
     float2 uv;
 };
@@ -54,10 +56,17 @@ struct PageCurlVertexOut {
     float turned;
 };
 
+/// Operates in **moving-edge space**, not page space: x is the distance from
+/// the edge that lifts, 0 at that edge and 1 at the spine. Callers must convert
+/// into this space with `foldSign` before calling and back out afterwards.
+/// Naming the parameter for the space it is actually in is deliberate — the
+/// earlier name `pagePos` is what made the missing entry conversion easy to
+/// overlook.
+///
 /// Fine to replace wholesale when the conical model lands. Everything else in
 /// this file is written against this signature, not against its internals.
 static inline void curlDeform(
-    float2 pagePos,
+    float2 canonicalPos,
     constant PageCurlUniforms &u,
     thread float2 &outPagePos,
     thread float &outHeight,
@@ -77,11 +86,11 @@ static inline void curlDeform(
     float travelled = phase;
 
     // Positive once this material has reached the bend.
-    float entered = travelled - pagePos.x;
+    float entered = travelled - canonicalPos.x;
 
     if (entered <= 0.0) {
         // Untouched: still lying flat.
-        outPagePos = pagePos;
+        outPagePos = canonicalPos;
         outHeight = 0.0;
         outTurned = 0.0;
         outNormal = float3(0.0, 0.0, 1.0);
@@ -117,16 +126,22 @@ vertex PageCurlVertexOut pageCurlVertex(
 ) {
     PageCurlVertex in = mesh[vertexID];
 
+    // `curlDeform` measures x as the distance from the moving edge, but the
+    // mesh always runs left to right. Convert into that space before deforming
+    // and back out afterwards. Doing only the exit conversion — as an earlier
+    // version did — leaves the page mirrored even at progress 0.
+    float canonicalX = uniforms.foldSign > 0.0 ? 1.0 - in.position.x : in.position.x;
+
     float2 curled;
     float height;
     float turned;
     float3 normal;
-    curlDeform(in.position, uniforms, curled, height, turned, normal);
+    curlDeform(float2(canonicalX, in.position.y), uniforms, curled, height, turned, normal);
 
-    // Fold direction picks which physical edge the moving side is. Flipping it
-    // here is what removes the old image-mirroring step.
-    float x = uniforms.foldSign > 0.0 ? (1.0 - curled.x) : curled.x;
-    float2 page = float2(x, in.position.y);
+    // Back to page space. Fold direction picks which physical edge is the
+    // moving one; this is what replaces the old image-mirroring step.
+    float pageX = uniforms.foldSign > 0.0 ? 1.0 - curled.x : curled.x;
+    float2 page = float2(pageX, in.position.y);
 
     // Page space (0..1) -> centred clip space (-1..1). Y is flipped because
     // page space grows downward and clip space grows upward.
@@ -141,7 +156,9 @@ vertex PageCurlVertexOut pageCurlVertex(
     PageCurlVertexOut out;
     out.position = float4(clip.x, clip.y, depth, 1.0);
     out.uv = in.uv;
-    out.pagePos = float2(curled.x, in.position.y);
+    // Page space, matching the member's name — `curled` is still in
+    // moving-edge space at this point.
+    out.pagePos = float2(pageX, in.position.y);
     out.normal = normal;
     out.height = height;
     out.turned = turned;
@@ -160,7 +177,12 @@ fragment float4 pageCurlFragment(
     // The back of the turning sheet shows the same page mirrored, dimmed and
     // pulled toward the paper colour, which is how a real sheet reads when it
     // catches the light at a shallow angle.
-    if (!frontFacing || in.turned > 0.5) {
+    //
+    // `front_facing` is the sole discriminator. The mesh winds counter-clockwise
+    // and the renderer declares that winding, so the rasteriser's answer is
+    // authoritative. `in.turned` describes the same thing geometrically and is
+    // kept only as an auxiliary input for shading.
+    if (!frontFacing) {
         float2 mirrored = float2(1.0 - in.uv.x, in.uv.y);
         float4 back = currentTexture.sample(pageSampler, mirrored);
         float luma = dot(back.rgb, float3(0.299, 0.587, 0.114));
@@ -220,9 +242,12 @@ fragment float4 pageCurlShadowFragment(
         return float4(0.0, 0.0, 0.0, 0.0);
     }
 
-    // The shadow creeps in from the moving edge and widens with the lift.
+    // The shadow creeps in from the moving edge and widens with the lift. It
+    // has to follow the same edge the sheet folds on, so mirror its coordinate
+    // exactly the way the vertex stage mirrors the page.
+    float edgeU = uniforms.foldSign > 0.0 ? 1.0 - in.uv.x : in.uv.x;
     float reach = phase * 0.55;
-    float edge = 1.0 - (in.uv.x / max(reach, 1e-3));
+    float edge = 1.0 - (edgeU / max(reach, 1e-3));
     float falloff = smoothstep(0.0, 1.0, saturate(edge));
 
     // Fade out as the sheet settles, so the shadow never outlives the curl.

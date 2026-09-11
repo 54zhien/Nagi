@@ -13,7 +13,6 @@ private enum PendingReaderMutation {
     case fontStep(Int)
     case preset(ReaderThemePreset)
     case transition(ReaderPageTransition)
-    case curlEngine(ReaderCurlEngine)
     case appearance(ReaderAppearanceMode)
 
     var visualMutationKind: ReaderVisualMutationKind {
@@ -22,7 +21,7 @@ private enum PendingReaderMutation {
             return .font
         case .preset, .appearance:
             return .theme
-        case .transition, .curlEngine:
+        case .transition:
             return .geometry
         }
     }
@@ -403,28 +402,22 @@ final class ReaderSettingsViewController: UIViewController {
                 ) { [weak self] _ in
                     self?.select(transition: option)
                 }
-            } + curlEngineActions(for: transition)
+            } + curlStatusActions(for: transition)
         ))
     }
 
-    /// Only meaningful for the curl transition, so these options appear there
-    /// and nowhere else. This is the switch that keeps the Core Image curl
-    /// reachable while the Metal one is validated on device.
-    private func curlEngineActions(for transition: ReaderPageTransition) -> [UIMenuElement] {
+    /// A single read-only line describing why the curl is or is not ready.
+    ///
+    /// Temporary scaffolding for the Metal curl bring-up: it exists so a device
+    /// test can say *why* the curl did not appear instead of only that it did
+    /// not, and it goes away once the curl is confirmed on hardware. It is not
+    /// an option, so it is disabled — readers have nothing to choose here.
+    private func curlStatusActions(for transition: ReaderPageTransition) -> [UIMenuElement] {
         guard transition == .pageCurl else { return [] }
+        let status = model.curlDiagnostics
+        guard !status.isEmpty else { return [] }
         return [
-            UIMenu(
-                title: "卷页引擎",
-                options: .displayInline,
-                children: ReaderCurlEngine.allCases.reversed().map { engine in
-                    UIAction(
-                        title: engine.label,
-                        state: engine == latestPreferences.curlEngine ? .on : .off
-                    ) { [weak self] _ in
-                        self?.select(curlEngine: engine)
-                    }
-                }
-            )
+            UIAction(title: status, attributes: .disabled) { _ in }
         ]
     }
 
@@ -564,11 +557,6 @@ final class ReaderSettingsViewController: UIViewController {
         enqueueMutation(.transition(transition))
     }
 
-    private func select(curlEngine: ReaderCurlEngine) {
-        guard model.preferences.curlEngine != curlEngine else { return }
-        enqueueMutation(.curlEngine(curlEngine))
-    }
-
     private func select(appearance: ReaderAppearanceMode) {
         guard model.preferences.appearanceMode != appearance else { return }
         enqueueMutation(.appearance(appearance))
@@ -597,13 +585,6 @@ final class ReaderSettingsViewController: UIViewController {
         case .transition:
             pendingMutations.removeAll {
                 if case .transition = $0 { return true }
-                return false
-            }
-            pendingMutations.append(mutation)
-
-        case .curlEngine:
-            pendingMutations.removeAll {
-                if case .curlEngine = $0 { return true }
                 return false
             }
             pendingMutations.append(mutation)
@@ -661,10 +642,6 @@ final class ReaderSettingsViewController: UIViewController {
             guard model.preferences.pageTransition != transition else { return }
             model.setPageTransition(transition)
 
-        case .curlEngine(let curlEngine):
-            guard model.preferences.curlEngine != curlEngine else { return }
-            model.setCurlEngine(curlEngine)
-
         case .appearance(let appearance):
             guard model.preferences.appearanceMode != appearance else { return }
             model.setAppearance(appearance)
@@ -678,8 +655,7 @@ final class ReaderSettingsViewController: UIViewController {
         if previous.fontSizeLevel != latestPreferences.fontSizeLevel {
             updateFontControls()
         }
-        if previous.pageTransition != latestPreferences.pageTransition
-            || previous.curlEngine != latestPreferences.curlEngine {
+        if previous.pageTransition != latestPreferences.pageTransition {
             updateTransitionControl()
         }
         if previous.appearanceMode != latestPreferences.appearanceMode {

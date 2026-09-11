@@ -31,11 +31,8 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     private static let curlRadius: Float = 0.18
 
     private let hostView: UIView
-    /// Fallback inputs, used only when no pre-uploaded texture was supplied.
-    private let sourceCurrentImage: UIImage?
-    private let sourceTargetImage: UIImage?
-    private let preuploadedCurrentTexture: MTLTexture?
-    private let preuploadedTargetTexture: MTLTexture?
+    private let currentTexture: MTLTexture
+    private let targetTexture: MTLTexture
     private let isDark: Bool
     private let foldSign: Float
     private let translationIsValid: Bool
@@ -46,8 +43,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     private var metalView: MTKView?
     private var commandQueue: MTLCommandQueue?
     private var renderer: PageCurlRenderer?
-    private var currentTexture: MTLTexture?
-    private var targetTexture: MTLTexture?
     private var installed = false
     private var displayLink: CADisplayLink?
     private var settlement: Settlement?
@@ -58,8 +53,9 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
     private(set) var progress: CGFloat = 0
 
-    /// Preferred path: the host already uploaded both pages while the reader
-    /// was idle, so a gesture does no rasterising and no texture upload.
+    /// Both pages must already be on the GPU. The reader uploads them while it
+    /// is idle; there is deliberately no image-based initialiser, because the
+    /// whole point is that a gesture never rasterises or uploads anything.
     init(
         hostView: UIView,
         currentTexture: MTLTexture,
@@ -68,30 +64,8 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         isDark: Bool
     ) {
         self.hostView = hostView
-        sourceCurrentImage = nil
-        sourceTargetImage = nil
-        preuploadedCurrentTexture = currentTexture
-        preuploadedTargetTexture = targetTexture
-        self.isDark = isDark
-        foldSign = Self.foldSign(for: completionTranslationX)
-        translationIsValid = Self.translationIsValid(completionTranslationX)
-        super.init()
-    }
-
-    /// Fallback path, kept so a cache miss degrades to a slower curl instead of
-    /// losing the transition. Uploads both pages inside `install()`.
-    init(
-        hostView: UIView,
-        currentImage: UIImage,
-        targetImage: UIImage,
-        completionTranslationX: CGFloat,
-        isDark: Bool
-    ) {
-        self.hostView = hostView
-        sourceCurrentImage = currentImage
-        sourceTargetImage = targetImage
-        preuploadedCurrentTexture = nil
-        preuploadedTargetTexture = nil
+        self.currentTexture = currentTexture
+        self.targetTexture = targetTexture
         self.isDark = isDark
         foldSign = Self.foldSign(for: completionTranslationX)
         translationIsValid = Self.translationIsValid(completionTranslationX)
@@ -136,11 +110,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
             return false
         }
 
-        guard let currentTexture = resolveCurrentTexture(resources: resources),
-              let targetTexture = resolveTargetTexture(resources: resources) else {
-            return false
-        }
-
         let metalView = MTKView(frame: bounds, device: resources.device)
         metalView.delegate = self
         metalView.frame = bounds
@@ -167,8 +136,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
         commandQueue = resources.commandQueue
         renderer = PageCurlRenderer(resources: resources)
-        self.currentTexture = currentTexture
-        self.targetTexture = targetTexture
         self.metalView = metalView
         installed = true
         progress = 0
@@ -229,9 +196,7 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         guard installed,
               view === metalView,
               let commandBuffer = commandQueue?.makeCommandBuffer(),
-              let renderer,
-              let currentTexture,
-              let targetTexture else {
+              let renderer else {
             resolvePendingFrameCompletion(false)
             return
         }
@@ -407,18 +372,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
 
     // MARK: - Textures
 
-    private func resolveCurrentTexture(resources: PageCurlMetalResources) -> MTLTexture? {
-        if let preuploadedCurrentTexture { return preuploadedCurrentTexture }
-        guard let sourceCurrentImage else { return nil }
-        return CurlTextureCache.makeTexture(from: sourceCurrentImage, device: resources.device)
-    }
-
-    private func resolveTargetTexture(resources: PageCurlMetalResources) -> MTLTexture? {
-        if let preuploadedTargetTexture { return preuploadedTargetTexture }
-        guard let sourceTargetImage else { return nil }
-        return CurlTextureCache.makeTexture(from: sourceTargetImage, device: resources.device)
-    }
-
     // MARK: - Frame rendering
 
     @discardableResult
@@ -486,8 +439,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         installed = false
         renderer?.releaseDrawables()
         renderer = nil
-        currentTexture = nil
-        targetTexture = nil
         commandQueue = nil
         lastRenderSucceeded = false
     }

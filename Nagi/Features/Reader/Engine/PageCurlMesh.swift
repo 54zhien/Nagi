@@ -49,8 +49,10 @@ struct PageCurlMesh {
                 let bottomLeft = topLeft + stride
                 let bottomRight = bottomLeft + 1
 
-                // Counter-clockwise when viewed from the front, so the front
-                // face keeps a consistent winding for `[[front_facing]]`.
+                // Counter-clockwise on screen. The renderer declares this
+                // winding explicitly rather than relying on Metal's clockwise
+                // default, because `[[front_facing]]` is what tells the
+                // fragment stage which side of the sheet it is shading.
                 indices.append(contentsOf: [
                     topLeft, bottomLeft, topRight,
                     topRight, bottomLeft, bottomRight,

@@ -295,6 +295,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             safeAreaInsets: contentInsets,
             displayScale: displayScale
         )
+        refreshCurlDiagnostics()
         schedulePageTurnPrewarm()
     }
 
@@ -536,12 +537,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         let customPreferenceIsActive = customPageTurnPreferenceIsActive
         let ownsPageTurns = shouldOwnPaginatedPageTurns
         if ownsPageTurns, model.preferences.pageTransition == .pageCurl {
-            switch model.preferences.curlEngine {
-            case .coreImage:
-                PageTurnCoreImageCurlAnimator.preparePipelineIfNeeded()
-            case .metal:
-                PageTurnCurlAnimator.preparePipelineIfNeeded()
-            }
+            PageTurnCurlAnimator.preparePipelineIfNeeded()
         }
         // A selected custom transition owns the entire hand-off window. The
         // native pager stays disabled while surfaces are warming or a new
@@ -706,6 +702,39 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             }
         }
 
+        // The curl cannot be drawn without both textures already on the GPU, and
+        // rasterising them here is exactly the cost the off-gesture pipeline
+        // exists to remove. A miss is almost always prewarming not having
+        // finished, so treat it like the surface race it is: hold resistance,
+        // keep prewarming, and let the gesture retry.
+        if model.preferences.pageTransition == .pageCurl,
+           !metalCurlTexturesReady(
+               currentSurface: currentSurface,
+               targetSurface: surface,
+               direction: direction
+           ) {
+            provider.cancel(surface: surface)
+            preferredPrewarmDirection = direction
+            if interactive {
+                schedulePageTurnPrewarm()
+                return startPageTurnResistance(
+                    currentSurface: currentSurface,
+                    direction: direction,
+                    generation: generation,
+                    provider: provider,
+                    isConfirmedBoundary: false,
+                    interactive: true
+                )
+            }
+            pageTurnStateMachine.invalidate()
+            if allowsDeferredProgrammaticRetry {
+                queueProgrammaticPageTurn(direction: direction, provider: provider)
+            } else {
+                schedulePageTurnPrewarm()
+            }
+            return true
+        }
+
         activeTurnGeneration = generation
         pendingPanDidEnd = !interactive
         if !interactive {
@@ -740,8 +769,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             animator = makeCurlAnimator(
                 currentSurface: currentSurface,
                 targetSurface: surface,
-                currentComposite: currentComposite,
-                targetComposite: targetComposite,
+                direction: direction,
                 destinationX: destinationX
             ) ?? makeCoverAnimator(
                 currentView: currentComposite,
@@ -1492,14 +1520,16 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     ) {
         guard shouldOwnPaginatedPageTurns,
               model.preferences.pageTransition == .pageCurl,
-              model.preferences.curlEngine == .metal,
-              let resources = PageCurlMetalResources.shared else { return }
+              let resources = PageCurlMetalResources.shared else {
+            refreshCurlDiagnostics()
+            return
+        }
 
         storeCurlTexture(
             image: currentSurface.image,
             geometry: currentSurface.geometry,
             headerTitle: latestTitle,
-            identity: currentSurface.identity,
+            key: .current(currentSurface),
             resources: resources
         )
 
@@ -1511,20 +1541,22 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 image: surface.image,
                 geometry: surface.geometry,
                 headerTitle: surface.headerTitle,
-                identity: surface.originIdentity,
+                key: .adjacent(surface, direction: direction),
                 resources: resources
             )
         }
+
+        refreshCurlDiagnostics()
     }
 
     private func storeCurlTexture(
         image: UIImage,
         geometry: NavigatorPageSurfaceGeometry,
         headerTitle: String?,
-        identity: NavigatorPagePositionIdentity,
+        key: CurlTextureKey,
         resources: PageCurlMetalResources
     ) {
-        guard curlTextureCache.texture(for: identity, matching: geometry) == nil else {
+        guard curlTextureCache.texture(for: key, matching: geometry) == nil else {
             return
         }
 
@@ -1540,7 +1572,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               ) else {
             return
         }
-        curlTextureCache.store(texture, geometry: geometry, for: identity)
+        curlTextureCache.store(texture, geometry: geometry, for: key)
     }
 
     private func makeCoverAnimator(
@@ -1558,73 +1590,104 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         )
     }
 
-    /// Returns nil when neither curl engine can produce a frame, so the caller
-    /// can fall back to the cover transition.
+    /// Returns nil when the curl textures are not on the GPU, so the caller can
+    /// fall back to the cover transition.
+    ///
+    /// There is deliberately no rasterise-on-demand path here. Uploading a page
+    /// mid-gesture is the exact cost this pipeline exists to remove, and a
+    /// fallback that quietly did it would also hide whether prewarming works.
     private func makeCurlAnimator(
         currentSurface: NavigatorCurrentPageSurface,
         targetSurface: PageSurface,
-        currentComposite: UIView,
-        targetComposite: UIView,
+        direction: PageDirection,
         destinationX: CGFloat
     ) -> (any PageTurnAnimating)? {
-        switch model.preferences.curlEngine {
-        case .coreImage:
-            guard let currentImage = makeCompositeImage(
-                from: currentComposite,
-                scale: currentSurface.geometry.scale
-            ), let targetImage = makeCompositeImage(
-                from: targetComposite,
-                scale: targetSurface.geometry.scale
-            ) else {
-                return nil
-            }
-            return PageTurnCoreImageCurlAnimator(
-                hostView: snapshotHostView,
-                currentImage: currentImage,
-                targetImage: targetImage,
-                completionTranslationX: destinationX,
-                isDark: isDarkPageBackground
-            )
-
-        case .metal:
-            // Preferred: both textures were uploaded while the reader was
-            // idle, so this branch does no rasterising and no upload.
-            if let currentTexture = curlTextureCache.texture(
-                for: currentSurface.identity,
-                matching: currentSurface.geometry
-            ), let targetTexture = curlTextureCache.texture(
-                for: targetSurface.originIdentity,
-                matching: targetSurface.geometry
-            ) {
-                return PageTurnCurlAnimator(
-                    hostView: snapshotHostView,
-                    currentTexture: currentTexture,
-                    targetTexture: targetTexture,
-                    completionTranslationX: destinationX,
-                    isDark: isDarkPageBackground
-                )
-            }
-
-            // Cache miss: prewarming either had not finished or was invalidated
-            // by a viewport change. Rasterise here so the gesture still gets a
-            // curl — this is the old behaviour, not a new cost.
-            guard let currentImage = makeCompositeImage(
-                from: currentComposite,
-                scale: currentSurface.geometry.scale
-            ), let targetImage = makeCompositeImage(
-                from: targetComposite,
-                scale: targetSurface.geometry.scale
-            ) else {
-                return nil
-            }
-            return PageTurnCurlAnimator(
-                hostView: snapshotHostView,
-                currentImage: currentImage,
-                targetImage: targetImage,
-                completionTranslationX: destinationX,
-                isDark: isDarkPageBackground
-            )
+        guard let textures = curlTextureCache.curlTextures(
+            currentSurface: currentSurface,
+            targetSurface: targetSurface,
+            direction: direction
+        ) else {
+            return nil
         }
+
+        return PageTurnCurlAnimator(
+            hostView: snapshotHostView,
+            currentTexture: textures.current,
+            targetTexture: textures.target,
+            completionTranslationX: destinationX,
+            isDark: isDarkPageBackground
+        )
+    }
+
+    /// True only when the Metal pipeline exists and both pages for this
+    /// direction are already uploaded at a compatible geometry.
+    private func metalCurlTexturesReady(
+        currentSurface: NavigatorCurrentPageSurface,
+        targetSurface: PageSurface,
+        direction: PageDirection
+    ) -> Bool {
+        guard PageCurlMetalResources.shared != nil else { return false }
+        return curlTextureCache.curlTextures(
+            currentSurface: currentSurface,
+            targetSurface: targetSurface,
+            direction: direction
+        ) != nil
+    }
+
+    /// Refreshes the status string the settings sheet shows.
+    ///
+    /// A curl that fails to appear has four very different causes — a shader
+    /// missing from the app target, no Metal device, prewarming not finished,
+    /// or a geometry mismatch — and they are indistinguishable from the outside,
+    /// since all of them fall back to the same cover transition. This is what
+    /// makes a device test reportable.
+    ///
+    /// Temporary scaffolding for the Metal curl bring-up.
+    private func refreshCurlDiagnostics() {
+        let next = makeCurlDiagnostics()
+        guard model.curlDiagnostics != next else { return }
+        model.curlDiagnostics = next
+    }
+
+    private func makeCurlDiagnostics() -> String {
+        guard model.preferences.pageTransition == .pageCurl else { return "" }
+
+        // Touch `shared` first: `unavailableReason` is only populated once the
+        // lazy build has actually run.
+        _ = PageCurlMetalResources.shared
+        if let reason = PageCurlMetalResources.unavailableReason {
+            return "管线不可用：\(reason)"
+        }
+
+        func mark(_ present: Bool) -> String { present ? "✓" : "✗" }
+
+        guard let provider = model.pageSurfaceProvider,
+              let current = provider.preparedCurrentSurface() else {
+            return "管线 ok · 表面未就绪"
+        }
+
+        let forward = provider.preparedAdjacentSurface(direction: .forward)
+        let backward = provider.preparedAdjacentSurface(direction: .backward)
+
+        let hasCurrent = curlTextureCache.texture(
+            for: .current(current),
+            matching: current.geometry
+        ) != nil
+        let hasForward = forward.map {
+            curlTextureCache.texture(
+                for: .adjacent($0, direction: .forward),
+                matching: $0.geometry
+            ) != nil
+        } ?? false
+        let hasBackward = backward.map {
+            curlTextureCache.texture(
+                for: .adjacent($0, direction: .backward),
+                matching: $0.geometry
+            ) != nil
+        } ?? false
+
+        return "管线 ok · 纹理 当前\(mark(hasCurrent)) 前\(mark(hasForward)) 后\(mark(hasBackward))"
+            + "（缓存 \(curlTextureCache.count)）"
     }
 
     private func invalidatePageTurnCache() {
