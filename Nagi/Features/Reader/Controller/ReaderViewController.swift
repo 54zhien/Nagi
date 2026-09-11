@@ -44,6 +44,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     /// Page textures rasterised and uploaded while the reader was idle, so a
     /// curl gesture only ever looks one up.
     private let curlTextureCache = CurlTextureCache()
+    /// Whether the last warm-up produced all three pages. Kept separately from
+    /// the surfaces' own readiness because an upload can fail while the
+    /// surfaces look perfectly ready, and the prewarm trigger has to know.
+    private var curlTexturesAreWarm = false
     private var activePageSurface: PageSurface?
     private var activeCurrentComposite: UIView?
     private var activeTargetComposite: UIView?
@@ -295,7 +299,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             safeAreaInsets: contentInsets,
             displayScale: displayScale
         )
-        refreshCurlDiagnostics()
         schedulePageTurnPrewarm()
     }
 
@@ -549,6 +552,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         if ownsPageTurns {
             schedulePageTurnPrewarm()
         }
+        // State-driven rather than per-layout: computing it needs the adjacent
+        // surfaces, and `preparedAdjacentSurface` allocates a fresh surface each
+        // call, so it must not run on every layout pass.
+        refreshCurlDiagnostics()
     }
 
     private func setPanGestureEnabled(_ enabled: Bool) {
@@ -702,21 +709,28 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             }
         }
 
-        // The curl cannot be drawn without both textures already on the GPU, and
-        // rasterising them here is exactly the cost the off-gesture pipeline
-        // exists to remove. A miss is almost always prewarming not having
-        // finished, so treat it like the surface race it is: hold resistance,
-        // keep prewarming, and let the gesture retry.
+        // The curl needs both textures already on the GPU, and rasterising them
+        // here is the cost the off-gesture pipeline exists to remove.
+        //
+        // This gate applies only while the Metal pipeline is actually usable.
+        // When it is not — no device, or PageCurlShaders.metal missing from the
+        // app target — no gesture could ever satisfy it, so holding the turn
+        // would leave the reader unable to turn a page at all. Fall through in
+        // that case and let the transition degrade to cover.
+        //
+        // A miss here is not repaired inside the gesture: prewarming only runs
+        // while the state machine is idle, so recovery happens on the release
+        // path or on the next gesture.
         if model.preferences.pageTransition == .pageCurl,
-           !metalCurlTexturesReady(
+           PageCurlMetalResources.shared != nil,
+           curlTextureCache.curlTextures(
                currentSurface: currentSurface,
                targetSurface: surface,
                direction: direction
-           ) {
+           ) == nil {
             provider.cancel(surface: surface)
             preferredPrewarmDirection = direction
             if interactive {
-                schedulePageTurnPrewarm()
                 return startPageTurnResistance(
                     currentSurface: currentSurface,
                     direction: direction,
@@ -1364,6 +1378,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               cachedCurrentSurface == nil
                 || needsPageSurfacePrewarm(provider.adjacentSurfaceReadiness(direction: .forward))
                 || needsPageSurfacePrewarm(provider.adjacentSurfaceReadiness(direction: .backward))
+                || needsCurlTexturePrewarm
         else { return }
 
         pageTurnPrewarmRevision &+= 1
@@ -1492,6 +1507,16 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
     }
 
+    /// True when the curl is selected and usable, but its textures are not all
+    /// uploaded. Without this the prewarm trigger would consider the cache
+    /// published as soon as the surfaces were ready and never retry a failed
+    /// upload — leaving the curl permanently without anything to draw.
+    private var needsCurlTexturePrewarm: Bool {
+        model.preferences.pageTransition == .pageCurl
+            && PageCurlMetalResources.shared != nil
+            && !curlTexturesAreWarm
+    }
+
     private func refreshPreparedPageTurnCacheIfAvailable() {
         guard pageTurnStateMachine.state == .idle,
               let provider = model.pageSurfaceProvider else { return }
@@ -1521,11 +1546,12 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         guard shouldOwnPaginatedPageTurns,
               model.preferences.pageTransition == .pageCurl,
               let resources = PageCurlMetalResources.shared else {
+            curlTexturesAreWarm = false
             refreshCurlDiagnostics()
             return
         }
 
-        storeCurlTexture(
+        var complete = storeCurlTexture(
             image: currentSurface.image,
             geometry: currentSurface.geometry,
             headerTitle: latestTitle,
@@ -1535,29 +1561,36 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         for direction in [PageDirection.forward, .backward] {
             guard let surface = provider.preparedAdjacentSurface(direction: direction) else {
+                complete = false
                 continue
             }
-            storeCurlTexture(
+            let stored = storeCurlTexture(
                 image: surface.image,
                 geometry: surface.geometry,
                 headerTitle: surface.headerTitle,
                 key: .adjacent(surface, direction: direction),
                 resources: resources
             )
+            complete = complete && stored
         }
 
+        curlTexturesAreWarm = complete
         refreshCurlDiagnostics()
     }
 
+    /// Returns whether the texture is on the GPU afterwards. A false result is
+    /// what lets prewarming retry: an upload that fails leaves the *surfaces*
+    /// looking ready while the curl still has nothing to draw.
+    @discardableResult
     private func storeCurlTexture(
         image: UIImage,
         geometry: NavigatorPageSurfaceGeometry,
         headerTitle: String?,
         key: CurlTextureKey,
         resources: PageCurlMetalResources
-    ) {
+    ) -> Bool {
         guard curlTextureCache.texture(for: key, matching: geometry) == nil else {
-            return
+            return true
         }
 
         let composite = makeCompositeSurface(
@@ -1570,9 +1603,10 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                   from: compositeImage,
                   device: resources.device
               ) else {
-            return
+            return false
         }
         curlTextureCache.store(texture, geometry: geometry, for: key)
+        return true
     }
 
     private func makeCoverAnimator(
@@ -1617,21 +1651,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             completionTranslationX: destinationX,
             isDark: isDarkPageBackground
         )
-    }
-
-    /// True only when the Metal pipeline exists and both pages for this
-    /// direction are already uploaded at a compatible geometry.
-    private func metalCurlTexturesReady(
-        currentSurface: NavigatorCurrentPageSurface,
-        targetSurface: PageSurface,
-        direction: PageDirection
-    ) -> Bool {
-        guard PageCurlMetalResources.shared != nil else { return false }
-        return curlTextureCache.curlTextures(
-            currentSurface: currentSurface,
-            targetSurface: targetSurface,
-            direction: direction
-        ) != nil
     }
 
     /// Refreshes the status string the settings sheet shows.
@@ -1698,6 +1717,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         // they have to go together — otherwise a rotated viewport could be
         // served a texture rasterised at the old size.
         curlTextureCache.removeAll()
+        curlTexturesAreWarm = false
         model.pageSurfaceProvider?.invalidatePreparedSurfaces()
         configurePageTurnInteraction()
     }

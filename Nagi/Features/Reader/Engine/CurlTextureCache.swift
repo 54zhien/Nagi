@@ -17,16 +17,7 @@ struct CurlTextureKey: Hashable {
     }
 
     let originIdentity: NavigatorPagePositionIdentity
-    /// Always `originIdentity.generation`. Kept explicit so a key reads as
-    /// "this page, this generation, this role" at the call site.
-    let generation: Int
     let role: Role
-
-    init(originIdentity: NavigatorPagePositionIdentity, role: Role) {
-        self.originIdentity = originIdentity
-        generation = originIdentity.generation
-        self.role = role
-    }
 
     // The role mapping lives here rather than at each call site: prewarming and
     // lookup must agree, and a spread of hand-written mappings is how the
@@ -103,11 +94,6 @@ final class CurlTextureCache {
             insertionOrder.removeFirst()
             entries.removeValue(forKey: oldest)
         }
-    }
-
-    func remove(_ key: CurlTextureKey) {
-        entries.removeValue(forKey: key)
-        insertionOrder.removeAll { $0 == key }
     }
 
     func removeAll() {

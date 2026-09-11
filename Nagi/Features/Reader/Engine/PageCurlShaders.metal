@@ -48,12 +48,9 @@ struct PageCurlVertex {
 struct PageCurlVertexOut {
     float4 position [[position]];
     float2 uv;
-    float2 pagePos;
     float3 normal;
     /// Height above the page plane, used for the projected shadow falloff.
     float height;
-    /// 1 when this vertex belongs to the part that already passed the bend.
-    float turned;
 };
 
 /// Operates in **moving-edge space**, not page space: x is the distance from
@@ -70,7 +67,6 @@ static inline void curlDeform(
     constant PageCurlUniforms &u,
     thread float2 &outPagePos,
     thread float &outHeight,
-    thread float &outTurned,
     thread float3 &outNormal
 ) {
     // Taper the bend to zero at both ends of the gesture. Without it the sheet
@@ -92,7 +88,6 @@ static inline void curlDeform(
         // Untouched: still lying flat.
         outPagePos = canonicalPos;
         outHeight = 0.0;
-        outTurned = 0.0;
         outNormal = float3(0.0, 0.0, 1.0);
         return;
     }
@@ -104,9 +99,10 @@ static inline void curlDeform(
         float a = entered / radius;
         outPagePos.x = travelled - radius * sin(a);
         outHeight = radius * (1.0 - cos(a));
-        outTurned = 0.0;
-        // Radial direction away from the cylinder axis.
-        outNormal = normalize(float3(sin(a), 0.0, -cos(a)));
+        // Perpendicular to the tangent (-cos a, sin a) and continuous with both
+        // neighbours: (0, 0, 1) as a -> 0 where the bend meets the flat sheet,
+        // and (0, 0, -1) at a -> PI where it meets the turned part.
+        outNormal = float3(sin(a), 0.0, cos(a));
         return;
     }
 
@@ -115,7 +111,6 @@ static inline void curlDeform(
     float excess = entered - bendArc;
     outPagePos.x = travelled + excess;
     outHeight = 2.0 * radius;
-    outTurned = 1.0;
     outNormal = float3(0.0, 0.0, -1.0);
 }
 
@@ -134,9 +129,8 @@ vertex PageCurlVertexOut pageCurlVertex(
 
     float2 curled;
     float height;
-    float turned;
     float3 normal;
-    curlDeform(float2(canonicalX, in.position.y), uniforms, curled, height, turned, normal);
+    curlDeform(float2(canonicalX, in.position.y), uniforms, curled, height, normal);
 
     // Back to page space. Fold direction picks which physical edge is the
     // moving one; this is what replaces the old image-mirroring step.
@@ -156,12 +150,8 @@ vertex PageCurlVertexOut pageCurlVertex(
     PageCurlVertexOut out;
     out.position = float4(clip.x, clip.y, depth, 1.0);
     out.uv = in.uv;
-    // Page space, matching the member's name — `curled` is still in
-    // moving-edge space at this point.
-    out.pagePos = float2(pageX, in.position.y);
     out.normal = normal;
     out.height = height;
-    out.turned = turned;
     return out;
 }
 
@@ -180,8 +170,8 @@ fragment float4 pageCurlFragment(
     //
     // `front_facing` is the sole discriminator. The mesh winds counter-clockwise
     // and the renderer declares that winding, so the rasteriser's answer is
-    // authoritative. `in.turned` describes the same thing geometrically and is
-    // kept only as an auxiliary input for shading.
+    // authoritative — including across the bend, where the surface turns away
+    // from the viewer and the winding flips on its own.
     if (!frontFacing) {
         float2 mirrored = float2(1.0 - in.uv.x, in.uv.y);
         float4 back = currentTexture.sample(pageSampler, mirrored);

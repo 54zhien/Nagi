@@ -21,10 +21,10 @@ struct PageCurlUniforms {
 /// or pipeline creation.
 ///
 /// `shared` is nil when any piece fails to build — a missing shader library, a
-/// device without the required formats. The reader then falls back to the Core
-/// Image curl. Note that a `.metal` file left out of the app target still
-/// builds cleanly and only fails here, so `unavailableReason` is what turns
-/// that silent failure into something reportable.
+/// device without the required formats. The reader then degrades to its cover
+/// transition, since there is no second curl engine. Note that a `.metal` file
+/// left out of the app target still builds cleanly and only fails here, so
+/// `unavailableReason` is what turns that silent failure into a reportable one.
 @MainActor
 final class PageCurlMetalResources {
     static let shared: PageCurlMetalResources? = build()

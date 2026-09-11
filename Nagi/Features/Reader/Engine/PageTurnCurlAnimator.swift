@@ -8,9 +8,8 @@ import UIKit
 /// The paper is a static grid; every frame only changes a 32-byte uniform
 /// struct (progress, fold direction, radius, lighting) and the vertex shader
 /// re-evaluates the curvature on the GPU. Nothing per frame touches the CPU
-/// bitmaps: both page textures are uploaded before the gesture starts, either
-/// by `CurlTextureCache` in the preferred path or, as a fallback, here in
-/// `install()`.
+/// bitmaps: both textures must already be uploaded by `CurlTextureCache` before
+/// the gesture starts, and `install()` fails rather than rasterising them.
 ///
 /// Readium navigation and locator commits stay outside this visual animator.
 @MainActor
@@ -75,11 +74,10 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
     /// Builds the Metal resources before the first gesture so that a gesture
     /// never pays for pipeline creation.
     ///
-    /// The shader library ships precompiled in the app bundle, so unlike the
-    /// old Core Image path there is no runtime shader compilation to warm —
-    /// this only forces the lazy `shared` build to happen now. When the shader
-    /// is missing from the app target `shared` stays nil and the reader keeps
-    /// using the Core Image curl.
+    /// The shader library ships precompiled in the app bundle, so there is no
+    /// runtime shader compilation to warm — this only forces the lazy `shared`
+    /// build to happen now. When the shader is missing from the app target
+    /// `shared` stays nil and the reader degrades to its cover transition.
     static func preparePipelineIfNeeded() {
         guard !didAttemptPipelineWarmup else { return }
         didAttemptPipelineWarmup = true
@@ -369,8 +367,6 @@ final class PageTurnCurlAnimator: NSObject, PageTurnAnimating, MTKViewDelegate {
         _ = renderFrame()
         displayLink.isPaused = true
     }
-
-    // MARK: - Textures
 
     // MARK: - Frame rendering
 

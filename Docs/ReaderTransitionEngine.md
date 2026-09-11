@@ -10,7 +10,7 @@ ReaderViewController
 ├─ immutable PageSurface overlay
 └─ PageTurn renderer
    ├─ Core Animation cover renderer
-   ├─ Core Image page curl rendered through Metal
+   ├─ Metal page curl (custom deforming sheet mesh)
    └─ opacity-only fade renderer
 
 Readium fork
@@ -29,7 +29,7 @@ Current and adjacent page pixels come from the same Readium WebKit snapshot path
 2. Add current/adjacent surfaces with explicit geometry plus settled navigation to the Readium 3.11 fork. **Implemented; device validation pending.**
 3. Implement cover turning with Core Animation and serialized navigator commit. **Implemented; 100-page device gate pending.**
 4. Implement a smooth opacity-only fade on the same surface pipeline, with no geometry or shadow work during interaction. **Implemented; device validation pending.**
-5. Drive Apple Core Image's public `CIPageCurlWithShadowTransition` from the same pan/state machine as the other paginated effects, render it with a Metal-backed `CIContext`, and automatically fall back to the cover renderer when the GPU/filter path cannot initialize. The old nested `UIPageViewController` gesture stack and all private transition strings are removed. **Implemented; device validation pending.**
+5. Drive a custom Metal page curl — a static sheet mesh deformed in the vertex stage, with the back face, the projected shadow and the sheen all shaded directly — from the same pan/state machine as the other paginated effects. Both page textures are rasterised and uploaded while the reader is idle, so the gesture path contains no bitmap work and no upload. Failures degrade to the cover renderer. An earlier Core Image implementation built on `CIPageCurlWithShadowTransition` has been removed. The old nested `UIPageViewController` gesture stack and all private transition strings are removed. **Implemented; device validation pending.**
 6. Add continuous cross-resource scrolling with a bounded WebView window, generation-safe loading, queued height remeasurement, visible-anchor preservation, and Readium Locator conversion. **Implemented; device validation pending.**
 7. Opt into the full iPhone ProMotion range and request 60–120 Hz settlement callbacks. Measure actual frame pacing on 60 Hz and ProMotion hardware with Instruments; interaction stability and reading-position correctness still take priority. **Configuration implemented; device validation pending.**
 
