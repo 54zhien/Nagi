@@ -38,6 +38,14 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     private let currentTintView = UIView()
     private let completionTranslationX: CGFloat
     private let isDark: Bool
+    /// True when the incoming page is the one that moves.
+    ///
+    /// Going back a page, the previous page slides in *over* the current one:
+    /// the incoming sheet is the mover and belongs on top. Going forward the
+    /// current sheet moves away and reveals the next one behind it. Playing the
+    /// forward animation with a flipped sign gets the direction right but the
+    /// roles wrong — the wrong page moves, and it moves on the wrong layer.
+    private let isReversed: Bool
 
     private var animationRevision = 0
     private var propertyAnimator: UIViewPropertyAnimator?
@@ -46,6 +54,7 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
 
     init(
         style: PageTurnVisualStyle,
+        direction: PageDirection,
         hostView: UIView,
         currentView: UIView,
         targetView: UIView,
@@ -58,6 +67,9 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         self.targetView = targetView
         self.completionTranslationX = completionTranslationX
         self.isDark = isDark
+        // Only the cover has a moving sheet to reassign; a cross-fade has no
+        // direction to speak of.
+        isReversed = style == .cover && direction == .backward
     }
 
     @discardableResult
@@ -109,9 +121,10 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
 
         switch style {
         case .cover:
-            // The outgoing current sheet reveals the target behind it.
-            currentContainer.layer.zPosition = 1
-            targetContainer.layer.zPosition = 0
+            // The moving sheet is the one on top: forward that is the outgoing
+            // current page, backward the incoming one.
+            currentContainer.layer.zPosition = isReversed ? 0 : 1
+            targetContainer.layer.zPosition = isReversed ? 1 : 0
         case .fade:
             // The incoming sheet must composite above the fading current one.
             currentContainer.layer.zPosition = 0
@@ -187,9 +200,40 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     }
 
     private func updateCover() {
-        // The current sheet is the moving page. The target stays behind it
-        // and closes only a small parallax gap, preserving spatial continuity
-        // without making the incoming text travel a full screen width.
+        let separation = CGFloat(sin(Double.pi * Double(progress)))
+
+        // The moving sheet travels a full width; the one it covers only gives up
+        // a little ground, which keeps the two pages spatially continuous
+        // without dragging the stationary text across the screen.
+        //
+        // Which sheet moves is the whole difference between forward and back, so
+        // the two branches only swap the roles and keep every formula identical.
+        // The shadow follows the same rule: `completionTranslationX` already
+        // carries the travel direction, so applying the same expression to
+        // whichever sheet is moving mirrors it for free.
+        if isReversed {
+            targetContainer.transform = CGAffineTransform(
+                translationX: -completionTranslationX * (1 - progress),
+                y: 0
+            )
+            currentContainer.transform = CGAffineTransform(
+                translationX: completionTranslationX * 0.08 * progress,
+                y: 0
+            )
+            currentTintView.alpha = 0
+
+            // Keep the overlay nearly neutral in light mode. The page shadow is
+            // the separation cue; a broad opaque shade is what previously made
+            // the transition look like a red or black rectangle.
+            currentContainer.layer.shadowOpacity = 0
+            setShadow(
+                on: targetContainer,
+                opacity: 0.20 * separation,
+                leading: completionTranslationX < 0
+            )
+            return
+        }
+
         currentContainer.transform = CGAffineTransform(
             translationX: completionTranslationX * progress,
             y: 0
@@ -198,12 +242,8 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
             translationX: -completionTranslationX * 0.08 * (1 - progress),
             y: 0
         )
-        let separation = CGFloat(sin(Double.pi * Double(progress)))
         currentTintView.alpha = (isDark ? 0.035 : 0.012) * separation
 
-        // Keep the overlay nearly neutral in light mode.  The page shadow is
-        // the separation cue; a broad opaque shade is what previously made
-        // the curl/cover transition look like a red or black rectangle.
         targetContainer.layer.shadowOpacity = 0
         setShadow(
             on: currentContainer,

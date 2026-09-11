@@ -498,22 +498,26 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               imageMatchesGeometry(currentSurface.image, currentSurface.geometry),
               let provider = model.pageSurfaceProvider else { return false }
 
-        return [PageDirection.forward, .backward].allSatisfy { direction in
-            switch provider.adjacentSurfaceReadiness(direction: direction) {
-            case .ready:
-                guard let target = provider.preparedAdjacentSurface(direction: direction) else {
-                    return false
-                }
-                return pageSurfaceGeometryIsCompatible(
-                    current: currentSurface,
-                    target: target,
-                    viewportSize: snapshotHostView.bounds.size
-                )
-            case .unavailable:
-                return true
-            case .unknown, .preparing, .failed:
+        // Only the direction the reader is about to move in has to be ready.
+        // Requiring both means a backward prewarm still in flight holds up a
+        // forward gesture, which is where the dead beat between consecutive
+        // turns comes from; the other direction keeps warming in the background
+        // and the prewarm trigger stays satisfied until it lands.
+        let direction = preferredPrewarmDirection
+        switch provider.adjacentSurfaceReadiness(direction: direction) {
+        case .ready:
+            guard let target = provider.preparedAdjacentSurface(direction: direction) else {
                 return false
             }
+            return pageSurfaceGeometryIsCompatible(
+                current: currentSurface,
+                target: target,
+                viewportSize: snapshotHostView.bounds.size
+            )
+        case .unavailable:
+            return true
+        case .unknown, .preparing, .failed:
+            return false
         }
     }
 
@@ -782,6 +786,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 direction: direction,
                 destinationX: destinationX
             ) ?? makeCoverAnimator(
+                direction: direction,
                 currentView: currentComposite,
                 targetView: targetComposite,
                 destinationX: destinationX
@@ -789,6 +794,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         case .fade:
             animator = PageTurnVisualAnimator(
                 style: .fade,
+                direction: direction,
                 hostView: snapshotHostView,
                 currentView: currentComposite,
                 targetView: targetComposite,
@@ -798,6 +804,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         case .slide, .scroll:
             animator = PageTurnVisualAnimator(
                 style: .cover,
+                direction: direction,
                 hostView: snapshotHostView,
                 currentView: currentComposite,
                 targetView: targetComposite,
@@ -813,6 +820,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         if !animatorInstalled, model.preferences.pageTransition == .pageCurl {
             animator.remove()
             animator = makeCoverAnimator(
+                direction: direction,
                 currentView: currentComposite,
                 targetView: targetComposite,
                 destinationX: destinationX
@@ -962,8 +970,13 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                 // WebView has painted the committed location. This gate applies
                 // to every visual style, not only curl, so no style can flash
                 // the previous page during the handoff.
+                //
+                // One barrier, not two. `waitForVisualUpdate` awaits the
+                // reader's own readiness predicate inside the page script, which
+                // is a real signal; the two-frame delay that used to follow it
+                // was a flat 32 ms of dead time on every turn, and it is what
+                // made consecutive turns feel like they had to wait their turn.
                 await self.model.waitForVisualUpdate(for: .full)
-                await self.waitForRecoveryFrames()
                 guard !Task.isCancelled,
                       self.pageTurnStateMachine.accepts(generation) else { return }
                 self.preferredPrewarmDirection = surface.direction
@@ -1062,6 +1075,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         let animator = PageTurnVisualAnimator(
             style: .cover,
+            direction: direction,
             hostView: snapshotHostView,
             currentView: currentView,
             targetView: targetView,
@@ -1604,12 +1618,14 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     }
 
     private func makeCoverAnimator(
+        direction: PageDirection,
         currentView: UIView,
         targetView: UIView,
         destinationX: CGFloat
     ) -> any PageTurnAnimating {
         PageTurnVisualAnimator(
             style: .cover,
+            direction: direction,
             hostView: snapshotHostView,
             currentView: currentView,
             targetView: targetView,
