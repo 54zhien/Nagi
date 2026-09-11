@@ -95,6 +95,7 @@
 		4A00000000000000000000FC /* ReadiumPreferenceMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */; };
 		4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */; };
 		4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FF /* EPUBResourcePath.swift */; };
+		4A00000000000000000000D2 /* ReadiumSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D2 /* ReadiumSession.swift */; };
 		4A00000000000000000000D1 /* EPUBResourcePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D1 /* EPUBResourcePathTests.swift */; };
 
 /* Begin PBXFileReference section */
@@ -184,6 +185,7 @@
 		3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceMapper.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceCoordinator.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FF /* EPUBResourcePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePath.swift; sourceTree = "<group>"; };
+		3A00000000000000000000D2 /* ReadiumSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumSession.swift; sourceTree = "<group>"; };
 		3A00000000000000000000D1 /* EPUBResourcePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePathTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -519,6 +521,7 @@
 				2A00000000000000000000F4 /* Preferences */,
 				2A00000000000000000000F5 /* Styling */,
 				2A00000000000000000000F6 /* Navigation */,
+				3A00000000000000000000D2 /* ReadiumSession.swift */,
 				3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */,
 			);
 			path = Readium;
@@ -792,6 +795,7 @@
 				4A00000000000000000000FC /* ReadiumPreferenceMapper.swift in Sources */,
 				4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */,
 				4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */,
+				4A00000000000000000000D2 /* ReadiumSession.swift in Sources */,
 				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -23,7 +23,7 @@ final class EPUBReaderModel {
 
     let book: Book
 
-    var navigator: EPUBNavigatorViewController?
+    var navigator: EPUBNavigatorViewController? { session.navigator }
     var isLoading = false
     var errorMessage: String?
     var title: String
@@ -72,10 +72,7 @@ final class EPUBReaderModel {
         resolvedAppearance.backgroundColor
     }
 
-    var isReflowable: Bool {
-        guard let publication else { return false }
-        return publication.metadata.layout != .fixed
-    }
+    var isReflowable: Bool { session.isReflowable }
 
     var onToggleControls: (() -> Void)?
     var onSwipeStart: (() -> Void)?
@@ -83,9 +80,11 @@ final class EPUBReaderModel {
     var onStateChange: (() -> Void)?
     @ObservationIgnored private var pageTurnLocationTransaction: PageTurnLocationTransaction?
 
-    private var publication: Publication?
+    @ObservationIgnored
+    private let session = ReadiumSession()
+    private var publication: Publication? { session.publication }
     // TXT books use their generated EPUB asset here.
-    private var activePublicationURL: URL?
+    private var activePublicationURL: URL? { session.publicationURL }
     @ObservationIgnored
     private let preferenceCoordinator = ReadiumPreferenceCoordinator()
     @ObservationIgnored
@@ -137,6 +136,21 @@ final class EPUBReaderModel {
         showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
     }
 
+    /// The stored reading position, resolved once the publication is open.
+    private func initialReadingLocation(for publication: Publication) async -> Locator? {
+        if let locatorJSON = book.readerLocatorJSON,
+           let locator = try? Locator(jsonString: locatorJSON) {
+            return locator
+        }
+        if book.format == .txt, progress > 0 {
+            // Restore progress from TXT records created before Readium.
+            currentLocatorJSON = nil
+            return await publication.locate(progression: progress)
+        }
+        currentLocatorJSON = nil
+        return nil
+    }
+
     func loadIfNeeded() async {
         guard !hasLoaded, !isLoading else { return }
         isLoading = true
@@ -144,51 +158,28 @@ final class EPUBReaderModel {
         defer { isLoading = false }
 
         do {
-            let readingURL = try await ReaderAssetResolver.resolve(book: book)
-            try Task.checkCancellation()
-            let publication = try await ReadiumService.shared.openEPUB(
-                at: readingURL
+            let opened = try await session.open(
+                book: book,
+                preferences: { [weak self] in
+                    guard let self else { return EPUBPreferences() }
+                    return ReadiumPreferenceMapper.makePreferences(
+                        from: self.readerPreferences,
+                        appearance: self.resolvedAppearance,
+                        isReflowable: self.isReflowable
+                    )
+                },
+                initialLocation: { [weak self] publication in
+                    await self?.initialReadingLocation(for: publication)
+                }
             )
-            try Task.checkCancellation()
-            activePublicationURL = readingURL
-            self.publication = publication
+            guard let publication = session.publication else { return }
+            let navigator = opened.navigator
+            let initialLocation = opened.initialLocation
             // The library title is user-editable and is the source of truth for
             // reader chrome. Publication metadata must not restore the imported
             // title after the user renames a book.
             title = book.title
 
-            let initialLocation: Locator?
-            if let locatorJSON = book.readerLocatorJSON,
-               let locator = try? Locator(jsonString: locatorJSON) {
-                initialLocation = locator
-            } else if book.format == .txt, progress > 0 {
-                // Restore progress from TXT records created before Readium.
-                currentLocatorJSON = nil
-                initialLocation = await publication.locate(progression: progress)
-            } else {
-                currentLocatorJSON = nil
-                initialLocation = nil
-            }
-            try Task.checkCancellation()
-            let navigator = try EPUBNavigatorViewController(
-                publication: publication,
-                initialLocation: initialLocation,
-                config: .init(
-                    preferences: ReadiumPreferenceMapper.makePreferences(
-                        from: readerPreferences,
-                        appearance: resolvedAppearance,
-                        isReflowable: isReflowable
-                    ),
-                    disablePageTurnsWhileScrolling: true,
-                    continuousScroll: true,
-                    preloadPreviousPositionCount: 2,
-                    preloadNextPositionCount: 6,
-                    fontFamilyDeclarations: EPUBFontResources.declarations(),
-                    readiumCSSRSProperties: CSSRSProperties(
-                        pageGutter: CSSPxLength(ReaderLayoutMetrics.pageMarginBase)
-                    )
-                )
-            )
             delegateAdapter.host = self
             navigator.delegate = delegateAdapter
             navigator.addObserver(.drag(onStart: { [weak self] _ in
@@ -196,7 +187,6 @@ final class EPUBReaderModel {
                 return false
             }))
             navigator.isUserPageTurnInteractionEnabled = nativePageTurnInteractionEnabled
-            self.navigator = navigator
             preferenceCoordinator.attach(navigator)
             preferenceCoordinator.didCommit = { [weak self] generation in
                 self?.refreshVisibleReaderOverrides(generation: generation)
