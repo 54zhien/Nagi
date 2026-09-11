@@ -153,7 +153,7 @@ private struct ReaderSessionView: View {
         .onDisappear {
             transitionCoordinator.cancel()
             model.saveProgress()
-            try? modelContext.save()
+            modelContext.saveLogged(operation: "退出阅读器时保存进度")
             model.tearDown()
         }
         .sheet(isPresented: $showSettings) {
@@ -250,7 +250,7 @@ private struct ReaderSessionView: View {
 
     private func dismissReader() {
         model.saveProgress()
-        try? modelContext.save()
+        modelContext.saveLogged(operation: "关闭阅读器时保存进度")
         dismiss()
     }
 }

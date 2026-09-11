@@ -174,7 +174,7 @@ final class LibraryViewModel {
                             BookFileLocator.persistedPath(for: $0)
                         }
                         book.importErrorMessage = message
-                        try? context.save()
+                        context.saveLogged(operation: "标记导入失败")
                     }
                 }
             }
@@ -187,7 +187,7 @@ final class LibraryViewModel {
     }
 
     static func resumeInterruptedImports(in context: ModelContext) {
-        let interrupted = ((try? context.fetch(FetchDescriptor<Book>())) ?? [])
+        let interrupted = context.fetchLogged(FetchDescriptor<Book>(), operation: "读取被中断的导入任务")
             .filter { $0.importState == .importing }
         var requests: [RecoveredImportRequest] = []
 
@@ -216,7 +216,7 @@ final class LibraryViewModel {
                 )
             )
         }
-        try? context.save()
+        context.saveLogged(operation: "记录待恢复的导入任务")
 
         Task {
             for request in requests {
@@ -238,7 +238,7 @@ final class LibraryViewModel {
                     currentBook.importState = .failed
                     currentBook.importOperationID = nil
                     currentBook.importErrorMessage = error.localizedDescription
-                    try? context.save()
+                    context.saveLogged(operation: "标记导入恢复失败")
                 }
             }
         }
@@ -261,7 +261,7 @@ final class LibraryViewModel {
         book.importState = .importing
         book.importOperationID = operationID
         book.importErrorMessage = nil
-        try? context.save()
+        context.saveLogged(operation: "开始重试导入")
 
         Task {
             do {
@@ -283,7 +283,7 @@ final class LibraryViewModel {
                 currentBook.importOperationID = nil
                 currentBook.importErrorMessage = error.localizedDescription
                 errorMessage = error.localizedDescription
-                try? context.save()
+                context.saveLogged(operation: "标记重试导入失败")
             }
         }
     }
@@ -309,7 +309,7 @@ final class LibraryViewModel {
             let covers = await Self.loadMissingCoversInBackground(requests)
             guard !covers.isEmpty else { return }
 
-            let currentBooks = (try? context.fetch(FetchDescriptor<Book>())) ?? []
+            let currentBooks = context.fetchLogged(FetchDescriptor<Book>(), operation: "读取书库以补全封面")
             var didUpdate = false
             for book in currentBooks {
                 guard book.coverData == nil, let coverData = covers[book.id] else { continue }
@@ -318,7 +318,7 @@ final class LibraryViewModel {
             }
 
             if didUpdate {
-                try? context.save()
+                context.saveLogged(operation: "补全书籍封面")
             }
         }
     }
@@ -447,7 +447,7 @@ final class LibraryViewModel {
         operationID: UUID,
         in context: ModelContext
     ) -> Book? {
-        ((try? context.fetch(FetchDescriptor<Book>())) ?? []).first {
+        context.fetchLogged(FetchDescriptor<Book>(), operation: "查找进行中的导入任务").first {
             $0.id == id && $0.importOperationID == operationID
         }
     }
@@ -456,7 +456,7 @@ final class LibraryViewModel {
         _ storedPath: String,
         in context: ModelContext
     ) {
-        let hasOwner = ((try? context.fetch(FetchDescriptor<Book>())) ?? []).contains {
+        let hasOwner = context.fetchLogged(FetchDescriptor<Book>(), operation: "检查导入文件归属").contains {
             BookFileLocator.normalizedPersistedPath($0.sourceURL) == storedPath
         }
         guard !hasOwner, let fileURL = BookFileLocator.resolve(storedPath) else { return }
@@ -466,7 +466,7 @@ final class LibraryViewModel {
     // MARK: - 书库操作
 
     static func migrateStoredFileLocations(in context: ModelContext) {
-        guard let books = try? context.fetch(FetchDescriptor<Book>()) else { return }
+        let books = context.fetchLogged(FetchDescriptor<Book>(), operation: "迁移书籍文件路径")
         var changed = false
 
         for book in books {
@@ -494,7 +494,7 @@ final class LibraryViewModel {
         }
 
         if changed {
-            try? context.save()
+            context.saveLogged(operation: "迁移书籍文件路径")
         }
     }
 
