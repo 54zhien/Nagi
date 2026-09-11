@@ -86,6 +86,7 @@
 		4A00000000000000000000F3 /* ReaderDomainBaselineTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F4 /* ReaderDomainBaselineTests.swift */; };
 		4A00000000000000000000F4 /* BookFileLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F5 /* BookFileLocatorTests.swift */; };
 		4A00000000000000000000F5 /* TXTParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F6 /* TXTParserTests.swift */; };
+		4A00000000000000000000F6 /* ReaderPreferencesMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */; };
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* NagiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiApp.swift; sourceTree = "<group>"; };
@@ -165,6 +166,7 @@
 		3A00000000000000000000F4 /* ReaderDomainBaselineTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderDomainBaselineTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000F5 /* BookFileLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookFileLocatorTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000F6 /* TXTParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTParserTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPreferencesMigrationTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A0000000000000000000003 /* Frameworks */ = {
@@ -500,6 +502,7 @@
 				3A00000000000000000000F4 /* ReaderDomainBaselineTests.swift */,
 				3A00000000000000000000F5 /* BookFileLocatorTests.swift */,
 				3A00000000000000000000F6 /* TXTParserTests.swift */,
+				3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */,
 			);
 			path = NagiTests;
 			sourceTree = "<group>";
@@ -736,6 +739,7 @@
 				4A00000000000000000000F3 /* ReaderDomainBaselineTests.swift in Sources */,
 				4A00000000000000000000F4 /* BookFileLocatorTests.swift in Sources */,
 				4A00000000000000000000F5 /* TXTParserTests.swift in Sources */,
+				4A00000000000000000000F6 /* ReaderPreferencesMigrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

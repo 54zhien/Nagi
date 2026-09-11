@@ -152,26 +152,6 @@ final class EPUBReaderModel {
         400_000_000
     ]
 
-    private enum PreferenceKey {
-        static let fontSizeLevel = "reader.epub.fontSizeLevel"
-        static let legacyFontScale = "reader.epub.fontScale"
-        static let fontFamily = "reader.epub.fontFamily"
-        static let boldText = "reader.epub.boldText"
-        static let lineHeight = "reader.epub.lineHeight"
-        static let pageMargins = "reader.epub.pageMargins"
-        static let pageMarginAdjustment = "reader.epub.pageMarginAdjustment"
-        static let pageMarginPoints = "reader.epub.pageMarginPoints"
-        static let paragraphIndent = "reader.epub.paragraphIndent"
-        static let characterSpacing = "reader.epub.characterSpacing"
-        static let wordSpacing = "reader.epub.wordSpacing"
-        static let theme = "reader.epub.theme"
-        static let appearanceMode = "reader.epub.appearanceMode"
-        static let pageTransition = "reader.epub.pageTransition"
-        static let publisherStyles = "reader.epub.publisherStyles"
-        static let showBookTitleInPageHeader = "reader.epub.showBookTitleInPageHeader"
-        static let selectedPreset = "reader.epub.selectedPreset"
-    }
-
     init(book: Book) {
         self.book = book
         title = book.title
@@ -185,49 +165,25 @@ final class EPUBReaderModel {
         }
         progress = min(max(book.progressPercent, 0), 1)
 
-        let defaults = UserDefaults.standard
-        if let savedLevel = defaults.object(forKey: PreferenceKey.fontSizeLevel) as? Int {
-            fontSizeLevel = ReaderFontSize.clampedLevel(savedLevel)
-        } else if let legacyScale = defaults.object(forKey: PreferenceKey.legacyFontScale) as? Double {
-            fontSizeLevel = ReaderFontSize.nearestLevel(forScale: legacyScale)
-        } else {
-            fontSizeLevel = ReaderFontSize.defaultLevel
-        }
-        fontFamily = defaults.string(forKey: PreferenceKey.fontFamily).flatMap(ReaderFontFamily.init) ?? .original
-        boldText = defaults.object(forKey: PreferenceKey.boldText) as? Bool ?? false
-        lineHeight = ReaderLayoutMetrics.clampLineHeight(
-            defaults.object(forKey: PreferenceKey.lineHeight) as? Double
-                ?? ReaderLayoutMetrics.defaultLineHeight
-        )
-        if let pageMargin = defaults.object(forKey: PreferenceKey.pageMarginPoints) as? Double {
-            pageMargins = ReaderLayoutMetrics.clampPageMargins(pageMargin)
-        } else if let adjustment = defaults.object(forKey: PreferenceKey.pageMarginAdjustment) as? Double {
-            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMarginAdjustment(adjustment)
-        } else {
-            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(
-                defaults.object(forKey: PreferenceKey.pageMargins) as? Double
-            )
-        }
+        // Preferences come from the shared store; the legacy `reader.epub.*`
+        // keys are only ever read once, by the store's migration.
+        let preferences = ReaderPreferencesStore.load() ?? ReaderPreferences()
+        fontSizeLevel = ReaderFontSize.clampedLevel(preferences.fontSizeLevel)
+        fontFamily = preferences.fontFamily
+        boldText = preferences.boldText
+        lineHeight = ReaderLayoutMetrics.clampLineHeight(preferences.lineHeight)
+        pageMargins = ReaderLayoutMetrics.clampPageMargins(preferences.pageMargins)
         paragraphIndent = ReaderLayoutMetrics.fixedParagraphIndent
-        characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(
-            defaults.object(forKey: PreferenceKey.characterSpacing) as? Double
-                ?? ReaderLayoutMetrics.defaultCharacterSpacing
-        )
-        wordSpacing = ReaderLayoutMetrics.clampWordSpacing(
-            defaults.object(forKey: PreferenceKey.wordSpacing) as? Double
-                ?? ReaderLayoutMetrics.defaultWordSpacing
-        )
-        theme = defaults.string(forKey: PreferenceKey.theme).flatMap(ReaderTheme.init) ?? .light
-        appearanceMode = defaults.string(forKey: PreferenceKey.appearanceMode)
-            .flatMap(ReaderAppearanceMode.init) ?? .system
-        pageTransition = defaults.string(forKey: PreferenceKey.pageTransition)
-            .flatMap(ReaderPageTransition.init) ?? .slide
-        publisherStyles = defaults.object(forKey: PreferenceKey.publisherStyles) as? Bool ?? false
-        showBookTitleInPageHeader = defaults.object(forKey: PreferenceKey.showBookTitleInPageHeader) as? Bool ?? false
-        selectedPreset = defaults.string(forKey: PreferenceKey.selectedPreset).flatMap(ReaderThemePreset.init)
-        if selectedPreset == nil {
-            selectedPreset = theme == .sepia ? .paper : (theme == .quiet ? .quiet : (theme == .light ? .original : nil))
-        }
+        characterSpacing = ReaderLayoutMetrics.clampCharacterSpacing(preferences.characterSpacing)
+        wordSpacing = ReaderLayoutMetrics.clampWordSpacing(preferences.wordSpacing)
+        theme = preferences.themePreset.paletteTheme
+        appearanceMode = preferences.appearanceMode
+        pageTransition = preferences.pageTransition
+        publisherStyles = preferences.publisherStyles
+        showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
+        // Not persisted any more: the settings UI derives the selected preset
+        // from `preferences.themePreset`.
+        selectedPreset = nil
     }
 
     func loadIfNeeded() async {
@@ -400,7 +356,7 @@ final class EPUBReaderModel {
             characterSpacing: characterSpacing,
             wordSpacing: wordSpacing,
             publisherStyles: publisherStyles,
-            themePreset: Self.themePreset(for: theme),
+            themePreset: ReaderThemePreset(theme: theme),
             appearanceMode: appearanceMode,
             pageTransition: pageTransition,
             showBookTitleInPageHeader: showBookTitleInPageHeader
@@ -1101,22 +1057,7 @@ final class EPUBReaderModel {
     }
 
     private func persistPreferences() {
-        let defaults = UserDefaults.standard
-        defaults.set(fontSizeLevel, forKey: PreferenceKey.fontSizeLevel)
-        defaults.removeObject(forKey: PreferenceKey.legacyFontScale)
-        defaults.set(fontFamily.rawValue, forKey: PreferenceKey.fontFamily)
-        defaults.set(boldText, forKey: PreferenceKey.boldText)
-        defaults.set(lineHeight, forKey: PreferenceKey.lineHeight)
-        defaults.set(pageMargins, forKey: PreferenceKey.pageMarginPoints)
-        defaults.set(ReaderLayoutMetrics.fixedParagraphIndent, forKey: PreferenceKey.paragraphIndent)
-        defaults.set(characterSpacing, forKey: PreferenceKey.characterSpacing)
-        defaults.set(wordSpacing, forKey: PreferenceKey.wordSpacing)
-        defaults.set(theme.rawValue, forKey: PreferenceKey.theme)
-        defaults.set(appearanceMode.rawValue, forKey: PreferenceKey.appearanceMode)
-        defaults.set(pageTransition.rawValue, forKey: PreferenceKey.pageTransition)
-        defaults.set(publisherStyles, forKey: PreferenceKey.publisherStyles)
-        defaults.set(showBookTitleInPageHeader, forKey: PreferenceKey.showBookTitleInPageHeader)
-        defaults.set(selectedPreset?.rawValue, forKey: PreferenceKey.selectedPreset)
+        ReaderPreferencesStore.save(readerPreferences)
     }
 
     private static func themePreset(for theme: ReaderTheme) -> ReaderThemePreset {

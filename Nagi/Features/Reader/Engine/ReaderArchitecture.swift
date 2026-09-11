@@ -117,6 +117,21 @@ enum ReaderThemePreset: String, CaseIterable, Identifiable, Codable, Sendable, H
     }
 }
 
+extension ReaderThemePreset {
+    /// The preset matching a stored reader theme.
+    ///
+    /// The reader keeps a `ReaderTheme` palette internally while preferences
+    /// store the coarser preset, so both directions of this mapping must stay
+    /// in one place.
+    init(theme: ReaderTheme) {
+        switch theme {
+        case .quiet: self = .quiet
+        case .sepia: self = .paper
+        case .light, .dark: self = .original
+        }
+    }
+}
+
 enum ReaderFontSize {
     static let basePointSize = 14.0
     private static let legacyBasePointSize = 17.0
@@ -372,17 +387,159 @@ enum ReaderContentInsetResolver {
     }
 }
 
+/// The single source of truth for reader preferences.
+///
+/// The store owns the whole `ReaderPreferences` payload.  Any other type that
+/// needs to read or write preferences must go through here; nothing else is
+/// allowed to touch `UserDefaults` for reader settings.
 enum ReaderPreferencesStore {
-    private static let key = "reader.shared.preferences.v1"
+    static let key = "reader.shared.preferences.v1"
+    static let migrationVersionKey = "reader.shared.preferences.migrationVersion"
+    static let currentMigrationVersion = 1
 
-    static func load() -> ReaderPreferences? {
-        guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
+    static func load(defaults: UserDefaults = .standard) -> ReaderPreferences? {
+        migrateIfNeeded(defaults: defaults)
+        guard let data = defaults.data(forKey: key) else { return nil }
         return try? JSONDecoder().decode(ReaderPreferences.self, from: data)
     }
 
-    static func save(_ preferences: ReaderPreferences) {
+    static func save(_ preferences: ReaderPreferences, defaults: UserDefaults = .standard) {
+        // Capture any legacy values before they can be overwritten.
+        migrateIfNeeded(defaults: defaults)
+        write(preferences, defaults: defaults)
+    }
+
+    /// One-time migration from the legacy `reader.epub.*` keys.
+    ///
+    /// Runs lazily so the launch path is untouched, and is idempotent: once the
+    /// version marker is written the legacy keys are never consulted again.
+    /// They are deliberately left in place for an upgrade or two so a rollback
+    /// still restores the previous settings, but nothing writes them any more.
+    static func migrateIfNeeded(defaults: UserDefaults = .standard) {
+        guard defaults.integer(forKey: migrationVersionKey) < currentMigrationVersion else {
+            return
+        }
+
+        if defaults.data(forKey: key) == nil,
+           let migrated = LegacyReaderPreferences.migrate(defaults: defaults) {
+            write(migrated, defaults: defaults)
+        }
+        defaults.set(currentMigrationVersion, forKey: migrationVersionKey)
+    }
+
+    private static func write(_ preferences: ReaderPreferences, defaults: UserDefaults) {
         guard let data = try? JSONEncoder().encode(preferences) else { return }
-        UserDefaults.standard.set(data, forKey: key)
+        defaults.set(data, forKey: key)
+    }
+}
+
+/// Read-only access to the preference keys used before the shared store.
+///
+/// This exists purely to move existing installs onto the shared store once.
+/// The legacy keys are intentionally never written again.
+enum LegacyReaderPreferences {
+    enum Key {
+        static let fontSizeLevel = "reader.epub.fontSizeLevel"
+        static let fontScale = "reader.epub.fontScale"
+        static let fontFamily = "reader.epub.fontFamily"
+        static let boldText = "reader.epub.boldText"
+        static let lineHeight = "reader.epub.lineHeight"
+        static let pageMargins = "reader.epub.pageMargins"
+        static let pageMarginAdjustment = "reader.epub.pageMarginAdjustment"
+        static let pageMarginPoints = "reader.epub.pageMarginPoints"
+        static let paragraphIndent = "reader.epub.paragraphIndent"
+        static let characterSpacing = "reader.epub.characterSpacing"
+        static let wordSpacing = "reader.epub.wordSpacing"
+        static let theme = "reader.epub.theme"
+        static let appearanceMode = "reader.epub.appearanceMode"
+        static let pageTransition = "reader.epub.pageTransition"
+        static let publisherStyles = "reader.epub.publisherStyles"
+        static let showBookTitleInPageHeader = "reader.epub.showBookTitleInPageHeader"
+        static let selectedPreset = "reader.epub.selectedPreset"
+
+        static let all = [
+            fontSizeLevel,
+            fontScale,
+            fontFamily,
+            boldText,
+            lineHeight,
+            pageMargins,
+            pageMarginAdjustment,
+            pageMarginPoints,
+            paragraphIndent,
+            characterSpacing,
+            wordSpacing,
+            theme,
+            appearanceMode,
+            pageTransition,
+            publisherStyles,
+            showBookTitleInPageHeader,
+            selectedPreset,
+        ]
+    }
+
+    /// Returns the migrated preferences, or nil when this install has no
+    /// legacy values and should simply keep the documented defaults.
+    static func migrate(defaults: UserDefaults = .standard) -> ReaderPreferences? {
+        guard Key.all.contains(where: { defaults.object(forKey: $0) != nil }) else {
+            return nil
+        }
+
+        // The newest legacy build stored a discrete level; older builds
+        // stored a multiplier of the legacy base point size.
+        let fontSizeLevel: Int
+        if let level = defaults.object(forKey: Key.fontSizeLevel) as? Int {
+            fontSizeLevel = ReaderFontSize.clampedLevel(level)
+        } else if let scale = defaults.object(forKey: Key.fontScale) as? Double {
+            fontSizeLevel = ReaderFontSize.nearestLevel(forScale: scale)
+        } else {
+            fontSizeLevel = ReaderFontSize.defaultLevel
+        }
+
+        // Resolution order matches the legacy reader: absolute points first,
+        // then the percentage adjustment, then the original multiplier.
+        let pageMargins: Double
+        if let points = defaults.object(forKey: Key.pageMarginPoints) as? Double {
+            pageMargins = ReaderLayoutMetrics.clampPageMargins(points)
+        } else if let adjustment = defaults.object(forKey: Key.pageMarginAdjustment) as? Double {
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMarginAdjustment(adjustment)
+        } else {
+            pageMargins = ReaderLayoutMetrics.migrateLegacyPageMargins(
+                defaults.object(forKey: Key.pageMargins) as? Double
+            )
+        }
+
+        let theme = defaults.string(forKey: Key.theme).flatMap(ReaderTheme.init) ?? .light
+
+        return ReaderPreferences(
+            fontSizeLevel: fontSizeLevel,
+            fontFamily: defaults.string(forKey: Key.fontFamily)
+                .flatMap(ReaderFontFamily.init) ?? .original,
+            boldText: defaults.object(forKey: Key.boldText) as? Bool ?? false,
+            lineHeight: ReaderLayoutMetrics.clampLineHeight(
+                defaults.object(forKey: Key.lineHeight) as? Double
+                    ?? ReaderLayoutMetrics.defaultLineHeight
+            ),
+            paragraphSpacing: 10,
+            pageMargins: pageMargins,
+            characterSpacing: ReaderLayoutMetrics.clampCharacterSpacing(
+                defaults.object(forKey: Key.characterSpacing) as? Double
+                    ?? ReaderLayoutMetrics.defaultCharacterSpacing
+            ),
+            wordSpacing: ReaderLayoutMetrics.clampWordSpacing(
+                defaults.object(forKey: Key.wordSpacing) as? Double
+                    ?? ReaderLayoutMetrics.defaultWordSpacing
+            ),
+            publisherStyles: defaults.object(forKey: Key.publisherStyles) as? Bool ?? false,
+            themePreset: ReaderThemePreset(theme: theme),
+            appearanceMode: defaults.string(forKey: Key.appearanceMode)
+                .flatMap(ReaderAppearanceMode.init) ?? .system,
+            pageTransition: defaults.string(forKey: Key.pageTransition)
+                .flatMap(ReaderPageTransition.init) ?? .slide,
+            showBookTitleInPageHeader: defaults.object(
+                forKey: Key.showBookTitleInPageHeader
+            ) as? Bool ?? false
+        )
     }
 }
 
