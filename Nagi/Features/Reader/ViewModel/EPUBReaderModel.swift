@@ -4,17 +4,6 @@ import ReadiumNavigator
 import ReadiumShared
 import UIKit
 
-private extension ReaderFontFamily {
-    var readiumFontFamily: FontFamily {
-        FontFamily(rawValue: readiumFamilyName)
-    }
-
-    /// Readium's weight scale for the lighter system font.
-    var readiumFontWeight: Double {
-        self == .pingFang ? 0.75 : 1.0
-    }
-}
-
 struct EPUBTOCEntry: Identifiable {
     let id: String
     let title: String
@@ -101,11 +90,7 @@ final class EPUBReaderModel {
     // TXT books use their generated EPUB asset here.
     private var activePublicationURL: URL?
     @ObservationIgnored
-    private lazy var mutationScheduler = ReaderMutationScheduler<EPUBPreferences>(
-        delayNanoseconds: 16_000_000
-    ) { [weak self] preferences, generation in
-        self?.commitPreferences(preferences, generation: generation)
-    }
+    private let preferenceCoordinator = ReadiumPreferenceCoordinator()
     @ObservationIgnored
     private let documentStyler = ReadiumDocumentStyler()
     @ObservationIgnored
@@ -124,10 +109,6 @@ final class EPUBReaderModel {
     private var viewportSize = CGSize.zero
     private var viewportSafeAreaInsets: UIEdgeInsets?
     private var viewportDisplayScale: CGFloat = 0
-    private var latestPreferenceGeneration: UInt64 = 0
-    private var pendingVisualMutationKind: ReaderVisualMutationKind?
-    private var latestCommittedVisualMutationKind: ReaderVisualMutationKind = .full
-
     init(book: Book) {
         self.book = book
         title = book.title
@@ -199,7 +180,10 @@ final class EPUBReaderModel {
                 publication: publication,
                 initialLocation: initialLocation,
                 config: .init(
-                    preferences: makePreferences(),
+                    preferences: ReadiumPreferenceMapper.makePreferences(
+                        from: readerPreferences,
+                        appearance: resolvedAppearance
+                    ),
                     disablePageTurnsWhileScrolling: true,
                     continuousScroll: true,
                     preloadPreviousPositionCount: 2,
@@ -218,6 +202,10 @@ final class EPUBReaderModel {
             }))
             navigator.isUserPageTurnInteractionEnabled = nativePageTurnInteractionEnabled
             self.navigator = navigator
+            preferenceCoordinator.attach(navigator)
+            preferenceCoordinator.didCommit = { [weak self] generation in
+                self?.refreshVisibleReaderOverrides(generation: generation)
+            }
             documentStyler.attach(navigator)
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
@@ -245,16 +233,16 @@ final class EPUBReaderModel {
     func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async {
         guard navigator != nil, isReflowable else { return }
 
-        _ = await mutationScheduler.waitForPendingCommit()
+        await preferenceCoordinator.waitForPendingCommit()
         guard !Task.isCancelled else { return }
 
-        let effectiveKind = kind == .full ? latestCommittedVisualMutationKind : kind
+        let effectiveKind = kind == .full ? preferenceCoordinator.latestCommittedMutationKind : kind
 
-        let generation = latestPreferenceGeneration
+        let generation = preferenceCoordinator.latestGeneration
 
         await documentStyler.waitForPendingVisibleUpdate()
 
-        guard generation == latestPreferenceGeneration, !Task.isCancelled else { return }
+        guard generation == preferenceCoordinator.latestGeneration, !Task.isCancelled else { return }
 
         guard effectiveKind != .geometry else {
             await Task.yield()
@@ -271,7 +259,7 @@ final class EPUBReaderModel {
         systemIsDark = isDark
         applyVisibleReaderBaseAppearance()
         enqueuePreferencesMutation(kind: .full)
-        mutationScheduler.flush()
+        preferenceCoordinator.flush()
         guard !Task.isCancelled else { return }
 
         await documentStyler.waitForPendingVisibleUpdate()
@@ -366,7 +354,7 @@ final class EPUBReaderModel {
     }
 
     func tearDown() {
-        mutationScheduler.cancel()
+        preferenceCoordinator.cancel()
         documentStyler.cancel()
         previewTask?.cancel()
         previewTask = nil
@@ -446,27 +434,20 @@ final class EPUBReaderModel {
     ) {
         enqueuePreferencesMutation(kind: kind)
         if commitBehavior == .immediate {
-            mutationScheduler.flush()
+            preferenceCoordinator.flush()
         }
     }
 
     /// Queues an immutable preference snapshot.
     private func enqueuePreferencesMutation(kind: ReaderVisualMutationKind? = nil) {
         guard navigator != nil else { return }
-        if let kind {
-            pendingVisualMutationKind = pendingVisualMutationKind?.merged(with: kind) ?? kind
-        }
-        mutationScheduler.enqueue(makePreferences())
-    }
-
-    private func commitPreferences(_ preferences: EPUBPreferences, generation: UInt64) {
-        guard let navigator else { return }
-        let mutationKind = pendingVisualMutationKind ?? .full
-        pendingVisualMutationKind = nil
-        latestCommittedVisualMutationKind = mutationKind
-        latestPreferenceGeneration = generation
-        navigator.submitPreferences(preferences)
-        refreshVisibleReaderOverrides(generation: generation)
+        preferenceCoordinator.enqueue(
+            ReadiumPreferenceMapper.makePreferences(
+                from: readerPreferences,
+                appearance: resolvedAppearance
+            ),
+            kind: kind
+        )
     }
 
     private static func visualMutationKind(
@@ -507,40 +488,6 @@ final class EPUBReaderModel {
         return kind ?? .full
     }
 
-    private func makePreferences() -> EPUBPreferences {
-        let appearance = resolvedAppearance
-        let navigatorBackgroundColor = ReadiumNavigator.Color(
-            uiColor: appearance.backgroundColor
-        )
-        let preferences = EPUBPreferences(
-            // Keep Readium's first paint in sync with ReaderChrome. The
-            // document override makes reflowable pages transparent once it
-            // is installed, but the fallback must never use WebKit white.
-            backgroundColor: navigatorBackgroundColor,
-            // Publisher styles only disable the app-owned typography rules.
-            fontFamily: fontFamily.readiumFontFamily,
-            fontSize: ReaderFontSize.scale(for: fontSizeLevel),
-            fontWeight: boldText ? 1.75 : fontFamily.readiumFontWeight,
-            letterSpacing: nil,
-            lineHeight: nil,
-            pageMargins: ReaderLayoutMetrics.pageMarginFactor(for: pageMargins),
-            paragraphIndent: ReaderLayoutMetrics.fixedParagraphIndent,
-            publisherStyles: publisherStyles,
-            // Fixed-layout EPUBs cannot participate in the outer continuous
-            // document scroll. Leave them paginated instead of disabling both
-            // their inner and outer page-turn gestures.
-            scroll: pageTransition == .scroll && isReflowable,
-            spread: .auto,
-            textColor: ReadiumNavigator.Color(
-                uiColor: appearance.contentColor
-            ),
-            textNormalization: !publisherStyles,
-            theme: appearance.readiumTheme,
-            wordSpacing: nil
-        )
-        return preferences
-    }
-
     private func applyVisibleReaderBaseAppearance() {
         documentStyler.applyBaseAppearance(
             snapshot: styleSnapshot,
@@ -557,7 +504,7 @@ final class EPUBReaderModel {
             isReflowable: isReflowable,
             isStillCurrent: { [weak self] in
                 guard let generation else { return true }
-                return self?.latestPreferenceGeneration == generation
+                return self?.preferenceCoordinator.latestGeneration == generation
             }
         )
     }

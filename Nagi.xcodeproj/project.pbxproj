@@ -92,6 +92,8 @@
 		4A00000000000000000000F9 /* ReadiumJavaScriptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FA /* ReadiumJavaScriptBuilder.swift */; };
 		4A00000000000000000000FA /* ReadiumDocumentStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FB /* ReadiumDocumentStyler.swift */; };
 		4A00000000000000000000FB /* ReadiumNavigatorDelegateAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */; };
+		4A00000000000000000000FC /* ReadiumPreferenceMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */; };
+		4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */; };
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* NagiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiApp.swift; sourceTree = "<group>"; };
@@ -177,6 +179,8 @@
 		3A00000000000000000000FA /* ReadiumJavaScriptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumJavaScriptBuilder.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FB /* ReadiumDocumentStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumDocumentStyler.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorDelegateAdapter.swift; sourceTree = "<group>"; };
+		3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceMapper.swift; sourceTree = "<group>"; };
+		3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceCoordinator.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A0000000000000000000003 /* Frameworks */ = {
@@ -519,6 +523,8 @@
 			isa = PBXGroup;
 			children = (
 				3A00000000000000000000F8 /* ReaderAppearanceResolver.swift */,
+				3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */,
+				3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */,
 			);
 			path = Preferences;
 			sourceTree = "<group>";
@@ -769,6 +775,8 @@
 				4A00000000000000000000F9 /* ReadiumJavaScriptBuilder.swift in Sources */,
 				4A00000000000000000000FA /* ReadiumDocumentStyler.swift in Sources */,
 				4A00000000000000000000FB /* ReadiumNavigatorDelegateAdapter.swift in Sources */,
+				4A00000000000000000000FC /* ReadiumPreferenceMapper.swift in Sources */,
+				4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */,
 				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
