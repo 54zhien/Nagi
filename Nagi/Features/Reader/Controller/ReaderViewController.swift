@@ -552,10 +552,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         if ownsPageTurns {
             schedulePageTurnPrewarm()
         }
-        // State-driven rather than per-layout: computing it needs the adjacent
-        // surfaces, and `preparedAdjacentSurface` allocates a fresh surface each
-        // call, so it must not run on every layout pass.
-        refreshCurlDiagnostics()
     }
 
     private func setPanGestureEnabled(_ enabled: Bool) {
@@ -1547,7 +1543,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               model.preferences.pageTransition == .pageCurl,
               let resources = PageCurlMetalResources.shared else {
             curlTexturesAreWarm = false
-            refreshCurlDiagnostics()
             return
         }
 
@@ -1575,7 +1570,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         }
 
         curlTexturesAreWarm = complete
-        refreshCurlDiagnostics()
     }
 
     /// Returns whether the texture is on the GPU afterwards. A false result is
@@ -1651,62 +1645,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             completionTranslationX: destinationX,
             isDark: isDarkPageBackground
         )
-    }
-
-    /// Refreshes the status string the settings sheet shows.
-    ///
-    /// A curl that fails to appear has four very different causes — a shader
-    /// missing from the app target, no Metal device, prewarming not finished,
-    /// or a geometry mismatch — and they are indistinguishable from the outside,
-    /// since all of them fall back to the same cover transition. This is what
-    /// makes a device test reportable.
-    ///
-    /// Temporary scaffolding for the Metal curl bring-up.
-    private func refreshCurlDiagnostics() {
-        let next = makeCurlDiagnostics()
-        guard model.curlDiagnostics != next else { return }
-        model.curlDiagnostics = next
-    }
-
-    private func makeCurlDiagnostics() -> String {
-        guard model.preferences.pageTransition == .pageCurl else { return "" }
-
-        // Touch `shared` first: `unavailableReason` is only populated once the
-        // lazy build has actually run.
-        _ = PageCurlMetalResources.shared
-        if let reason = PageCurlMetalResources.unavailableReason {
-            return "管线不可用：\(reason)"
-        }
-
-        func mark(_ present: Bool) -> String { present ? "✓" : "✗" }
-
-        guard let provider = model.pageSurfaceProvider,
-              let current = provider.preparedCurrentSurface() else {
-            return "管线 ok · 表面未就绪"
-        }
-
-        let forward = provider.preparedAdjacentSurface(direction: .forward)
-        let backward = provider.preparedAdjacentSurface(direction: .backward)
-
-        let hasCurrent = curlTextureCache.texture(
-            for: .current(current),
-            matching: current.geometry
-        ) != nil
-        let hasForward = forward.map {
-            curlTextureCache.texture(
-                for: .adjacent($0, direction: .forward),
-                matching: $0.geometry
-            ) != nil
-        } ?? false
-        let hasBackward = backward.map {
-            curlTextureCache.texture(
-                for: .adjacent($0, direction: .backward),
-                matching: $0.geometry
-            ) != nil
-        } ?? false
-
-        return "管线 ok · 纹理 当前\(mark(hasCurrent)) 前\(mark(hasForward)) 后\(mark(hasBackward))"
-            + "（缓存 \(curlTextureCache.count)）"
     }
 
     private func invalidatePageTurnCache() {

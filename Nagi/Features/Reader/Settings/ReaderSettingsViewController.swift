@@ -31,7 +31,6 @@ private enum PendingReaderMutation {
 final class ReaderSettingsViewController: UIViewController {
     private let model: ReaderViewModel
     private var latestPreferences: ReaderPreferences
-    private var latestCurlDiagnostics: String
     private var latestSystemBrightness: Double
     private var latestIsDarkAppearance: Bool
     private var latestReduceMotion: Bool
@@ -58,12 +57,10 @@ final class ReaderSettingsViewController: UIViewController {
     init(
         model: ReaderViewModel,
         preferences: ReaderPreferences,
-        curlDiagnostics: String,
         systemBrightness: Double,
         isDarkAppearance: Bool,
         reduceMotion: Bool
     ) {
-        latestCurlDiagnostics = curlDiagnostics
         self.model = model
         latestPreferences = preferences
         latestSystemBrightness = systemBrightness
@@ -375,16 +372,6 @@ final class ReaderSettingsViewController: UIViewController {
         }
     }
 
-    /// Applies a new curl status string, rebuilding the transition menu when it
-    /// changes so the row is present and current by the time a test looks for
-    /// it. Without this it would only refresh when some other preference moved.
-    func updateCurlDiagnostics(_ value: String) {
-        guard latestCurlDiagnostics != value else { return }
-        latestCurlDiagnostics = value
-        guard isViewLoaded else { return }
-        updateTransitionControl()
-    }
-
     private func updateTransitionControl() {
         let transition = latestPreferences.pageTransition
         transitionControl.update(
@@ -415,23 +402,8 @@ final class ReaderSettingsViewController: UIViewController {
                 ) { [weak self] _ in
                     self?.select(transition: option)
                 }
-            } + curlStatusActions(for: transition)
+            }
         ))
-    }
-
-    /// A single read-only line describing why the curl is or is not ready.
-    ///
-    /// Temporary scaffolding for the Metal curl bring-up: it exists so a device
-    /// test can say *why* the curl did not appear instead of only that it did
-    /// not, and it goes away once the curl is confirmed on hardware. It is not
-    /// an option, so it is disabled — readers have nothing to choose here.
-    private func curlStatusActions(for transition: ReaderPageTransition) -> [UIMenuElement] {
-        guard transition == .pageCurl else { return [] }
-        let status = latestCurlDiagnostics
-        guard !status.isEmpty else { return [] }
-        return [
-            UIAction(title: status, attributes: .disabled) { _ in }
-        ]
     }
 
     private func updateAppearanceControl() {
@@ -718,7 +690,6 @@ final class ReaderSettingsViewController: UIViewController {
 struct ReaderSettingsViewControllerRepresentable: UIViewControllerRepresentable {
     let model: ReaderViewModel
     let preferences: ReaderPreferences
-    let curlDiagnostics: String
     let systemBrightness: Double
     let isDarkAppearance: Bool
     let reduceMotion: Bool
@@ -730,7 +701,6 @@ struct ReaderSettingsViewControllerRepresentable: UIViewControllerRepresentable 
         let controller = ReaderSettingsViewController(
             model: model,
             preferences: preferences,
-            curlDiagnostics: curlDiagnostics,
             systemBrightness: systemBrightness,
             isDarkAppearance: isDarkAppearance,
             reduceMotion: reduceMotion
@@ -748,7 +718,6 @@ struct ReaderSettingsViewControllerRepresentable: UIViewControllerRepresentable 
         uiViewController.onCustomSettings = onCustomSettings
         uiViewController.onBeforeMutation = onBeforeMutation
         uiViewController.onSystemBrightnessChanged = onSystemBrightnessChanged
-        uiViewController.updateCurlDiagnostics(curlDiagnostics)
         uiViewController.update(
             preferences: preferences,
             systemBrightness: systemBrightness,

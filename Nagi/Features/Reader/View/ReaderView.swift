@@ -169,10 +169,6 @@ private struct ReaderSessionView: View {
             ReaderSettingsViewControllerRepresentable(
                 model: model,
                 preferences: model.preferences,
-                // Read here so SwiftUI observes it: the sheet has to update when
-                // the reader refreshes the status, not only when a preference
-                // happens to change.
-                curlDiagnostics: model.curlDiagnostics,
                 systemBrightness: systemBrightness,
                 isDarkAppearance: isDarkAppearance,
                 reduceMotion: reduceMotion,

@@ -608,13 +608,6 @@ final class ReaderViewModel {
     private(set) var preferences: ReaderPreferences
     private(set) var stateRevision = 0
 
-    /// Short, human-readable status for the Metal curl, surfaced in the reader's
-    /// settings so a curl that fails to appear can be attributed on device.
-    ///
-    /// Temporary scaffolding: it goes away once the curl is confirmed on
-    /// hardware, together with the rest of the curl diagnostics.
-    var curlDiagnostics = ""
-
     init(book: Book) {
         self.book = book
         let engine = ReaderEngine(book: book)
