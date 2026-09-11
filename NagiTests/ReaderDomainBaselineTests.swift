@@ -118,7 +118,7 @@ final class ReaderDomainBaselineTests: XCTestCase {
 
     func testDiffDetectsFontChange() {
         var size = ReaderPreferences()
-        size.fontSize = 23
+        size.fontSizeLevel = 5
         XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: size), .font)
 
         var family = ReaderPreferences()
@@ -160,7 +160,7 @@ final class ReaderDomainBaselineTests: XCTestCase {
 
     func testDiffOfTwoCategoriesCollapsesToFull() {
         var next = ReaderPreferences()
-        next.fontSize = 23
+        next.fontSizeLevel = 5
         next.lineHeight = 2.0
         XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: next), .full)
     }

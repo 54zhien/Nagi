@@ -52,7 +52,8 @@ final class ReaderPreferencesMigrationTests: XCTestCase {
         defaults.set(true, forKey: "reader.epub.showBookTitleInPageHeader")
 
         let migrated = try XCTUnwrap(ReaderPreferencesStore.load(defaults: defaults))
-        XCTAssertEqual(migrated.fontSize, ReaderFontSize.defaultValue * 1.5, accuracy: 0.0001)
+        // A legacy scale of 1.5 lands on the nearest discrete level (1.54).
+        XCTAssertEqual(migrated.fontSizeLevel, 3)
         XCTAssertEqual(migrated.fontFamily, .kai)
         XCTAssertTrue(migrated.boldText)
         XCTAssertEqual(migrated.lineHeight, 1.8, accuracy: 0.0001)
@@ -69,7 +70,20 @@ final class ReaderPreferencesMigrationTests: XCTestCase {
     func testFontScaleIsClampedWhenMigrating() throws {
         defaults.set(99.0, forKey: "reader.epub.fontScale")
         let migrated = try XCTUnwrap(LegacyReaderPreferences.migrate(defaults: defaults))
-        XCTAssertEqual(migrated.fontSize, ReaderFontSize.maximum, accuracy: 0.0001)
+        XCTAssertEqual(migrated.fontSizeLevel, ReaderFontSize.maximumLevel)
+    }
+
+    func testLegacyFontSizeLevelWinsOverTheOlderScale() throws {
+        defaults.set(7, forKey: "reader.epub.fontSizeLevel")
+        defaults.set(1.5, forKey: "reader.epub.fontScale")
+        let migrated = try XCTUnwrap(LegacyReaderPreferences.migrate(defaults: defaults))
+        XCTAssertEqual(migrated.fontSizeLevel, 7)
+    }
+
+    func testLegacyFontSizeLevelIsClamped() throws {
+        defaults.set(99, forKey: "reader.epub.fontSizeLevel")
+        let migrated = try XCTUnwrap(LegacyReaderPreferences.migrate(defaults: defaults))
+        XCTAssertEqual(migrated.fontSizeLevel, ReaderFontSize.maximumLevel)
     }
 
     func testPageMarginPointsWinOverTheOtherLegacyFormats() throws {
@@ -120,12 +134,12 @@ final class ReaderPreferencesMigrationTests: XCTestCase {
     func testMigrationRunsOnlyOnce() throws {
         defaults.set(1.5, forKey: "reader.epub.fontScale")
         let first = try XCTUnwrap(ReaderPreferencesStore.load(defaults: defaults))
-        XCTAssertEqual(first.fontSize, 25.5, accuracy: 0.0001)
+        XCTAssertEqual(first.fontSizeLevel, 3)
 
         // A later legacy change must not overwrite the shared payload.
         defaults.set(2.0, forKey: "reader.epub.fontScale")
         let second = try XCTUnwrap(ReaderPreferencesStore.load(defaults: defaults))
-        XCTAssertEqual(second.fontSize, 25.5, accuracy: 0.0001)
+        XCTAssertEqual(second.fontSizeLevel, 3)
     }
 
     func testLegacyKeysAreLeftInPlaceForRollback() throws {
@@ -156,7 +170,7 @@ final class ReaderPreferencesMigrationTests: XCTestCase {
     // MARK: - 健壮性
 
     func testSavedPreferencesRoundTripThroughTheStore() throws {
-        let preferences = ReaderPreferences(fontSize: 21, fontFamily: .song, pageMargins: 28)
+        let preferences = ReaderPreferences(fontSizeLevel: 5, fontFamily: .song, pageMargins: 28)
         ReaderPreferencesStore.save(preferences, defaults: defaults)
         XCTAssertEqual(ReaderPreferencesStore.load(defaults: defaults), preferences)
     }

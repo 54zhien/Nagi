@@ -36,7 +36,12 @@ enum ReadiumPreferenceMapper {
             wordSpacing: nil
         )
     }
+}
 
+extension ReaderFontFamily {
+    var readiumFontFamily: FontFamily {
+        FontFamily(rawValue: readiumFamilyName)
+    }
 
     /// Readium's weight scale for the lighter system font.
     var readiumFontWeight: Double {

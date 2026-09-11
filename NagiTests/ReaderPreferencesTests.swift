@@ -56,7 +56,7 @@ final class ReaderPreferencesTests: XCTestCase {
 
     func testMissingKeysDecodeToDocumentedDefaults() throws {
         let preferences = try decode("{}")
-        XCTAssertEqual(preferences.fontSize, ReaderFontSize.defaultValue, accuracy: 0.0001)
+        XCTAssertEqual(preferences.fontSizeLevel, ReaderFontSize.defaultLevel)
         XCTAssertEqual(preferences.fontFamily, .original)
         XCTAssertFalse(preferences.boldText)
         XCTAssertEqual(preferences.lineHeight, ReaderLayoutMetrics.defaultLineHeight, accuracy: 0.0001)
@@ -76,7 +76,7 @@ final class ReaderPreferencesTests: XCTestCase {
 
     func testEncodingRoundTripsEveryActivePreference() throws {
         let original = ReaderPreferences(
-            fontSize: 23,
+            fontSizeLevel: 5,
             fontFamily: .kai,
             boldText: true,
             lineHeight: 1.8,
@@ -97,7 +97,7 @@ final class ReaderPreferencesTests: XCTestCase {
     func testEncodedPayloadCarriesTheCurrentStorageVersion() throws {
         let data = try JSONEncoder().encode(ReaderPreferences())
         let object = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        XCTAssertEqual(object["storageVersion"] as? Int, 4)
+        XCTAssertEqual(object["storageVersion"] as? Int, 5)
     }
 
     func testDecodingClampsOutOfRangeTypography() throws {
