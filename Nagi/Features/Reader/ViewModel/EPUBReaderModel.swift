@@ -107,8 +107,8 @@ final class EPUBReaderModel {
     ) { [weak self] preferences, generation in
         self?.commitPreferences(preferences, generation: generation)
     }
-    private var readerOverrideRefreshTask: Task<Void, Never>?
-    private var preloadedReaderOverrideTask: Task<Void, Never>?
+    @ObservationIgnored
+    private let documentStyler = ReadiumDocumentStyler()
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
     private var hasLoaded = false
@@ -124,18 +124,8 @@ final class EPUBReaderModel {
     private var viewportSafeAreaInsets: UIEdgeInsets?
     private var viewportDisplayScale: CGFloat = 0
     private var latestPreferenceGeneration: UInt64 = 0
-    private var latestOverrideRequestGeneration: UInt64 = 0
     private var pendingVisualMutationKind: ReaderVisualMutationKind?
     private var latestCommittedVisualMutationKind: ReaderVisualMutationKind = .full
-
-    private static let readerAppearanceRetryDelays: [UInt64] = [
-        0,
-        16_000_000,
-        50_000_000,
-        100_000_000,
-        200_000_000,
-        400_000_000
-    ]
 
     init(book: Book) {
         self.book = book
@@ -226,6 +216,7 @@ final class EPUBReaderModel {
             }))
             navigator.isUserPageTurnInteractionEnabled = nativePageTurnInteractionEnabled
             self.navigator = navigator
+            documentStyler.attach(navigator)
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
             hasLoaded = true
@@ -250,7 +241,7 @@ final class EPUBReaderModel {
 
     /// Waits for the affected visible content to settle.
     func waitForVisualUpdate(for kind: ReaderVisualMutationKind) async {
-        guard let navigator, isReflowable else { return }
+        guard navigator != nil, isReflowable else { return }
 
         _ = await mutationScheduler.waitForPendingCommit()
         guard !Task.isCancelled else { return }
@@ -259,9 +250,7 @@ final class EPUBReaderModel {
 
         let generation = latestPreferenceGeneration
 
-        if let overrideTask = readerOverrideRefreshTask {
-            await overrideTask.value
-        }
+        await documentStyler.waitForPendingVisibleUpdate()
 
         guard generation == latestPreferenceGeneration, !Task.isCancelled else { return }
 
@@ -270,8 +259,7 @@ final class EPUBReaderModel {
             return
         }
 
-        let readinessScript = ReadiumJavaScriptBuilder.readiness(snapshot: styleSnapshot, kind: effectiveKind)
-        await navigator.waitForNagiReaderReadiness(readinessScript)
+        await documentStyler.waitForReadiness(snapshot: styleSnapshot, kind: effectiveKind)
     }
 
     /// Re-applies Readium state after returning from the background.
@@ -284,9 +272,7 @@ final class EPUBReaderModel {
         mutationScheduler.flush()
         guard !Task.isCancelled else { return }
 
-        if let refreshTask = readerOverrideRefreshTask {
-            await refreshTask.value
-        }
+        await documentStyler.waitForPendingVisibleUpdate()
         guard !Task.isCancelled else { return }
         await waitForVisualUpdate(for: .full)
     }
@@ -379,10 +365,7 @@ final class EPUBReaderModel {
 
     func tearDown() {
         mutationScheduler.cancel()
-        readerOverrideRefreshTask?.cancel()
-        readerOverrideRefreshTask = nil
-        preloadedReaderOverrideTask?.cancel()
-        preloadedReaderOverrideTask = nil
+        documentStyler.cancel()
         previewTask?.cancel()
         previewTask = nil
         navigator?.delegate = nil
@@ -557,10 +540,9 @@ final class EPUBReaderModel {
     }
 
     private func applyVisibleReaderBaseAppearance() {
-        guard let navigator else { return }
-        navigator.applyNagiReaderBaseAppearance(
-            isReflowable: isReflowable,
-            fallbackBackground: readerBackgroundUIColor
+        documentStyler.applyBaseAppearance(
+            snapshot: styleSnapshot,
+            isReflowable: isReflowable
         )
     }
 
@@ -568,72 +550,14 @@ final class EPUBReaderModel {
     private func refreshVisibleReaderOverrides(
         generation: UInt64? = nil
     ) {
-        readerOverrideRefreshTask?.cancel()
-        preloadedReaderOverrideTask?.cancel()
-        preloadedReaderOverrideTask = nil
-        guard let navigator, isReflowable else { return }
-
-        latestOverrideRequestGeneration &+= 1
-        let requestGeneration = latestOverrideRequestGeneration
-        let script = ReadiumJavaScriptBuilder.override(snapshot: styleSnapshot, requestGeneration: requestGeneration)
-        let readinessScript = ReadiumJavaScriptBuilder.readiness(snapshot: styleSnapshot, kind: .theme)
-        readerOverrideRefreshTask = Task { @MainActor [weak self, weak navigator] in
-            guard let self, let navigator else { return }
-            guard self.latestOverrideRequestGeneration == requestGeneration else { return }
-
-            for delay in Self.readerAppearanceRetryDelays {
-                if delay > 0 {
-                    do {
-                        try await Task.sleep(nanoseconds: delay)
-                    } catch {
-                        return
-                    }
-                }
-
-                guard !Task.isCancelled,
-                      self.latestOverrideRequestGeneration == requestGeneration else {
-                    return
-                }
-                if let generation {
-                    guard self.latestPreferenceGeneration == generation else { return }
-                }
-
-                // The navigator can create its visible WebView after this
-                // task starts. Reapply both UIKit and document appearance so
-                // the first spread cannot expose Readium's white fallback.
-                self.applyVisibleReaderBaseAppearance()
-                await navigator.applyNagiReaderOverridesToVisible(script)
-
-                guard !Task.isCancelled,
-                      self.latestOverrideRequestGeneration == requestGeneration else {
-                    return
-                }
-                if let generation {
-                    guard self.latestPreferenceGeneration == generation else { return }
-                }
-
-                if await navigator.waitForNagiReaderReadiness(readinessScript) { break }
+        documentStyler.refreshOverrides(
+            snapshot: styleSnapshot,
+            isReflowable: isReflowable,
+            isStillCurrent: { [weak self] in
+                guard let generation else { return true }
+                return self?.latestPreferenceGeneration == generation
             }
-
-            guard !Task.isCancelled,
-                  self.latestOverrideRequestGeneration == requestGeneration else { return }
-            if let generation {
-                guard self.latestPreferenceGeneration == generation else { return }
-            }
-
-            self.preloadedReaderOverrideTask = Task { @MainActor [weak self, weak navigator] in
-                // Let the visible document render before touching preloaded pages.
-                await Task.yield()
-                guard let self, let navigator,
-                      !Task.isCancelled,
-                      self.latestOverrideRequestGeneration == requestGeneration else { return }
-                if let generation {
-                    guard self.latestPreferenceGeneration == generation else { return }
-                }
-                await navigator.applyNagiReaderOverridesToPreloaded(script)
-            }
-
-        }
+        )
     }
 
     private func loadPreviewIfNeeded() {
@@ -875,9 +799,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         setupUserScripts userContentController: WKUserContentController
     ) {
         guard publication?.metadata.layout != .fixed else { return }
-        if latestOverrideRequestGeneration == 0 {
-            latestOverrideRequestGeneration = 1
-        }
+        documentStyler.startGenerationIfNeeded()
         userContentController.addUserScript(
             WKUserScript(
                 source: ReadiumJavaScriptBuilder.bootstrap(snapshot: styleSnapshot),
@@ -889,7 +811,7 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
             WKUserScript(
                 source: ReadiumJavaScriptBuilder.override(
                     snapshot: styleSnapshot,
-                    requestGeneration: latestOverrideRequestGeneration
+                    requestGeneration: documentStyler.currentGeneration
                 ),
                 injectionTime: .atDocumentEnd,
                 forMainFrameOnly: true
