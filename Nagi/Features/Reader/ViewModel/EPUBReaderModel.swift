@@ -35,9 +35,9 @@ final class EPUBReaderModel {
 
     var currentTOCEntryID: String? {
         guard let currentReadingHref else { return nil }
-        let currentResource = normalizedResourceHref(currentReadingHref)
+        let currentResource = EPUBResourcePath.normalize(currentReadingHref)
         return tableOfContents.first {
-            normalizedResourceHref($0.link.href) == currentResource
+            EPUBResourcePath.normalize($0.link.href) == currentResource
         }?.id
     }
 
@@ -59,9 +59,6 @@ final class EPUBReaderModel {
     var pageTransition: ReaderPageTransition { didSet { persistPreferencesIfNeeded() } }
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferencesIfNeeded() } }
-
-    /// Nil means the current settings are custom.
-    var selectedPreset: ReaderThemePreset? { didSet { persistPreferencesIfNeeded() } }
 
     private(set) var previewText = ""
     private(set) var previewChapterTitle = ""
@@ -138,9 +135,6 @@ final class EPUBReaderModel {
         pageTransition = preferences.pageTransition
         publisherStyles = preferences.publisherStyles
         showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
-        // Not persisted any more: the settings UI derives the selected preset
-        // from `preferences.themePreset`.
-        selectedPreset = nil
     }
 
     func loadIfNeeded() async {
@@ -299,7 +293,6 @@ final class EPUBReaderModel {
 
     func apply(preset: ReaderThemePreset) {
         withPreferenceUpdatesSuspended {
-            selectedPreset = preset
             theme = preset.paletteTheme
         }
         persistPreferences()
@@ -344,7 +337,6 @@ final class EPUBReaderModel {
             pageTransition = preferences.pageTransition
             theme = preferences.themePreset.paletteTheme
             showBookTitleInPageHeader = preferences.showBookTitleInPageHeader
-            selectedPreset = nil
         }
         persistPreferences()
         schedulePreferencesCommit(
@@ -480,7 +472,7 @@ final class EPUBReaderModel {
             return
         }
 
-        let normalizedHref = normalizedResourceHref(href)
+        let normalizedHref = EPUBResourcePath.normalize(href)
         guard previewResourceHref != normalizedHref else { return }
         previewResourceHref = normalizedHref
         previewTask?.cancel()
@@ -585,7 +577,7 @@ final class EPUBReaderModel {
             .nilIfEmpty
         let nextHref = locator.href.path
         let chapterChanged = currentReadingHref.map {
-            normalizedResourceHref($0) != normalizedResourceHref(nextHref)
+            EPUBResourcePath.normalize($0) != EPUBResourcePath.normalize(nextHref)
         } ?? true
         chapterTitle = locatorTitle ?? chapterTitle
         if locatorTitle == nil, chapterChanged {
@@ -625,9 +617,9 @@ final class EPUBReaderModel {
 
     private var currentTOCIndex: Int? {
         guard let currentReadingHref else { return nil }
-        let currentResource = normalizedResourceHref(currentReadingHref)
+        let currentResource = EPUBResourcePath.normalize(currentReadingHref)
         return tableOfContents.firstIndex {
-            normalizedResourceHref($0.link.href) == currentResource
+            EPUBResourcePath.normalize($0.link.href) == currentResource
         }
     }
 }
@@ -678,15 +670,6 @@ extension EPUBReaderModel {
             horizontal: 0
         )
     }
-}
-
-private func normalizedResourceHref(_ href: String) -> String {
-    let resource = href.split(whereSeparator: { $0 == "#" || $0 == "?" }).first.map(String.init) ?? href
-    var decoded = resource.removingPercentEncoding ?? resource
-    while decoded.hasPrefix("/") {
-        decoded.removeFirst()
-    }
-    return decoded
 }
 
 extension EPUBReaderModel: ReadiumNavigatorDelegateHost {

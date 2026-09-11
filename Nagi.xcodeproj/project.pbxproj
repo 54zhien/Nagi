@@ -94,6 +94,8 @@
 		4A00000000000000000000FB /* ReadiumNavigatorDelegateAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */; };
 		4A00000000000000000000FC /* ReadiumPreferenceMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */; };
 		4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */; };
+		4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FF /* EPUBResourcePath.swift */; };
+		4A00000000000000000000D1 /* EPUBResourcePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D1 /* EPUBResourcePathTests.swift */; };
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* NagiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiApp.swift; sourceTree = "<group>"; };
@@ -181,6 +183,8 @@
 		3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorDelegateAdapter.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FD /* ReadiumPreferenceMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceMapper.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FE /* ReadiumPreferenceCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPreferenceCoordinator.swift; sourceTree = "<group>"; };
+		3A00000000000000000000FF /* EPUBResourcePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePath.swift; sourceTree = "<group>"; };
+		3A00000000000000000000D1 /* EPUBResourcePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePathTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A0000000000000000000003 /* Frameworks */ = {
@@ -514,6 +518,7 @@
 			children = (
 				2A00000000000000000000F4 /* Preferences */,
 				2A00000000000000000000F5 /* Styling */,
+				2A00000000000000000000F6 /* Navigation */,
 				3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */,
 			);
 			path = Readium;
@@ -538,7 +543,15 @@
 			path = Styling;
 			sourceTree = "<group>";
 		};
-/* End PBXGroup section */
+/* End PBXGroup section */		2A00000000000000000000F6 /* Navigation */ = {
+			isa = PBXGroup;
+			children = (
+				3A00000000000000000000FF /* EPUBResourcePath.swift */,
+			);
+			path = Navigation;
+			sourceTree = "<group>";
+		};
+
 		2A00000000000000000000F2 /* NagiTests */ = {
 			isa = PBXGroup;
 			children = (
@@ -548,6 +561,7 @@
 				3A00000000000000000000F6 /* TXTParserTests.swift */,
 				3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */,
 				3A00000000000000000000F9 /* ReaderAppearanceResolverTests.swift */,
+				3A00000000000000000000D1 /* EPUBResourcePathTests.swift */,
 			);
 			path = NagiTests;
 			sourceTree = "<group>";
@@ -777,6 +791,7 @@
 				4A00000000000000000000FB /* ReadiumNavigatorDelegateAdapter.swift in Sources */,
 				4A00000000000000000000FC /* ReadiumPreferenceMapper.swift in Sources */,
 				4A00000000000000000000FD /* ReadiumPreferenceCoordinator.swift in Sources */,
+				4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */,
 				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -792,6 +807,7 @@
 				4A00000000000000000000F5 /* TXTParserTests.swift in Sources */,
 				4A00000000000000000000F6 /* ReaderPreferencesMigrationTests.swift in Sources */,
 				4A00000000000000000000F8 /* ReaderAppearanceResolverTests.swift in Sources */,
+				4A00000000000000000000D1 /* EPUBResourcePathTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
