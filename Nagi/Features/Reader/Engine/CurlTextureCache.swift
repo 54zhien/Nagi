@@ -1,5 +1,6 @@
 import CoreGraphics
 import Metal
+import ReadiumNavigator
 import UIKit
 
 /// Page textures for the Metal curl, uploaded while the reader is idle.

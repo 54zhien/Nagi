@@ -601,6 +601,13 @@ final class ReaderSettingsViewController: UIViewController {
             }
             pendingMutations.append(mutation)
 
+        case .curlEngine:
+            pendingMutations.removeAll {
+                if case .curlEngine = $0 { return true }
+                return false
+            }
+            pendingMutations.append(mutation)
+
         case .appearance:
             pendingMutations.removeAll {
                 if case .appearance = $0 { return true }
