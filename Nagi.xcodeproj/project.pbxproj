@@ -97,6 +97,8 @@
 		4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FF /* EPUBResourcePath.swift */; };
 		4A00000000000000000000D2 /* ReadiumSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D2 /* ReadiumSession.swift */; };
 		4A00000000000000000000D3 /* ReadiumNavigationController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D3 /* ReadiumNavigationController.swift */; };
+		4A00000000000000000000D4 /* EPUBPreviewProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D4 /* EPUBPreviewProvider.swift */; };
+		4A00000000000000000000D5 /* EPUBPreviewExcerptTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D5 /* EPUBPreviewExcerptTests.swift */; };
 		4A00000000000000000000D1 /* EPUBResourcePathTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000D1 /* EPUBResourcePathTests.swift */; };
 
 /* Begin PBXFileReference section */
@@ -188,6 +190,8 @@
 		3A00000000000000000000FF /* EPUBResourcePath.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePath.swift; sourceTree = "<group>"; };
 		3A00000000000000000000D2 /* ReadiumSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumSession.swift; sourceTree = "<group>"; };
 		3A00000000000000000000D3 /* ReadiumNavigationController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigationController.swift; sourceTree = "<group>"; };
+		3A00000000000000000000D4 /* EPUBPreviewProvider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBPreviewProvider.swift; sourceTree = "<group>"; };
+		3A00000000000000000000D5 /* EPUBPreviewExcerptTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBPreviewExcerptTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000D1 /* EPUBResourcePathTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EPUBResourcePathTests.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -524,6 +528,7 @@
 				2A00000000000000000000F5 /* Styling */,
 				2A00000000000000000000F6 /* Navigation */,
 				3A00000000000000000000D2 /* ReadiumSession.swift */,
+				3A00000000000000000000D4 /* EPUBPreviewProvider.swift */,
 				3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */,
 			);
 			path = Readium;
@@ -568,6 +573,7 @@
 				3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */,
 				3A00000000000000000000F9 /* ReaderAppearanceResolverTests.swift */,
 				3A00000000000000000000D1 /* EPUBResourcePathTests.swift */,
+				3A00000000000000000000D5 /* EPUBPreviewExcerptTests.swift */,
 			);
 			path = NagiTests;
 			sourceTree = "<group>";
@@ -800,6 +806,7 @@
 				4A00000000000000000000FE /* EPUBResourcePath.swift in Sources */,
 				4A00000000000000000000D2 /* ReadiumSession.swift in Sources */,
 				4A00000000000000000000D3 /* ReadiumNavigationController.swift in Sources */,
+				4A00000000000000000000D4 /* EPUBPreviewProvider.swift in Sources */,
 				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -816,6 +823,7 @@
 				4A00000000000000000000F6 /* ReaderPreferencesMigrationTests.swift in Sources */,
 				4A00000000000000000000F8 /* ReaderAppearanceResolverTests.swift in Sources */,
 				4A00000000000000000000D1 /* EPUBResourcePathTests.swift in Sources */,
+				4A00000000000000000000D5 /* EPUBPreviewExcerptTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

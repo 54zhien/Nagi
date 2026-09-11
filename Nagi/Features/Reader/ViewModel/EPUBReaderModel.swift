@@ -54,9 +54,9 @@ final class EPUBReaderModel {
     var publisherStyles: Bool { didSet { preferencesDidChange() } }
     var showBookTitleInPageHeader: Bool { didSet { persistPreferencesIfNeeded() } }
 
-    private(set) var previewText = ""
-    private(set) var previewChapterTitle = ""
-    private(set) var isLoadingPreview = false
+    var previewText: String { preview.text }
+    var previewChapterTitle: String { preview.chapterTitle }
+    var isLoadingPreview: Bool { preview.isLoading }
 
     var readerContentUIColor: UIColor {
         resolvedAppearance.contentColor
@@ -87,8 +87,8 @@ final class EPUBReaderModel {
     private let documentStyler = ReadiumDocumentStyler()
     @ObservationIgnored
     private let delegateAdapter = ReadiumNavigatorDelegateAdapter()
-    private var previewTask: Task<Void, Never>?
-    private var previewResourceHref: String?
+    @ObservationIgnored
+    private let preview = EPUBPreviewProvider()
     private var hasLoaded = false
     private var suppressPreferenceUpdates = false
     // Keep the host's native page-turn policy across the async navigator
@@ -193,6 +193,7 @@ final class EPUBReaderModel {
             }
             documentStyler.attach(navigator)
             navigation.attach(navigator)
+            preview.didChange = { [weak self] in self?.onStateChange?() }
             applyVisibleReaderBaseAppearance()
             refreshVisibleReaderOverrides()
             hasLoaded = true
@@ -339,8 +340,7 @@ final class EPUBReaderModel {
     func tearDown() {
         preferenceCoordinator.cancel()
         documentStyler.cancel()
-        previewTask?.cancel()
-        previewTask = nil
+        preview.cancel()
         navigator?.delegate = nil
         onToggleControls = nil
         onSwipeStart = nil
@@ -439,52 +439,11 @@ final class EPUBReaderModel {
     }
 
     private func loadPreviewIfNeeded() {
-        let fallbackHref = publication?.readingOrder.first?.href
-        guard let href = currentReadingHref ?? fallbackHref else {
-            previewText = "暂时无法载入正文预览"
-            return
-        }
-
-        let normalizedHref = EPUBResourcePath.normalize(href)
-        guard previewResourceHref != normalizedHref else { return }
-        previewResourceHref = normalizedHref
-        previewTask?.cancel()
-        isLoadingPreview = true
-
-        guard let sourceURL = activePublicationURL ?? BookFileLocator.resolve(book.sourceURL) else {
-            isLoadingPreview = false
-            previewText = "暂时无法载入正文预览"
-            onStateChange?()
-            return
-        }
-        previewTask = Task { [weak self] in
-            let text = await Task.detached(priority: .userInitiated) {
-                try? EPUBParser().loadChapterContent(url: sourceURL, href: normalizedHref)
-            }.value
-
-            guard !Task.isCancelled, let self else { return }
-            self.isLoadingPreview = false
-            guard let text, !text.isEmpty else {
-                self.previewText = "暂时无法载入正文预览"
-                self.onStateChange?()
-                return
-            }
-            self.previewText = Self.previewExcerpt(from: text)
-            self.previewChapterTitle = self.chapterTitle.isEmpty ? "当前章节" : self.chapterTitle
-            self.onStateChange?()
-        }
-    }
-
-    private static func previewExcerpt(from text: String) -> String {
-        let paragraphs = text
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        let cleaned = (paragraphs.isEmpty ? text : paragraphs.joined(separator: "\n\n"))
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        guard cleaned.count > 280 else { return cleaned }
-        return String(cleaned.prefix(280)).trimmingCharacters(in: .whitespacesAndNewlines) + "…"
+        preview.loadIfNeeded(
+            href: currentReadingHref ?? publication?.readingOrder.first?.href,
+            sourceURL: activePublicationURL ?? BookFileLocator.resolve(book.sourceURL),
+            currentChapterTitle: { [weak self] in self?.chapterTitle ?? "" }
+        )
     }
 
     private func persistPreferences() {
