@@ -1243,6 +1243,11 @@ extension EPUBReaderModel {
         viewportSafeAreaInsets = safeAreaInsets
         viewportDisplayScale = displayScale
         navigator?.view.setNeedsLayout()
+        // The navigator only reads `navigatorContentInset(_:)` on its own
+        // safe-area, trait and settings changes. Our inset also carries the
+        // reader chrome reserved above and below the text, which can change
+        // while the navigator's bounds stay put, so push it explicitly.
+        navigator?.refreshContentInsets()
         return true
     }
 
