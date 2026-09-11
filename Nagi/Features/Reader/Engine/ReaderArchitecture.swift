@@ -576,6 +576,46 @@ enum ReaderVisualMutationKind: Sendable, Equatable {
     func merged(with other: Self) -> Self {
         self == other ? self : .full
     }
+
+    /// The part of the document that changed between two preference
+    /// snapshots.
+    ///
+    /// This is the single implementation shared by every caller that needs to
+    /// know what a preference change affects.
+    static func diff(
+        from previous: ReaderPreferences,
+        to next: ReaderPreferences
+    ) -> ReaderVisualMutationKind {
+        var kind: ReaderVisualMutationKind?
+
+        func include(_ candidate: ReaderVisualMutationKind) {
+            kind = kind?.merged(with: candidate) ?? candidate
+        }
+
+        if previous.themePreset != next.themePreset
+            || previous.appearanceMode != next.appearanceMode {
+            include(.theme)
+        }
+        if previous.fontSizeLevel != next.fontSizeLevel
+            || previous.fontFamily != next.fontFamily
+            || previous.boldText != next.boldText {
+            include(.font)
+        }
+        if previous.lineHeight != next.lineHeight
+            || previous.characterSpacing != next.characterSpacing
+            || previous.wordSpacing != next.wordSpacing
+            || previous.publisherStyles != next.publisherStyles {
+            include(.typography)
+        }
+        if previous.pageMargins != next.pageMargins
+            || previous.paragraphIndent != next.paragraphIndent
+            || previous.pageTransition != next.pageTransition
+            || previous.showBookTitleInPageHeader != next.showBookTitleInPageHeader {
+            include(.geometry)
+        }
+
+        return kind ?? .full
+    }
 }
 
 @MainActor
@@ -894,28 +934,18 @@ final class ReaderViewModel {
     }
 
     func visualMutationKind(for draft: ReaderCustomizationDraft) -> ReaderVisualMutationKind {
-        var kind: ReaderVisualMutationKind?
-
-        func include(_ candidate: ReaderVisualMutationKind) {
-            kind = kind?.merged(with: candidate) ?? candidate
-        }
-
-        if preferences.fontFamily != draft.fontFamily
-            || preferences.boldText != draft.boldText {
-            include(.font)
-        }
-        if preferences.lineHeight != draft.lineHeight
-            || preferences.characterSpacing != draft.characterSpacing
-            || preferences.wordSpacing != draft.wordSpacing
-            || preferences.publisherStyles != draft.publisherStyles {
-            include(.typography)
-        }
-        if preferences.pageMargins != draft.pageMargins
-            || preferences.paragraphIndent != draft.paragraphIndent {
-            include(.geometry)
-        }
-
-        return kind ?? .full
+        // The draft only carries the customisation fields; every other field
+        // keeps its current value, so those never register as a change.
+        var next = preferences
+        next.fontFamily = draft.fontFamily
+        next.boldText = draft.boldText
+        next.lineHeight = draft.lineHeight
+        next.pageMargins = draft.pageMargins
+        next.paragraphIndent = draft.paragraphIndent
+        next.characterSpacing = draft.characterSpacing
+        next.wordSpacing = draft.wordSpacing
+        next.publisherStyles = draft.publisherStyles
+        return ReaderVisualMutationKind.diff(from: preferences, to: next)
     }
 
     func apply(_ draft: ReaderCustomizationDraft) {

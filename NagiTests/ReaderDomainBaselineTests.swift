@@ -95,4 +95,73 @@ final class ReaderDomainBaselineTests: XCTestCase {
         XCTAssertEqual(ReaderPageTransition.pageCurl.rawValue, "pageCurl")
         XCTAssertEqual(ReaderAppearanceMode.system.rawValue, "system")
     }
+
+    // MARK: - 偏好差异（全项目唯一实现）
+
+    func testDiffOfIdenticalPreferencesKeepsTheConservativeResult() {
+        let preferences = ReaderPreferences()
+        XCTAssertEqual(
+            ReaderVisualMutationKind.diff(from: preferences, to: preferences),
+            .full
+        )
+    }
+
+    func testDiffDetectsThemeChange() {
+        var preset = ReaderPreferences()
+        preset.themePreset = .paper
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: preset), .theme)
+
+        var mode = ReaderPreferences()
+        mode.appearanceMode = .dark
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: mode), .theme)
+    }
+
+    func testDiffDetectsFontChange() {
+        var size = ReaderPreferences()
+        size.fontSize = 23
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: size), .font)
+
+        var family = ReaderPreferences()
+        family.fontFamily = .kai
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: family), .font)
+
+        var bold = ReaderPreferences()
+        bold.boldText = true
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: bold), .font)
+    }
+
+    func testDiffDetectsTypographyChange() {
+        var height = ReaderPreferences()
+        height.lineHeight = 2.0
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: height), .typography)
+
+        var spacing = ReaderPreferences()
+        spacing.characterSpacing = 4
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: spacing), .typography)
+
+        var styles = ReaderPreferences()
+        styles.publisherStyles = true
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: styles), .typography)
+    }
+
+    func testDiffDetectsGeometryChange() {
+        var margins = ReaderPreferences()
+        margins.pageMargins = 40
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: margins), .geometry)
+
+        var transition = ReaderPreferences()
+        transition.pageTransition = .pageCurl
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: transition), .geometry)
+
+        var header = ReaderPreferences()
+        header.showBookTitleInPageHeader = true
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: header), .geometry)
+    }
+
+    func testDiffOfTwoCategoriesCollapsesToFull() {
+        var next = ReaderPreferences()
+        next.fontSize = 23
+        next.lineHeight = 2.0
+        XCTAssertEqual(ReaderVisualMutationKind.diff(from: ReaderPreferences(), to: next), .full)
+    }
 }

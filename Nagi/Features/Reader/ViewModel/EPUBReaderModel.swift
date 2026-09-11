@@ -182,7 +182,8 @@ final class EPUBReaderModel {
                 config: .init(
                     preferences: ReadiumPreferenceMapper.makePreferences(
                         from: readerPreferences,
-                        appearance: resolvedAppearance
+                        appearance: resolvedAppearance,
+                        isReflowable: isReflowable
                     ),
                     disablePageTurnsWhileScrolling: true,
                     continuousScroll: true,
@@ -347,7 +348,7 @@ final class EPUBReaderModel {
         }
         persistPreferences()
         schedulePreferencesCommit(
-            kind: Self.visualMutationKind(from: previousPreferences, to: readerPreferences),
+            kind: ReaderVisualMutationKind.diff(from: previousPreferences, to: readerPreferences),
             commitBehavior: commitBehavior
         )
         onStateChange?()
@@ -444,48 +445,11 @@ final class EPUBReaderModel {
         preferenceCoordinator.enqueue(
             ReadiumPreferenceMapper.makePreferences(
                 from: readerPreferences,
-                appearance: resolvedAppearance
+                appearance: resolvedAppearance,
+                isReflowable: isReflowable
             ),
             kind: kind
         )
-    }
-
-    private static func visualMutationKind(
-        from previous: ReaderPreferences,
-        to next: ReaderPreferences
-    ) -> ReaderVisualMutationKind {
-        var kind: ReaderVisualMutationKind?
-
-        func include(_ candidate: ReaderVisualMutationKind) {
-            kind = kind?.merged(with: candidate) ?? candidate
-        }
-
-        if previous.themePreset != next.themePreset
-            || previous.appearanceMode != next.appearanceMode {
-            include(.theme)
-        }
-
-        if previous.fontSizeLevel != next.fontSizeLevel
-            || previous.fontFamily != next.fontFamily
-            || previous.boldText != next.boldText {
-            include(.font)
-        }
-
-        if previous.lineHeight != next.lineHeight
-            || previous.characterSpacing != next.characterSpacing
-            || previous.wordSpacing != next.wordSpacing
-            || previous.publisherStyles != next.publisherStyles {
-            include(.typography)
-        }
-
-        if previous.pageMargins != next.pageMargins
-            || previous.paragraphIndent != next.paragraphIndent
-            || previous.pageTransition != next.pageTransition
-            || previous.showBookTitleInPageHeader != next.showBookTitleInPageHeader {
-            include(.geometry)
-        }
-
-        return kind ?? .full
     }
 
     private func applyVisibleReaderBaseAppearance() {
