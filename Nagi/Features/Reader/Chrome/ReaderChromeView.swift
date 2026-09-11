@@ -292,7 +292,7 @@ final class ReaderChromeView: UIView {
 
         let currentBounds = bounds
         let currentSafeAreaInsets = safeAreaInsets
-        let currentDisplayScale = window?.screen.scale ?? UIScreen.main.scale
+        let currentDisplayScale = window?.screen.scale ?? traitCollection.displayScale
         guard currentBounds != cachedBounds
             || currentSafeAreaInsets != cachedSafeAreaInsets
             || currentDisplayScale != cachedDisplayScale

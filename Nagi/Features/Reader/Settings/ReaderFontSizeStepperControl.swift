@@ -101,7 +101,6 @@ final class ReaderFontSizeStepperControl: UIControl {
 
     private func configureButton(_ button: UIButton, accessibilityLabel: String) {
         button.backgroundColor = .clear
-        button.adjustsImageWhenHighlighted = true
         button.imageView?.contentMode = .center
         button.accessibilityLabel = accessibilityLabel
         button.accessibilityTraits = .button

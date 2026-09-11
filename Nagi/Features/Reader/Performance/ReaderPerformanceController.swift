@@ -38,7 +38,11 @@ final class ReaderPerformanceController {
                 object: processInfo,
                 queue: .main
             ) { [weak self] _ in
-                self?.refresh()
+                // The observer is delivered on the main queue; state that
+                // guarantee explicitly instead of relying on it implicitly.
+                MainActor.assumeIsolated {
+                    self?.refresh()
+                }
             }
         )
         observerTokens.append(
@@ -47,7 +51,11 @@ final class ReaderPerformanceController {
                 object: processInfo,
                 queue: .main
             ) { [weak self] _ in
-                self?.refresh()
+                // The observer is delivered on the main queue; state that
+                // guarantee explicitly instead of relying on it implicitly.
+                MainActor.assumeIsolated {
+                    self?.refresh()
+                }
             }
         )
     }

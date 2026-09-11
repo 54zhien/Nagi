@@ -44,7 +44,7 @@ struct ReaderView: View {
         }
         .onChange(of: systemBrightness) { _, newValue in
             guard brightnessBeforeReader != nil else { return }
-            UIScreen.main.brightness = CGFloat(min(max(newValue, 0), 1))
+            readerScreen?.brightness = CGFloat(min(max(newValue, 0), 1))
         }
         .onChange(of: book.title) { _, _ in
             model?.synchronizeBookTitle()
@@ -54,16 +54,25 @@ struct ReaderView: View {
         }
     }
 
+    /// iOS 26 deprecates `UIScreen.main`.  Resolve the screen through the
+    /// window scene that currently hosts the foreground window instead.
+    private var readerScreen: UIScreen? {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .first { $0.activationState == .foregroundActive }?
+            .screen
+    }
+
     private func beginSystemBrightnessSession() {
-        guard brightnessBeforeReader == nil else { return }
-        let currentBrightness = UIScreen.main.brightness
+        guard brightnessBeforeReader == nil, let screen = readerScreen else { return }
+        let currentBrightness = screen.brightness
         brightnessBeforeReader = currentBrightness
         systemBrightness = Double(currentBrightness)
     }
 
     private func restoreSystemBrightness() {
         guard let brightnessBeforeReader else { return }
-        UIScreen.main.brightness = brightnessBeforeReader
+        readerScreen?.brightness = brightnessBeforeReader
         self.brightnessBeforeReader = nil
     }
 }

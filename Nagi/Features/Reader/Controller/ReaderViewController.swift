@@ -267,7 +267,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
         let chromeSafeAreaInsets = view.safeAreaInsets
         let contentInsets = readableContentInsets(for: chromeSafeAreaInsets)
-        let displayScale = view.window?.screen.scale ?? UIScreen.main.scale
+        let displayScale = view.window?.screen.scale ?? traitCollection.displayScale
         guard bounds != lastViewportBounds
             || contentInsets != lastViewportContentInsets
             || displayScale != lastViewportDisplayScale else {
