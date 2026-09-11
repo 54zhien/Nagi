@@ -91,6 +91,7 @@
 		4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F8 /* ReaderAppearanceResolver.swift */; };
 		4A00000000000000000000F9 /* ReadiumJavaScriptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FA /* ReadiumJavaScriptBuilder.swift */; };
 		4A00000000000000000000FA /* ReadiumDocumentStyler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FB /* ReadiumDocumentStyler.swift */; };
+		4A00000000000000000000FB /* ReadiumNavigatorDelegateAdapter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */; };
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* NagiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiApp.swift; sourceTree = "<group>"; };
@@ -175,6 +176,7 @@
 		3A00000000000000000000F8 /* ReaderAppearanceResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderAppearanceResolver.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FA /* ReadiumJavaScriptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumJavaScriptBuilder.swift; sourceTree = "<group>"; };
 		3A00000000000000000000FB /* ReadiumDocumentStyler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumDocumentStyler.swift; sourceTree = "<group>"; };
+		3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumNavigatorDelegateAdapter.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A0000000000000000000003 /* Frameworks */ = {
@@ -508,6 +510,7 @@
 			children = (
 				2A00000000000000000000F4 /* Preferences */,
 				2A00000000000000000000F5 /* Styling */,
+				3A00000000000000000000FC /* ReadiumNavigatorDelegateAdapter.swift */,
 			);
 			path = Readium;
 			sourceTree = "<group>";
@@ -765,6 +768,7 @@
 				4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */,
 				4A00000000000000000000F9 /* ReadiumJavaScriptBuilder.swift in Sources */,
 				4A00000000000000000000FA /* ReadiumDocumentStyler.swift in Sources */,
+				4A00000000000000000000FB /* ReadiumNavigatorDelegateAdapter.swift in Sources */,
 				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

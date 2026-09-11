@@ -3,7 +3,6 @@ import Observation
 import ReadiumNavigator
 import ReadiumShared
 import UIKit
-import WebKit
 
 private extension ReaderFontFamily {
     var readiumFontFamily: FontFamily {
@@ -109,6 +108,8 @@ final class EPUBReaderModel {
     }
     @ObservationIgnored
     private let documentStyler = ReadiumDocumentStyler()
+    @ObservationIgnored
+    private let delegateAdapter = ReadiumNavigatorDelegateAdapter()
     private var previewTask: Task<Void, Never>?
     private var previewResourceHref: String?
     private var hasLoaded = false
@@ -209,7 +210,8 @@ final class EPUBReaderModel {
                     )
                 )
             )
-            navigator.delegate = self
+            delegateAdapter.host = self
+            navigator.delegate = delegateAdapter
             navigator.addObserver(.drag(onStart: { [weak self] _ in
                 self?.onSwipeStart?()
                 return false
@@ -397,7 +399,7 @@ final class EPUBReaderModel {
     }
 
     /// Everything the injected scripts depend on.
-    private var styleSnapshot: ReadiumStyleSnapshot {
+    var styleSnapshot: ReadiumStyleSnapshot {
         let appearance = resolvedAppearance
         return ReadiumStyleSnapshot(
             backgroundColor: appearance.backgroundColor,
@@ -776,9 +778,24 @@ private func normalizedResourceHref(_ href: String) -> String {
     return decoded
 }
 
-extension EPUBReaderModel: EPUBNavigatorDelegate {
-    func navigator(_ navigator: VisualNavigator, presentationDidChange presentation: VisualNavigatorPresentation) {
-        _ = presentation
+extension EPUBReaderModel: ReadiumNavigatorDelegateHost {
+    var isFixedLayout: Bool {
+        publication?.metadata.layout == .fixed
+    }
+
+    var overrideGeneration: UInt64 {
+        documentStyler.currentGeneration
+    }
+
+    var navigatorViewWidth: CGFloat {
+        navigator?.view.bounds.width ?? 0
+    }
+
+    func beginOverrideGenerationIfNeeded() {
+        documentStyler.startGenerationIfNeeded()
+    }
+
+    func navigatorPresentationDidChange() {
         applyVisibleReaderBaseAppearance()
         refreshVisibleReaderOverrides()
         // ReaderViewController must re-evaluate gesture ownership after the
@@ -786,54 +803,25 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
         onStateChange?()
     }
 
-    func navigator(_ navigator: Navigator, locationDidChange locator: Locator) {
+    func navigatorLocationDidChange(_ locator: Locator) {
         updateLocation(locator)
     }
 
-    func navigator(_ navigator: Navigator, didJumpTo locator: Locator) {
-        updateLocation(locator)
-    }
-
-    func navigator(
-        _ navigator: EPUBNavigatorViewController,
-        setupUserScripts userContentController: WKUserContentController
-    ) {
-        guard publication?.metadata.layout != .fixed else { return }
-        documentStyler.startGenerationIfNeeded()
-        userContentController.addUserScript(
-            WKUserScript(
-                source: ReadiumJavaScriptBuilder.bootstrap(snapshot: styleSnapshot),
-                injectionTime: .atDocumentStart,
-                forMainFrameOnly: true
-            )
-        )
-        userContentController.addUserScript(
-            WKUserScript(
-                source: ReadiumJavaScriptBuilder.override(
-                    snapshot: styleSnapshot,
-                    requestGeneration: documentStyler.currentGeneration
-                ),
-                injectionTime: .atDocumentEnd,
-                forMainFrameOnly: true
-            )
-        )
-    }
-
-    func navigator(_ navigator: Navigator, presentError error: NavigatorError) {
+    func navigatorDidFail(_ error: NavigatorError) {
         errorMessage = "阅读器发生错误：\(error.localizedDescription)"
         onStateChange?()
     }
 
-    func navigator(_ navigator: VisualNavigator, didTapAt point: CGPoint) {
-        let width = self.navigator?.view.bounds.width ?? 0
+    func navigatorDidTap(atX x: CGFloat) {
+        let width = navigatorViewWidth
         guard width > 0 else { return }
 
-        switch PageTurnMetrics.edgeHit(atX: point.x, screenWidth: width) {
+        switch PageTurnMetrics.edgeHit(atX: x, screenWidth: width) {
         case .left:
-            if self.navigator?.isContinuousScrollEnabled == true {
+            if navigator?.isContinuousScrollEnabled == true {
                 onToggleControls?()
             } else {
-                let readingDirection: PageTurnReadingDirection = self.navigator?.pageReadingProgression == .rtl
+                let readingDirection: PageTurnReadingDirection = navigator?.pageReadingProgression == .rtl
                     ? .rightToLeft
                     : .leftToRight
                 onPageTurnRequested?(
@@ -841,10 +829,10 @@ extension EPUBReaderModel: EPUBNavigatorDelegate {
                 )
             }
         case .right:
-            if self.navigator?.isContinuousScrollEnabled == true {
+            if navigator?.isContinuousScrollEnabled == true {
                 onToggleControls?()
             } else {
-                let readingDirection: PageTurnReadingDirection = self.navigator?.pageReadingProgression == .rtl
+                let readingDirection: PageTurnReadingDirection = navigator?.pageReadingProgression == .rtl
                     ? .rightToLeft
                     : .leftToRight
                 onPageTurnRequested?(
