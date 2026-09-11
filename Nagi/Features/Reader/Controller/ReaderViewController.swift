@@ -489,7 +489,19 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
             && model.pageSurfaceProvider?.supportsCustomPageTurns == true
     }
 
-    private var pageTurnCacheIsFullyPublished: Bool {
+    /// Whether the turn in `direction` can run right now.
+    ///
+    /// Only the direction the reader is about to move in has to be ready.
+    /// Requiring both means a backward prewarm still in flight holds up a
+    /// forward gesture, which is where the dead beat between consecutive turns
+    /// comes from; the other direction keeps warming in the background and the
+    /// prewarm trigger stays satisfied until it lands.
+    ///
+    /// The direction is a parameter rather than a read of the live one because
+    /// the prewarm loop this terminates captured its own direction once, at
+    /// start. A tap arriving mid-loop would otherwise leave the loop judging
+    /// readiness for a direction it never warmed.
+    private func pageTurnCacheIsReady(for direction: PageDirection) -> Bool {
         guard let currentSurface = cachedCurrentSurface,
               pageSurfaceGeometryIsCompatibleWithViewport(
                   currentSurface.geometry,
@@ -498,12 +510,6 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
               imageMatchesGeometry(currentSurface.image, currentSurface.geometry),
               let provider = model.pageSurfaceProvider else { return false }
 
-        // Only the direction the reader is about to move in has to be ready.
-        // Requiring both means a backward prewarm still in flight holds up a
-        // forward gesture, which is where the dead beat between consecutive
-        // turns comes from; the other direction keeps warming in the background
-        // and the prewarm trigger stays satisfied until it lands.
-        let direction = preferredPrewarmDirection
         switch provider.adjacentSurfaceReadiness(direction: direction) {
         case .ready:
             guard let target = provider.preparedAdjacentSurface(direction: direction) else {
@@ -1395,12 +1401,17 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         let revision = pageTurnPrewarmRevision
         let preferred = preferredPrewarmDirection
         pageTurnPrewarmTask = Task { @MainActor [weak self, weak provider] in
-            guard let self, let provider else { return }
+            // The defer has to be registered before the guard: returning with
+            // the task still assigned would make every later call to
+            // `schedulePageTurnPrewarm` fail its `pageTurnPrewarmTask == nil`
+            // guard, and prewarming would never run again — every swipe would
+            // degrade to a resistance bounce, permanently.
             defer {
-                if revision == self.pageTurnPrewarmRevision {
+                if let self, revision == self.pageTurnPrewarmRevision {
                     self.pageTurnPrewarmTask = nil
                 }
             }
+            guard let self, let provider else { return }
             await Task.yield()
 
             for attempt in 0 ..< Self.pageSurfacePrewarmMaxAttempts {
@@ -1414,7 +1425,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
                       self.pageTurnStateMachine.state == .idle else { return }
 
                 self.refreshPreparedPageTurnCacheIfAvailable()
-                if self.pageTurnCacheIsFullyPublished {
+                if self.pageTurnCacheIsReady(for: preferred) {
                     self.configurePageTurnInteraction()
                     return
                 }

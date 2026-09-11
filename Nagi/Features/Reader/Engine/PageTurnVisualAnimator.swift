@@ -47,6 +47,10 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
     /// roles wrong — the wrong page moves, and it moves on the wrong layer.
     private let isReversed: Bool
 
+    /// The sheet that travels a full width, and the one it uncovers or covers.
+    private var movingContainer: UIView { isReversed ? targetContainer : currentContainer }
+    private var restingContainer: UIView { isReversed ? currentContainer : targetContainer }
+
     private var animationRevision = 0
     private var propertyAnimator: UIViewPropertyAnimator?
     private var cornerRadius: CGFloat = 0
@@ -103,6 +107,10 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
             $0.isUserInteractionEnabled = false
             $0.accessibilityElementsHidden = true
             $0.isAccessibilityElement = false
+            // The fade cross-dissolves these very views, so a cover installed
+            // over them afterwards (the completion fallback reuses the same
+            // composites) would otherwise animate two translucent pages.
+            $0.alpha = 1
         }
 
         targetContainer.frame = bounds
@@ -143,14 +151,18 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
         currentView.layer.masksToBounds = true
         currentContainer.addSubview(currentView)
 
-        currentTintView.frame = currentContainer.bounds
+        // The tint shades the sheet that moves, so it has to live in whichever
+        // container that is. Leaving it on `currentContainer` would have made
+        // it shade the *resting* sheet on every backward turn, and `isDark`
+        // inert there.
+        currentTintView.frame = movingContainer.bounds
         currentTintView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
         currentTintView.backgroundColor = isDark ? .white : .black
         currentTintView.alpha = 0
         currentTintView.isUserInteractionEnabled = false
         currentTintView.layer.cornerCurve = .continuous
         currentTintView.layer.masksToBounds = true
-        currentContainer.addSubview(currentTintView)
+        movingContainer.addSubview(currentTintView)
 
         applyCornerGeometry()
         UIView.performWithoutAnimation {
@@ -201,52 +213,44 @@ final class PageTurnVisualAnimator: PageTurnAnimating {
 
     private func updateCover() {
         let separation = CGFloat(sin(Double.pi * Double(progress)))
+        let moving = movingContainer
+        let resting = restingContainer
 
-        // The moving sheet travels a full width; the one it covers only gives up
-        // a little ground, which keeps the two pages spatially continuous
-        // without dragging the stationary text across the screen.
+        // The moving sheet travels a full width; the sheet it uncovers or covers
+        // only gives up a little ground, which keeps the two pages spatially
+        // continuous without dragging the stationary text across the screen.
         //
-        // Which sheet moves is the whole difference between forward and back, so
-        // the two branches only swap the roles and keep every formula identical.
-        // The shadow follows the same rule: `completionTranslationX` already
-        // carries the travel direction, so applying the same expression to
-        // whichever sheet is moving mirrors it for free.
-        if isReversed {
-            targetContainer.transform = CGAffineTransform(
-                translationX: -completionTranslationX * (1 - progress),
-                y: 0
-            )
-            currentContainer.transform = CGAffineTransform(
-                translationX: completionTranslationX * 0.08 * progress,
-                y: 0
-            )
-            currentTintView.alpha = 0
-
-            // Keep the overlay nearly neutral in light mode. The page shadow is
-            // the separation cue; a broad opaque shade is what previously made
-            // the transition look like a red or black rectangle.
-            currentContainer.layer.shadowOpacity = 0
-            setShadow(
-                on: targetContainer,
-                opacity: 0.20 * separation,
-                leading: completionTranslationX < 0
-            )
-            return
-        }
-
-        currentContainer.transform = CGAffineTransform(
-            translationX: completionTranslationX * progress,
+        // Forward the mover starts on screen and leaves; backward it starts off
+        // the far edge and arrives. The same two tracks read in opposite
+        // directions, so the roles are resolved once and everything else is
+        // shared rather than duplicated per direction.
+        moving.transform = CGAffineTransform(
+            translationX: isReversed
+                ? -completionTranslationX * (1 - progress)
+                : completionTranslationX * progress,
             y: 0
         )
-        targetContainer.transform = CGAffineTransform(
-            translationX: -completionTranslationX * 0.08 * (1 - progress),
+        resting.transform = CGAffineTransform(
+            translationX: isReversed
+                ? completionTranslationX * 0.08 * progress
+                : -completionTranslationX * 0.08 * (1 - progress),
             y: 0
         )
+
         currentTintView.alpha = (isDark ? 0.035 : 0.012) * separation
 
-        targetContainer.layer.shadowOpacity = 0
+        // Keep the overlay nearly neutral in light mode. The page shadow is the
+        // separation cue; a broad opaque shade is what previously made the
+        // transition look like a red or black rectangle.
+        //
+        // The shadow follows the mover and keeps the expression the forward
+        // branch has always used. That expression keys off the travel sign, and
+        // a mover that leaves travels opposite to one that arrives, so the two
+        // directions are not literal mirrors of each other here — changing it
+        // would alter forward, which this is not meant to touch.
+        resting.layer.shadowOpacity = 0
         setShadow(
-            on: currentContainer,
+            on: moving,
             opacity: 0.20 * separation,
             leading: completionTranslationX < 0
         )
