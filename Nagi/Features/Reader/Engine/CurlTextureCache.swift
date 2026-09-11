@@ -31,10 +31,15 @@ struct CurlTextureKey: Hashable {
     // The role mapping lives here rather than at each call site: prewarming and
     // lookup must agree, and a spread of hand-written mappings is how the
     // current page and its neighbour ended up sharing a key.
+    //
+    // Both surface types are main-actor isolated, so reading their identities
+    // pins these to the main actor too.
+    @MainActor
     static func current(_ surface: NavigatorCurrentPageSurface) -> CurlTextureKey {
         CurlTextureKey(originIdentity: surface.identity, role: .current)
     }
 
+    @MainActor
     static func adjacent(_ surface: PageSurface, direction: PageDirection) -> CurlTextureKey {
         CurlTextureKey(
             originIdentity: surface.originIdentity,
