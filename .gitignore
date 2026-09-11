@@ -12,3 +12,15 @@ xcuserdata/
 
 # macOS
 .DS_Store
+
+# Distribution builds
+*.ipa
+
+# Codex / CI run artifacts and logs
+.codex-*
+
+# Agent scratch workspace
+tasks/
+
+# Local-only agent spec
+AGENTS.md
