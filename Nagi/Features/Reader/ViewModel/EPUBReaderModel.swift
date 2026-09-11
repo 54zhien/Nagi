@@ -5,21 +5,6 @@ import ReadiumShared
 import UIKit
 import WebKit
 
-private extension ReaderTheme {
-    func readiumTheme(isDarkAppearance: Bool) -> ReadiumNavigator.Theme {
-        switch self {
-        case .light:
-            return .light
-        case .quiet:
-            return .dark
-        case .sepia:
-            return isDarkAppearance ? .dark : .sepia
-        case .dark:
-            return .dark
-        }
-    }
-}
-
 private extension ReaderFontFamily {
     var readiumFontFamily: FontFamily {
         FontFamily(rawValue: readiumFamilyName)
@@ -95,11 +80,11 @@ final class EPUBReaderModel {
     private(set) var isLoadingPreview = false
 
     var readerContentUIColor: UIColor {
-        resolvedTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance)
+        resolvedAppearance.contentColor
     }
 
     var readerBackgroundUIColor: UIColor {
-        resolvedTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
+        resolvedAppearance.backgroundColor
     }
 
     var isReflowable: Bool {
@@ -428,28 +413,14 @@ final class EPUBReaderModel {
         synchronizeStoredChapterMetadata()
     }
 
-    private var resolvedTheme: ReaderTheme {
-        switch appearanceMode {
-        case .light:
-            return theme == .dark ? .light : theme
-        case .dark:
-            return theme == .light ? .dark : theme
-        case .system:
-            return systemIsDark
-                ? (theme == .light ? .dark : theme)
-                : (theme == .dark ? .light : theme)
-        }
-    }
-
-    private var isDarkAppearance: Bool {
-        switch appearanceMode {
-        case .light:
-            return false
-        case .dark:
-            return true
-        case .system:
-            return systemIsDark
-        }
+    /// The appearance shared by the chrome, the UIKit host, Readium's
+    /// preferences and the injected CSS.
+    private var resolvedAppearance: ResolvedReaderAppearance {
+        ReaderAppearanceResolver.resolve(
+            theme: theme,
+            appearanceMode: appearanceMode,
+            systemIsDark: systemIsDark
+        )
     }
 
     private func withPreferenceUpdatesSuspended(_ action: () -> Void) {
@@ -537,9 +508,9 @@ final class EPUBReaderModel {
     }
 
     private func makePreferences() -> EPUBPreferences {
-        let effectiveTheme = resolvedTheme
+        let appearance = resolvedAppearance
         let navigatorBackgroundColor = ReadiumNavigator.Color(
-            uiColor: effectiveTheme.readerBackgroundUIColor(isDarkAppearance: isDarkAppearance)
+            uiColor: appearance.backgroundColor
         )
         let preferences = EPUBPreferences(
             // Keep Readium's first paint in sync with ReaderChrome. The
@@ -561,10 +532,10 @@ final class EPUBReaderModel {
             scroll: pageTransition == .scroll && isReflowable,
             spread: .auto,
             textColor: ReadiumNavigator.Color(
-                uiColor: effectiveTheme.readerContentUIColor(isDarkAppearance: isDarkAppearance)
+                uiColor: appearance.contentColor
             ),
             textNormalization: !publisherStyles,
-            theme: effectiveTheme.readiumTheme(isDarkAppearance: isDarkAppearance),
+            theme: appearance.readiumTheme,
             wordSpacing: nil
         )
         return preferences
@@ -936,14 +907,7 @@ final class EPUBReaderModel {
     }
 
     private var readiumThemeAppearanceMarker: String? {
-        switch resolvedTheme.readiumTheme(isDarkAppearance: isDarkAppearance) {
-        case .light:
-            return nil
-        case .dark:
-            return "readium-night-on"
-        case .sepia:
-            return "readium-sepia-on"
-        }
+        resolvedAppearance.readiumThemeMarker
     }
 
     private static func cssDecimal(_ value: Double) -> String {

@@ -87,6 +87,8 @@
 		4A00000000000000000000F4 /* BookFileLocatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F5 /* BookFileLocatorTests.swift */; };
 		4A00000000000000000000F5 /* TXTParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F6 /* TXTParserTests.swift */; };
 		4A00000000000000000000F6 /* ReaderPreferencesMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */; };
+		4A00000000000000000000F8 /* ReaderAppearanceResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F9 /* ReaderAppearanceResolverTests.swift */; };
+		4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000F8 /* ReaderAppearanceResolver.swift */; };
 
 /* Begin PBXFileReference section */
 		3A0000000000000000000001 /* NagiApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NagiApp.swift; sourceTree = "<group>"; };
@@ -167,6 +169,8 @@
 		3A00000000000000000000F5 /* BookFileLocatorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookFileLocatorTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000F6 /* TXTParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTParserTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPreferencesMigrationTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000F9 /* ReaderAppearanceResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderAppearanceResolverTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000F8 /* ReaderAppearanceResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderAppearanceResolver.swift; sourceTree = "<group>"; };
 
 /* Begin PBXFrameworksBuildPhase section */
 		5A0000000000000000000003 /* Frameworks */ = {
@@ -341,6 +345,7 @@
 			isa = PBXGroup;
 			children = (
 				2A0000000000000000000011 /* Engine */,
+				2A00000000000000000000F3 /* Readium */,
 				2A0000000000000000000012 /* ViewModel */,
 				2A0000000000000000000013 /* View */,
 				2A0000000000000000000016 /* Controller */,
@@ -494,6 +499,22 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		2A00000000000000000000F3 /* Readium */ = {
+			isa = PBXGroup;
+			children = (
+				2A00000000000000000000F4 /* Preferences */,
+			);
+			path = Readium;
+			sourceTree = "<group>";
+		};
+		2A00000000000000000000F4 /* Preferences */ = {
+			isa = PBXGroup;
+			children = (
+				3A00000000000000000000F8 /* ReaderAppearanceResolver.swift */,
+			);
+			path = Preferences;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 		2A00000000000000000000F2 /* NagiTests */ = {
 			isa = PBXGroup;
@@ -503,6 +524,7 @@
 				3A00000000000000000000F5 /* BookFileLocatorTests.swift */,
 				3A00000000000000000000F6 /* TXTParserTests.swift */,
 				3A00000000000000000000F7 /* ReaderPreferencesMigrationTests.swift */,
+				3A00000000000000000000F9 /* ReaderAppearanceResolverTests.swift */,
 			);
 			path = NagiTests;
 			sourceTree = "<group>";
@@ -727,6 +749,7 @@
 				4A0000000000000000000097 /* PageTurnDomain.swift in Sources */,
 				4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */,
 				4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */,
+				4A00000000000000000000F7 /* ReaderAppearanceResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -740,6 +763,7 @@
 				4A00000000000000000000F4 /* BookFileLocatorTests.swift in Sources */,
 				4A00000000000000000000F5 /* TXTParserTests.swift in Sources */,
 				4A00000000000000000000F6 /* ReaderPreferencesMigrationTests.swift in Sources */,
+				4A00000000000000000000F8 /* ReaderAppearanceResolverTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
