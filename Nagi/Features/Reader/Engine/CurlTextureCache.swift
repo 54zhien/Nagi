@@ -1,11 +1,10 @@
 import CoreGraphics
 import Metal
-import ReadiumNavigator
 import UIKit
 
 /// Identifies one uploaded page texture.
 ///
-/// The role is not decoration: `NavigatorPagePositionIdentity` for an adjacent
+/// The role is not decoration: `PagePositionIdentity` for an adjacent
 /// surface is the position the surface was *built from*, which is the current
 /// page. Keying by identity alone therefore puts the current page and both
 /// neighbours under one key and they overwrite each other.
@@ -16,7 +15,7 @@ struct CurlTextureKey: Hashable {
         case backward
     }
 
-    let originIdentity: NavigatorPagePositionIdentity
+    let originIdentity: PagePositionIdentity
     let role: Role
 
     // The role mapping lives here rather than at each call site: prewarming and
@@ -26,7 +25,7 @@ struct CurlTextureKey: Hashable {
     // Both surface types are main-actor isolated, so reading their identities
     // pins these to the main actor too.
     @MainActor
-    static func current(_ surface: NavigatorCurrentPageSurface) -> CurlTextureKey {
+    static func current(_ surface: CurrentPageSurface) -> CurlTextureKey {
         CurlTextureKey(originIdentity: surface.identity, role: .current)
     }
 
@@ -49,7 +48,7 @@ struct CurlTextureKey: Hashable {
 final class CurlTextureCache {
     struct Entry {
         let texture: MTLTexture
-        let geometry: NavigatorPageSurfaceGeometry
+        let geometry: PageSurfaceGeometry
     }
 
     /// Three live textures is the working set (current, forward, backward); the
@@ -72,7 +71,7 @@ final class CurlTextureCache {
     /// viewport change can never hand the renderer a stale-sized page.
     func texture(
         for key: CurlTextureKey,
-        matching geometry: NavigatorPageSurfaceGeometry
+        matching geometry: PageSurfaceGeometry
     ) -> MTLTexture? {
         guard let entry = entries[key], entry.geometry == geometry else {
             return nil
@@ -82,7 +81,7 @@ final class CurlTextureCache {
 
     func store(
         _ texture: MTLTexture,
-        geometry: NavigatorPageSurfaceGeometry,
+        geometry: PageSurfaceGeometry,
         for key: CurlTextureKey
     ) {
         if entries[key] == nil {
@@ -104,7 +103,7 @@ final class CurlTextureCache {
     /// The pair of textures a curl for `direction` needs, or nil when either is
     /// missing or was rasterised for a different geometry.
     func curlTextures(
-        currentSurface: NavigatorCurrentPageSurface,
+        currentSurface: CurrentPageSurface,
         targetSurface: PageSurface,
         direction: PageDirection
     ) -> (current: MTLTexture, target: MTLTexture)? {
