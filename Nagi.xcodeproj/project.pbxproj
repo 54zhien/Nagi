@@ -88,6 +88,7 @@
 		4A000000000000000000009D /* PageCurlRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009D /* PageCurlRenderer.swift */; };
 		4A000000000000000000009E /* PageCurlShaders.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009E /* PageCurlShaders.metal */; };
 		4A00000000000000000000A0 /* ReaderSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A0 /* ReaderSurfaceContractTests.swift */; };
+		4A00000000000000000000A5 /* TXTParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A4 /* TXTParserTests.swift */; };
 		4A00000000000000000000A1 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
 		4A00000000000000000000A2 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
 /* End PBXBuildFile section */
@@ -181,6 +182,7 @@
 		3A000000000000000000009D /* PageCurlRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageCurlRenderer.swift; sourceTree = "<group>"; };
 		3A000000000000000000009E /* PageCurlShaders.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = PageCurlShaders.metal; sourceTree = "<group>"; };
 		3A00000000000000000000A0 /* ReaderSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSurfaceContractTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000A4 /* TXTParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTParserTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A1 /* NagiReaderContractTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NagiReaderContractTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -513,6 +515,7 @@
 			isa = PBXGroup;
 			children = (
 				3A00000000000000000000A0 /* ReaderSurfaceContractTests.swift */,
+				3A00000000000000000000A4 /* TXTParserTests.swift */,
 			);
 			path = NagiReaderContractTests;
 			sourceTree = "<group>";
@@ -757,6 +760,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				4A00000000000000000000A0 /* ReaderSurfaceContractTests.swift in Sources */,
+				4A00000000000000000000A5 /* TXTParserTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -858,7 +862,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 192;
+				CURRENT_PROJECT_VERSION = 193;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -884,7 +888,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 192;
+				CURRENT_PROJECT_VERSION = 193;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
