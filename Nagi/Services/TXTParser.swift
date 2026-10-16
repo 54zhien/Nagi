@@ -51,15 +51,15 @@ struct TXTParser: Sendable {
     static let supportedExtensions: Set<String> = ["txt", "text"]
 
     func parse(url: URL) throws -> ParsedBook {
-        let trimmed = try TXTSourceSnapshot.read(at: url).preparedText()
+        let document = try TXTIngestDocument.read(at: url)
         let title = url.deletingPathExtension().lastPathComponent
-        let chapters = Self.splitIntoChapters(trimmed, fallbackTitle: title)
+        let chapters = document.units.map { $0.chapter }
 
         return ParsedBook(
             title: title,
             author: nil,
             chapterCount: chapters.count,
-            content: trimmed,
+            content: document.partition.normalizedText,
             chapters: chapters
         )
     }

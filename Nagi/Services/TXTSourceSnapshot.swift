@@ -99,8 +99,13 @@ struct TXTSourceSnapshot: Sendable {
     }
 
     func preparedText() throws -> String {
+        try Self.prepare(decoded.text)
+    }
+
+    /// Preparation shared with ingest, which retains and reuses its chosen decode.
+    static func prepare(_ decodedText: String) throws -> String {
         let text = Self.normalizeLineEndings(
-            decoded.text.replacingOccurrences(of: "\u{FEFF}", with: "")
+            decodedText.replacingOccurrences(of: "\u{FEFF}", with: "")
         ).trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { throw ParseError.emptyContent }
         return text
