@@ -1,0 +1,130 @@
+name: Reader contract tests
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ codex/reader-transition-engine, main ]
+
+permissions:
+  contents: read
+
+jobs:
+  reader-contract-tests:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26.3
+        shell: bash
+        run: |
+          set -euo pipefail
+          XCODE_APP="/Applications/Xcode_26.3.app"
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::Environment problem: $XCODE_APP is not installed on this runner image."
+            echo "Installed Xcode bundles:"
+            find /Applications -maxdepth 1 -name 'Xcode*.app' -print
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP"
+          xcodebuild -version
+          xcodebuild -showsdks
+
+      - name: Select iOS 26 iPhone simulator
+        id: destination
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Available simulator runtimes:"
+          xcrun simctl list runtimes available
+          echo "Available simulator devices:"
+          xcrun simctl list devices available
+          DEVICES_JSON="$RUNNER_TEMP/simulator-devices.json"
+          xcrun simctl list devices available --json > "$DEVICES_JSON"
+          python3 -I - "$DEVICES_JSON" <<'PY'
+          import json
+          import os
+          import re
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              data = json.load(handle)
+
+          runtime_pattern = re.compile(
+              r"com\.apple\.CoreSimulator\.SimRuntime\.iOS-26(?:-(\d+))?(?:-(\d+))?"
+          )
+          candidates = []
+          for runtime, devices in data.get("devices", {}).items():
+              match = runtime_pattern.fullmatch(runtime)
+              if not match:
+                  continue
+              version = tuple(int(part or 0) for part in match.groups())
+              for device in devices:
+                  device_type = device.get("deviceTypeIdentifier", "")
+                  if device.get("isAvailable") and device_type.startswith(
+                      "com.apple.CoreSimulator.SimDeviceType.iPhone"
+                  ):
+                      candidates.append((version, device["name"], device["udid"], runtime))
+
+          if not candidates:
+              print("::error::Environment problem: no available iPhone simulator with an iOS 26 runtime for the selected Xcode.")
+              sys.exit(1)
+
+          candidates.sort(key=lambda item: (item[0], item[1]))
+          _, name, udid, runtime = candidates[-1]
+          print(f"Selected simulator: {name} ({runtime}) {udid}")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"udid={udid}\n")
+          PY
+
+      - name: Resolve package dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -resolvePackageDependencies \
+            -project Nagi.xcodeproj \
+            -scheme Nagi
+
+      - name: Run reader contract tests
+        shell: bash
+        env:
+          SIMULATOR_UDID: ${{ steps.destination.outputs.udid }}
+        run: |
+          set -uo pipefail
+          if [ -z "${SIMULATOR_UDID}" ]; then
+            echo "::error::No simulator UDID was selected."
+            exit 1
+          fi
+          mkdir -p TestResults
+          set +e
+          xcodebuild test \
+            -project Nagi.xcodeproj \
+            -scheme Nagi \
+            -configuration Debug \
+            -destination "id=${SIMULATOR_UDID}" \
+            -only-testing:NagiReaderContractTests \
+            -resultBundlePath TestResults/ReaderContract.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+          status=$?
+          set -e
+          echo "xcodebuild test exit status: ${status}"
+          exit "${status}"
+
+      - name: Summarize xcresult
+        if: ${{ always() && hashFiles('TestResults/ReaderContract.xcresult/**') != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun xcresulttool get test-results summary --path TestResults/ReaderContract.xcresult
+          xcrun xcresulttool get test-results tests --path TestResults/ReaderContract.xcresult
+
+      - name: Upload xcresult
+        if: ${{ always() && hashFiles('TestResults/ReaderContract.xcresult/**') != '' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReaderContract-xcresult
+          path: TestResults/ReaderContract.xcresult
+          if-no-files-found: error
+          retention-days: 14
