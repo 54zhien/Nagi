@@ -26,6 +26,49 @@ final class TXTIngestDocumentTests: XCTestCase {
                        "54a77f6e002e7bc15ea3e0ed338a9787a0b0522de51cdb3e15399d0bfc0a817f")
     }
 
+    // Characterization: truncating lengths to their low byte corrupts 256 and 257;
+    // little endian breaks the complete preimage. Oracles use Python struct >Q + hashlib,
+    // independently of the Swift encoder; the literal body byte is ASCII 0x61.
+    func testFieldLengthsCarryIntoTheNextByteWithoutTruncation() {
+        let fixtures: [(count: Int, lengthHex: String, digest: String)] = [
+            (255, "00000000000000ff", "f8746d35130458b8c6dde8007591769da834fe9a5af235c646f50502be52f647"),
+            (256, "0000000000000100", "e3474c7edc0f3102fdb4b231a9f551038ad47b9789a66c3d8c18add4fe3311c7"),
+            (257, "0000000000000101", "a37cf37ccfa12bf45e268d4b3b26b8f96314e95b3faca51cf48b5e8633bd459e"),
+        ]
+        let headerHex = "00000000000000116e6167692e7478742e6d616e6966657374000000000000000100000000000000027231000000000000000100000000000000017500000000000000016e"
+        for fixture in fixtures {
+            let text = String(repeating: "a", count: fixture.count)
+            let records: [TXTIngestDocument.ManifestRecord] = [("u", "n", text)]
+            var bytes = Data()
+            TXTIngestDocument.encodeManifest(revision: "r1", records: records) { bytes.append($0) }
+            XCTAssertEqual(hex(bytes), headerHex + fixture.lengthHex + String(repeating: "61", count: fixture.count))
+            XCTAssertEqual(TXTIngestDocument.fingerprint(revision: "r1", records: records), fixture.digest)
+        }
+    }
+
+    // Characterization: counting Characters/UTF-16 instead of UTF-8 would emit 86, not 258.
+    func testMultibyteFieldUsesItsWideUTF8ByteLength() {
+        let records: [TXTIngestDocument.ManifestRecord] = [("u", "n", String(repeating: "中", count: 86))]
+        var bytes = Data()
+        TXTIngestDocument.encodeManifest(revision: "r1", records: records) { bytes.append($0) }
+        let headerHex = "00000000000000116e6167692e7478742e6d616e6966657374000000000000000100000000000000027231000000000000000100000000000000017500000000000000016e0000000000000102"
+        XCTAssertEqual(hex(bytes), headerHex + String(repeating: "e4b8ad", count: 86))
+        XCTAssertEqual(TXTIngestDocument.fingerprint(revision: "r1", records: records),
+                       "87ede0afd24db5e18cc666084b9fc746bc215b653c1928cd0102c33942bccdef")
+    }
+
+    // Characterization: the separate record-count framing must also retain high bytes.
+    func testManifestRecordCountCarriesIntoTheNextByte() {
+        let records = Array<TXTIngestDocument.ManifestRecord>(repeating: ("u", "n", ""), count: 256)
+        var bytes = Data()
+        TXTIngestDocument.encodeManifest(revision: "r1", records: records) { bytes.append($0) }
+        let headerHex = "00000000000000116e6167692e7478742e6d616e69666573740000000000000001000000000000000272310000000000000100"
+        let recordHex = "00000000000000017500000000000000016e0000000000000000"
+        XCTAssertEqual(hex(bytes), headerHex + String(repeating: recordHex, count: 256))
+        XCTAssertEqual(TXTIngestDocument.fingerprint(revision: "r1", records: records),
+                       "ab8df2bec527b567111b463673c9c9d24387c3757e9d5de4acb507678193626c")
+    }
+
     // Falsifier: dropping empty fields conflates an empty record with an absent record.
     func testEmptyFieldsStillCarryTheirThreeLengthPrefixes() {
         var bytes = Data()
