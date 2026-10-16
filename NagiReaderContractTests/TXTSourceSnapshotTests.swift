@@ -13,10 +13,11 @@ final class TXTSourceSnapshotTests: XCTestCase {
         XCTAssertFalse(result.usedLossyUTF8Fallback)
     }
 
-    // Catches decoding provenance changing Unicode or pretending an interior FEFF is a BOM.
+    // Catches altered scalars, an interior FEFF mistaken for a BOM, or a literal
+    // replacement character mistaken for evidence of lossy decoding.
     func testStrictUTF8PreservesRawScalarsBeforePreparation() {
-        let result = TXTSourceSnapshot(copying: Data("中😀e\u{0301}\u{FEFF}\r\n".utf8)).decoded
-        XCTAssertEqual(result.text.unicodeScalars.map(\.value), [0x4E2D, 0x1F600, 0x65, 0x301, 0xFEFF, 0xD, 0xA])
+        let result = TXTSourceSnapshot(copying: Data("中😀e\u{0301}\u{FEFF}\r\n\u{FFFD}".utf8)).decoded
+        XCTAssertEqual(result.text.unicodeScalars.map(\.value), [0x4E2D, 0x1F600, 0x65, 0x301, 0xFEFF, 0xD, 0xA, 0xFFFD])
         XCTAssertEqual(result.encoding, TXTTextEncoding.utf8)
         XCTAssertEqual(result.method, TXTDecodingMethod.utf8)
         XCTAssertTrue(result.didDecode)
@@ -126,7 +127,7 @@ final class TXTSourceSnapshotTests: XCTestCase {
         XCTAssertEqual(result.text.unicodeScalars.map(\.value), [0xFFFD])
         XCTAssertEqual(result.encoding, TXTTextEncoding.utf8)
         XCTAssertEqual(result.method, TXTDecodingMethod.lossyUTF8)
-        XCTAssertTrue(result.didDecode)
+        XCTAssertFalse(result.didDecode, "The strict decoders failed; replacement output is not strict success")
         XCTAssertTrue(result.usedLossyUTF8Fallback)
     }
 
