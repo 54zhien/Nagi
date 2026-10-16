@@ -208,6 +208,48 @@ final class TXTReaderAssetBuilderTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), [])
     }
 
+    // This must fail before validation exists: ZIP creation is not a valid-XML guarantee.
+    func testInvalidXMLBodyScalarsAreRejectedBeforeCreatingOutput() throws {
+        let directory = try temporaryDirectory()
+        for value: UInt32 in [0x0000, 0x0001, 0x000B, 0x000C, 0xFFFE, 0xFFFF] {
+            let scalar = try XCTUnwrap(Unicode.Scalar(value))
+            let parent = directory.appendingPathComponent("scalar-\(value)", isDirectory: true)
+            let destination = parent.appendingPathComponent("invalid.epub")
+            let parsed = document([TXTChapter(title: "正文", content: "甲\(scalar)乙")])
+            XCTAssertThrowsError(try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination), "U+\(String(value, radix: 16))")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: parent.path), "U+\(String(value, radix: 16))")
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        }
+    }
+
+    // Metadata and TOC text need the same rejection, not just paragraph contents.
+    func testInvalidDocumentAndChapterTitlesAreRejectedWithoutWritingFiles() throws {
+        let directory = try temporaryDirectory()
+        let fixtures = [
+            document([TXTChapter(title: "正文", content: "有效正文")], title: "书\u{0001}名"),
+            document([TXTChapter(title: "章\u{0001}名", content: "有效正文")]),
+        ]
+        for (index, parsed) in fixtures.enumerated() {
+            let parent = directory.appendingPathComponent("title-\(index)", isDirectory: true)
+            let destination = parent.appendingPathComponent("invalid.epub")
+            XCTAssertThrowsError(try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: parent.path))
+            XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
+        }
+    }
+
+    // Catches an overbroad control/ASCII filter; XML1.0 permits these whitespace and scalar-range edges.
+    func testXMLLegalWhitespaceAndUnicodeRemainUnchanged() throws {
+        let entries = try build(chapters: [
+            TXTChapter(title: "正文", content: "A\tB\nC\rD \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}"),
+        ])
+        let serialized = try text(entries, "OEBPS/chapter-1.xhtml")
+        XCTAssertTrue(serialized.contains("A\tB<br />\nC\rD \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}"))
+        let body = try XCTUnwrap(xml(entries, "OEBPS/chapter-1.xhtml").named("p").first?.text)
+        // Literal CR is normalized to LF by the XML consumer, not by a new TXT rule.
+        XCTAssertEqual(body.unicodeScalars.map(\.value), "A\tB\nC\nD \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}".unicodeScalars.map(\.value))
+    }
+
     private func threeChapters() -> [TXTChapter] {
         [TXTChapter(title: "书名", content: "序言"),
          TXTChapter(title: "第一章 开始", content: "第一章 开始\n甲"),
