@@ -95,7 +95,7 @@ struct TXTSourceSnapshot: Sendable {
                                      method: .gb18030, didDecode: true)
         }
         return TXTDecodingResult(text: String(decoding: data, as: UTF8.self), encoding: .utf8,
-                                 method: .lossyUTF8, didDecode: true)
+                                 method: .lossyUTF8, didDecode: false)
     }
 
     func preparedText() throws -> String {
