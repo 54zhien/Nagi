@@ -1,4 +1,3 @@
-import ReadiumNavigator
 import SwiftUI
 import UIKit
 
@@ -40,7 +39,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     private var pageTurnPrewarmRevision: UInt = 0
     private var pendingProgrammaticPageTurnRevision: UInt = 0
     private var preferredPrewarmDirection: PageDirection = .forward
-    private var cachedCurrentSurface: NavigatorCurrentPageSurface?
+    private var cachedCurrentSurface: CurrentPageSurface?
     /// Page textures rasterised and uploaded while the reader was idle, so a
     /// curl gesture only ever looks one up.
     private let curlTextureCache = CurlTextureCache()
@@ -1309,7 +1308,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     @discardableResult
     private func startPageTurnResistance(
-        currentSurface: NavigatorCurrentPageSurface,
+        currentSurface: CurrentPageSurface,
         direction: PageDirection,
         generation: UInt,
         provider: any PageSurfaceProvider,
@@ -1519,7 +1518,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
         pendingProgrammaticPageTurnTask = nil
     }
 
-    private func needsPageSurfacePrewarm(_ readiness: NavigatorPageSurfaceReadiness) -> Bool {
+    private func needsPageSurfacePrewarm(_ readiness: PageSurfaceReadiness) -> Bool {
         switch readiness {
         case .unknown, .failed:
             return true
@@ -1561,7 +1560,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     /// Peeking (`preparedAdjacentSurface`) rather than consuming, so the
     /// surfaces themselves stay available for the gesture that follows.
     private func warmCurlTexturesIfNeeded(
-        currentSurface: NavigatorCurrentPageSurface,
+        currentSurface: CurrentPageSurface,
         provider: PageSurfaceProvider
     ) {
         guard shouldOwnPaginatedPageTurns,
@@ -1603,7 +1602,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     @discardableResult
     private func storeCurlTexture(
         image: UIImage,
-        geometry: NavigatorPageSurfaceGeometry,
+        geometry: PageSurfaceGeometry,
         headerTitle: String?,
         key: CurlTextureKey,
         resources: PageCurlMetalResources
@@ -1652,7 +1651,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     /// mid-gesture is the exact cost this pipeline exists to remove, and a
     /// fallback that quietly did it would also hide whether prewarming works.
     private func makeCurlAnimator(
-        currentSurface: NavigatorCurrentPageSurface,
+        currentSurface: CurrentPageSurface,
         targetSurface: PageSurface,
         direction: PageDirection,
         destinationX: CGFloat
@@ -1792,7 +1791,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func makeCompositeSurface(
         contentImage: UIImage,
-        geometry: NavigatorPageSurfaceGeometry,
+        geometry: PageSurfaceGeometry,
         headerTitle: String?
     ) -> UIView {
         let composite = UIView(frame: snapshotHostView.bounds)
@@ -1875,7 +1874,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     }
 
     private func pageSurfaceGeometryIsCompatible(
-        current currentSurface: NavigatorCurrentPageSurface,
+        current currentSurface: CurrentPageSurface,
         target targetSurface: PageSurface,
         viewportSize: CGSize
     ) -> Bool {
@@ -1906,7 +1905,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
 
     private func imageMatchesGeometry(
         _ image: UIImage,
-        _ geometry: NavigatorPageSurfaceGeometry
+        _ geometry: PageSurfaceGeometry
     ) -> Bool {
         guard geometry.pointSize.width.isFinite,
               geometry.pointSize.height.isFinite,
@@ -1947,7 +1946,7 @@ final class ReaderViewController: UIViewController, UIGestureRecognizerDelegate 
     }
 
     private func pageSurfaceGeometryIsCompatibleWithViewport(
-        _ geometry: NavigatorPageSurfaceGeometry,
+        _ geometry: PageSurfaceGeometry,
         viewportSize: CGSize
     ) -> Bool {
         guard viewportSize.width.isFinite, viewportSize.height.isFinite,

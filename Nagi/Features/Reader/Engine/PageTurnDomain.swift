@@ -1,6 +1,5 @@
 import CoreGraphics
 import Foundation
-import ReadiumNavigator
 import UIKit
 
 /// The logical direction of a page turn. The physical direction is derived
@@ -190,20 +189,20 @@ public final class PageSurface {
     /// Immutable pixels captured while the navigator was idle. Gesture code
     /// must never retain or animate a live WebKit view.
     public let image: UIImage
-    public let identity: NavigatorPageSurfaceIdentity
-    public let originIdentity: NavigatorPagePositionIdentity
+    public let identity: PageSurfaceIdentity
+    public let originIdentity: PagePositionIdentity
     public let generation: Int
-    public let geometry: NavigatorPageSurfaceGeometry
+    public let geometry: PageSurfaceGeometry
     public let headerTitle: String?
 
     public init(
         id: UUID = UUID(),
         direction: PageDirection,
         image: UIImage,
-        identity: NavigatorPageSurfaceIdentity,
-        originIdentity: NavigatorPagePositionIdentity,
+        identity: PageSurfaceIdentity,
+        originIdentity: PagePositionIdentity,
         generation: Int,
-        geometry: NavigatorPageSurfaceGeometry,
+        geometry: PageSurfaceGeometry,
         headerTitle: String?
     ) {
         self.id = id
@@ -214,6 +213,27 @@ public final class PageSurface {
         self.generation = generation
         self.geometry = geometry
         self.headerTitle = headerTitle
+    }
+}
+
+/// The already-prepared current page exposed by a surface provider.
+@MainActor
+public final class CurrentPageSurface {
+    public let image: UIImage
+    public let geometry: PageSurfaceGeometry
+    public let identity: PagePositionIdentity
+    public let generation: Int
+
+    public init(
+        image: UIImage,
+        geometry: PageSurfaceGeometry,
+        identity: PagePositionIdentity,
+        generation: Int
+    ) {
+        self.image = image
+        self.geometry = geometry
+        self.identity = identity
+        self.generation = generation
     }
 }
 
@@ -238,9 +258,9 @@ public protocol PageSurfaceProvider: AnyObject {
     /// Gesture handling must only consume this cache; it must never trigger
     /// WebKit navigation, layout, or snapshotting.
     func prewarmAdjacentSurfaces(preferredDirection: PageDirection, deadline: UInt64) async
-    func preparedCurrentSurface() -> NavigatorCurrentPageSurface?
+    func preparedCurrentSurface() -> CurrentPageSurface?
     func preparedAdjacentSurface(direction: PageDirection) -> PageSurface?
-    func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness
+    func adjacentSurfaceReadiness(direction: PageDirection) -> PageSurfaceReadiness
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface?
     func commit(surface: PageSurface) async -> PageSurfaceCommitResult
     func reconcile(

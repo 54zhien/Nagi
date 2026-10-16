@@ -5,6 +5,8 @@ import UIKit
 @MainActor
 final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
     let model: EPUBReaderModel
+    private weak var surfaceNamespaceNavigator: EPUBNavigatorViewController?
+    private var surfaceIdentityNamespace = UUID()
     private struct ActiveSurface {
         let navigatorSurface: NavigatorPageSurface
         let pageSurfaceID: UUID
@@ -186,22 +188,25 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         return ReadingPosition(locatorJSON: locatorJSON)
     }
 
-    func adjacentSurfaceReadiness(direction: PageDirection) -> NavigatorPageSurfaceReadiness {
+    func adjacentSurfaceReadiness(direction: PageDirection) -> PageSurfaceReadiness {
         guard model.pageTransition != .scroll, let navigator = model.navigator else {
             return .unavailable
         }
         let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
-        return navigator.adjacentPageReadiness(direction: navigatorDirection)
+        return ReadiumPageSurfaceBridge.readiness(
+            navigator.adjacentPageReadiness(direction: navigatorDirection)
+        )
     }
 
     func takePreparedAdjacentSurface(direction: PageDirection) -> PageSurface? {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
+        let namespace = surfaceIdentityNamespace(for: navigator)
         let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
         guard let prepared = navigator.takePreparedAdjacentPage(direction: navigatorDirection) else {
             return nil
         }
 
-        let surface = makePageSurface(prepared, direction: direction)
+        let surface = makePageSurface(prepared, direction: direction, namespace: namespace)
         activeSurface = ActiveSurface(
             navigatorSurface: prepared,
             pageSurfaceID: surface.id,
@@ -275,32 +280,50 @@ final class ReadiumRenderer: ReaderRenderer, PageSurfaceProvider {
         }
     }
 
-    func preparedCurrentSurface() -> NavigatorCurrentPageSurface? {
-        model.navigator?.preparedCurrentPageSurface()
+    func preparedCurrentSurface() -> CurrentPageSurface? {
+        guard let navigator = model.navigator else { return nil }
+        let namespace = surfaceIdentityNamespace(for: navigator)
+        guard let prepared = navigator.preparedCurrentPageSurface() else { return nil }
+        return ReadiumPageSurfaceBridge.currentSurface(prepared, namespace: namespace)
     }
 
     func preparedAdjacentSurface(direction: PageDirection) -> PageSurface? {
         guard model.pageTransition != .scroll, let navigator = model.navigator else { return nil }
+        let namespace = surfaceIdentityNamespace(for: navigator)
         let navigatorDirection: NavigatorPageDirection = direction == .forward ? .forward : .backward
         guard let prepared = navigator.preparedAdjacentPageSurface(direction: navigatorDirection) else {
             return nil
         }
-        return makePageSurface(prepared, direction: direction)
+        return makePageSurface(prepared, direction: direction, namespace: namespace)
     }
 
     private func makePageSurface(
         _ prepared: NavigatorPageSurface,
-        direction: PageDirection
+        direction: PageDirection,
+        namespace: UUID
     ) -> PageSurface {
         PageSurface(
             direction: direction,
             image: prepared.image,
-            identity: prepared.identity,
-            originIdentity: prepared.originIdentity,
+            identity: ReadiumPageSurfaceBridge.surfaceIdentity(prepared.identity, namespace: namespace),
+            originIdentity: ReadiumPageSurfaceBridge.positionIdentity(
+                prepared.originIdentity,
+                namespace: namespace
+            ),
             generation: prepared.generation,
-            geometry: prepared.geometry,
+            geometry: ReadiumPageSurfaceBridge.geometry(prepared.geometry),
             headerTitle: model.pageHeaderTitle()
         )
+    }
+
+    private func surfaceIdentityNamespace(for navigator: EPUBNavigatorViewController) -> UUID {
+        guard let activeNavigator = surfaceNamespaceNavigator,
+              activeNavigator === navigator else {
+            surfaceNamespaceNavigator = navigator
+            surfaceIdentityNamespace = UUID()
+            return surfaceIdentityNamespace
+        }
+        return surfaceIdentityNamespace
     }
 
     func commit(surface: PageSurface) async -> PageSurfaceCommitResult {

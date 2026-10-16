@@ -78,6 +78,8 @@
 		4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000095 /* ReaderPerformanceController.swift */; };
 		4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */; };
 		4A0000000000000000000097 /* PageTurnDomain.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000097 /* PageTurnDomain.swift */; };
+		4A00000000000000000000A3 /* ReaderSurfaceValues.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A2 /* ReaderSurfaceValues.swift */; };
+		4A00000000000000000000A4 /* ReadiumPageSurfaceBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A3 /* ReadiumPageSurfaceBridge.swift */; };
 		4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000098 /* PageTurnVisualAnimator.swift */; };
 		4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A0000000000000000000099 /* PageTurnCurlAnimator.swift */; };
 		4A000000000000000000009A /* CurlTextureCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A000000000000000000009A /* CurlTextureCache.swift */; };
@@ -169,6 +171,8 @@
 		3A0000000000000000000095 /* ReaderPerformanceController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderPerformanceController.swift; sourceTree = "<group>"; };
 		3A0000000000000000000096 /* ReaderFontSizeStepperControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderFontSizeStepperControl.swift; sourceTree = "<group>"; };
 		3A0000000000000000000097 /* PageTurnDomain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnDomain.swift; sourceTree = "<group>"; };
+		3A00000000000000000000A2 /* ReaderSurfaceValues.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSurfaceValues.swift; sourceTree = "<group>"; };
+		3A00000000000000000000A3 /* ReadiumPageSurfaceBridge.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReadiumPageSurfaceBridge.swift; sourceTree = "<group>"; };
 		3A0000000000000000000098 /* PageTurnVisualAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnVisualAnimator.swift; sourceTree = "<group>"; };
 		3A0000000000000000000099 /* PageTurnCurlAnimator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageTurnCurlAnimator.swift; sourceTree = "<group>"; };
 		3A000000000000000000009A /* CurlTextureCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CurlTextureCache.swift; sourceTree = "<group>"; };
@@ -370,6 +374,8 @@
 			isa = PBXGroup;
 			children = (
 				3A0000000000000000000097 /* PageTurnDomain.swift */,
+				3A00000000000000000000A2 /* ReaderSurfaceValues.swift */,
+				3A00000000000000000000A3 /* ReadiumPageSurfaceBridge.swift */,
 				3A0000000000000000000098 /* PageTurnVisualAnimator.swift */,
 				3A0000000000000000000099 /* PageTurnCurlAnimator.swift */,
 				3A000000000000000000009A /* CurlTextureCache.swift */,
@@ -734,6 +740,8 @@
 				4A0000000000000000000095 /* ReaderPerformanceController.swift in Sources */,
 				4A0000000000000000000096 /* ReaderFontSizeStepperControl.swift in Sources */,
 				4A0000000000000000000097 /* PageTurnDomain.swift in Sources */,
+				4A00000000000000000000A3 /* ReaderSurfaceValues.swift in Sources */,
+				4A00000000000000000000A4 /* ReadiumPageSurfaceBridge.swift in Sources */,
 				4A0000000000000000000098 /* PageTurnVisualAnimator.swift in Sources */,
 				4A0000000000000000000099 /* PageTurnCurlAnimator.swift in Sources */,
 				4A000000000000000000009A /* CurlTextureCache.swift in Sources */,
@@ -850,7 +858,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 191;
+				CURRENT_PROJECT_VERSION = 192;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -859,7 +867,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.41.9;
+				MARKETING_VERSION = 0.41.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -876,7 +884,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 191;
+				CURRENT_PROJECT_VERSION = 192;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -885,7 +893,7 @@
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
-				MARKETING_VERSION = 0.41.9;
+				MARKETING_VERSION = 0.41.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.imzhien.Nagi;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
