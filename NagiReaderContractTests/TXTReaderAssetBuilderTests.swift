@@ -186,6 +186,13 @@ final class TXTReaderAssetBuilderTests: XCTestCase {
         } catch TXTReaderAssetError.destinationAlreadyExists {
             // Expected boundary; the bytes below are the behavioral guarantee.
         }
+        do {
+            let invalid = document([TXTChapter(title: "正文", content: "甲\u{0001}乙")])
+            try TXTReaderAssetBuilder.build(parsed: invalid, destinationURL: destination)
+            XCTFail("Expected destinationAlreadyExists to retain priority over text validation")
+        } catch TXTReaderAssetError.destinationAlreadyExists {
+            // Existing assets are never overwritten, even if the new input is invalid.
+        }
         XCTAssertEqual(try Data(contentsOf: destination), sentinel)
         XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path), ["existing.epub"])
     }
@@ -197,7 +204,7 @@ final class TXTReaderAssetBuilderTests: XCTestCase {
         let destination = parent.appendingPathComponent("empty.epub")
         do {
             try TXTReaderAssetBuilder.build(
-                parsed: ParsedBook(title: "空书", author: nil, chapterCount: 0, content: ""),
+                parsed: ParsedBook(title: "空\u{0001}书", author: nil, chapterCount: 0, content: ""),
                 destinationURL: destination
             )
             XCTFail("Expected emptyContent")
@@ -211,12 +218,14 @@ final class TXTReaderAssetBuilderTests: XCTestCase {
     // This must fail before validation exists: ZIP creation is not a valid-XML guarantee.
     func testInvalidXMLBodyScalarsAreRejectedBeforeCreatingOutput() throws {
         let directory = try temporaryDirectory()
-        for value: UInt32 in [0x0000, 0x0001, 0x000B, 0x000C, 0xFFFE, 0xFFFF] {
+        for value: UInt32 in [0x0000, 0x0001, 0x0008, 0x000B, 0x000C, 0x000E, 0x001F, 0xFFFE, 0xFFFF] {
             let scalar = try XCTUnwrap(Unicode.Scalar(value))
             let parent = directory.appendingPathComponent("scalar-\(value)", isDirectory: true)
             let destination = parent.appendingPathComponent("invalid.epub")
             let parsed = document([TXTChapter(title: "正文", content: "甲\(scalar)乙")])
-            XCTAssertThrowsError(try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination), "U+\(String(value, radix: 16))")
+            assertInvalidXMLCharacter(value) {
+                try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination)
+            }
             XCTAssertFalse(FileManager.default.fileExists(atPath: parent.path), "U+\(String(value, radix: 16))")
             XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         }
@@ -232,7 +241,9 @@ final class TXTReaderAssetBuilderTests: XCTestCase {
         for (index, parsed) in fixtures.enumerated() {
             let parent = directory.appendingPathComponent("title-\(index)", isDirectory: true)
             let destination = parent.appendingPathComponent("invalid.epub")
-            XCTAssertThrowsError(try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination))
+            assertInvalidXMLCharacter(0x0001) {
+                try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination)
+            }
             XCTAssertFalse(FileManager.default.fileExists(atPath: parent.path))
             XCTAssertFalse(FileManager.default.fileExists(atPath: destination.path))
         }
@@ -241,13 +252,56 @@ final class TXTReaderAssetBuilderTests: XCTestCase {
     // Catches an overbroad control/ASCII filter; XML1.0 permits these whitespace and scalar-range edges.
     func testXMLLegalWhitespaceAndUnicodeRemainUnchanged() throws {
         let entries = try build(chapters: [
-            TXTChapter(title: "正文", content: "A\tB\nC\rD \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}"),
+            TXTChapter(title: "正文", content: "A\tB\nC\rD \u{007F}\u{0080}\u{0085}\u{009F}\u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}"),
         ])
         let serialized = try text(entries, "OEBPS/chapter-1.xhtml")
-        XCTAssertTrue(serialized.contains("A\tB<br />\nC\rD \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}"))
+        XCTAssertTrue(serialized.contains("A\tB<br />\nC\rD \u{007F}\u{0080}\u{0085}\u{009F}\u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}"))
         let body = try XCTUnwrap(xml(entries, "OEBPS/chapter-1.xhtml").named("p").first?.text)
         // Literal CR is normalized to LF by the XML consumer, not by a new TXT rule.
-        XCTAssertEqual(body.unicodeScalars.map(\.value), "A\tB\nC\nD \u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}".unicodeScalars.map(\.value))
+        XCTAssertEqual(body.unicodeScalars.map(\.value), "A\tB\nC\nD \u{007F}\u{0080}\u{0085}\u{009F}\u{D7FF}\u{E000}\u{FFFD}\u{10000}\u{10FFFF}中文😀e\u{0301}".unicodeScalars.map(\.value))
+    }
+
+    // Catches validators that only inspect the first unit, or start writing before checking later units.
+    func testLaterChaptersAreValidatedBeforeAnyOutputIsWritten() throws {
+        let directory = try temporaryDirectory()
+        let fixtures = [
+            [TXTChapter(title: "一", content: "有效正文"), TXTChapter(title: "二\u{0001}", content: "有效正文")],
+            [TXTChapter(title: "一", content: "有效正文"), TXTChapter(title: "二", content: "甲\u{0001}乙")],
+        ]
+        for (index, chapters) in fixtures.enumerated() {
+            let parent = directory.appendingPathComponent("late-\(index)", isDirectory: true)
+            assertInvalidXMLCharacter(0x0001) {
+                try TXTReaderAssetBuilder.build(parsed: document(chapters), destinationURL: parent.appendingPathComponent("invalid.epub"))
+            }
+            XCTAssertFalse(FileManager.default.fileExists(atPath: parent.path))
+        }
+    }
+
+    // The legacy full-text projection is not serialized when explicit valid chapters are supplied.
+    func testUnusedFullTextDoesNotRejectValidSerializedChapters() throws {
+        let directory = try temporaryDirectory()
+        let destination = directory.appendingPathComponent("valid.epub")
+        let parsed = ParsedBook(title: "书名", author: nil, chapterCount: 1, content: "未使用\u{0001}文本",
+                                chapters: [TXTChapter(title: "正文", content: "有效正文")])
+        try TXTReaderAssetBuilder.build(parsed: parsed, destinationURL: destination)
+        XCTAssertEqual(try xml(readArchive(destination), "OEBPS/chapter-1.xhtml").named("p").map(\.text), ["有效正文"])
+    }
+
+    private func assertInvalidXMLCharacter(
+        _ expected: UInt32,
+        file: StaticString = #filePath,
+        line: UInt = #line,
+        operation: () throws -> Void
+    ) {
+        XCTAssertThrowsError(try operation(), file: file, line: line) { error in
+            guard let assetError = error as? TXTReaderAssetError,
+                  case .invalidXMLCharacter(let actual) = assetError else {
+                XCTFail("Expected typed invalidXMLCharacter, got \(error)", file: file, line: line)
+                return
+            }
+            XCTAssertEqual(actual, expected, file: file, line: line)
+            XCTAssertTrue(error.localizedDescription.contains(String(format: "U+%04X", expected)), file: file, line: line)
+        }
     }
 
     private func threeChapters() -> [TXTChapter] {

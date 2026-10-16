@@ -3,6 +3,7 @@ import Foundation
 enum TXTReaderAssetError: LocalizedError {
     case cannotLocateDocumentsDirectory
     case destinationAlreadyExists
+    case invalidXMLCharacter(UInt32)
     case archiveCreationFailed(String)
 
     var errorDescription: String? {
@@ -11,6 +12,8 @@ enum TXTReaderAssetError: LocalizedError {
             return "无法定位阅读资源目录"
         case .destinationAlreadyExists:
             return "阅读资源文件已存在"
+        case .invalidXMLCharacter(let value):
+            return "TXT 包含无法写入阅读资源的字符（\(String(format: "U+%04X", value))）"
         case .archiveCreationFailed(let message):
             return "生成 TXT 阅读资源失败：\(message)"
         }
@@ -103,6 +106,14 @@ enum TXTReaderAssetBuilder {
             throw TXTReaderAssetError.destinationAlreadyExists
         }
 
+        // Escape sequences cannot make an XML-illegal scalar legal. Refuse before
+        // creating directories or temporary files; never silently alter the text axis.
+        try validateXMLCharacters(in: document.title)
+        for chapter in document.chapters {
+            try validateXMLCharacters(in: chapter.title)
+            try validateXMLCharacters(in: chapter.content)
+        }
+
         let directoryURL = destinationURL.deletingLastPathComponent()
         do {
             try fileManager.createDirectory(
@@ -125,6 +136,18 @@ enum TXTReaderAssetBuilder {
             throw error
         } catch {
             throw TXTReaderAssetError.archiveCreationFailed(error.localizedDescription)
+        }
+    }
+
+    /// XML 1.0 Fifth Edition, Char production: https://www.w3.org/TR/xml/#charsets
+    private static func validateXMLCharacters(in text: String) throws {
+        for scalar in text.unicodeScalars {
+            switch scalar.value {
+            case 0x9, 0xA, 0xD, 0x20...0xD7FF, 0xE000...0xFFFD, 0x10000...0x10FFFF:
+                continue
+            default:
+                throw TXTReaderAssetError.invalidXMLCharacter(scalar.value)
+            }
         }
     }
 
