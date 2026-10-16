@@ -23,7 +23,22 @@ enum NativeCoordinateValidation: Equatable, Sendable {
 enum TXTNativeRestorationPolicy {
     static func validate(_ candidate: ScopedNativePosition, in document: TXTIngestDocument,
                          bookID: UUID) -> NativeCoordinateValidation {
-        // Compilable RED seam. The test commit must execute before implementation.
-        .unavailable(.scopeMismatch)
+        guard candidate.scope == document.scope(for: bookID) else {
+            return .unavailable(.scopeMismatch)
+        }
+        let position = candidate.position
+        guard let unit = document.units.first(where: {
+            DocumentUnitID(rawValue: $0.unitID) == position.unitID
+        }) else {
+            return .unavailable(.unknownUnit)
+        }
+        guard NodeID(rawValue: unit.nodeID) == position.nodeID else {
+            return .unavailable(.unknownNode)
+        }
+        let segment = PrimaryTextSegment(unitID: position.unitID, string: unit.chapter.content)
+        guard segment.isStorageBoundary(at: position.utf16Offset) else {
+            return .unavailable(.invalidStorageBoundary)
+        }
+        return .validCoordinate(candidate)
     }
 }
