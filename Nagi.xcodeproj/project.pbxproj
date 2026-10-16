@@ -96,6 +96,10 @@
 		4A00000000000000000000AA /* TXTChapterPartitionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AA /* TXTChapterPartitionTests.swift */; };
 		4A00000000000000000000AB /* TXTIngestDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AB /* TXTIngestDocument.swift */; };
 		4A00000000000000000000AC /* TXTIngestDocumentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AC /* TXTIngestDocumentTests.swift */; };
+		4A00000000000000000000AD /* TXTNativeRestorationPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AD /* TXTNativeRestorationPolicy.swift */; };
+		4A00000000000000000000AE /* TXTNativeRestorationPolicyTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000AE /* TXTNativeRestorationPolicyTests.swift */; };
+		4A00000000000000000000AF /* NagiEngineCore in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000000AD /* NagiEngineCore */; };
+		4A00000000000000000000B0 /* NagiEngineCore in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000000AD /* NagiEngineCore */; };
 		4A00000000000000000000A1 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
 		4A00000000000000000000A2 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
 /* End PBXBuildFile section */
@@ -197,6 +201,8 @@
 		3A00000000000000000000AA /* TXTChapterPartitionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTChapterPartitionTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AB /* TXTIngestDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTIngestDocument.swift; sourceTree = "<group>"; };
 		3A00000000000000000000AC /* TXTIngestDocumentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTIngestDocumentTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000AD /* TXTNativeRestorationPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTNativeRestorationPolicy.swift; sourceTree = "<group>"; };
+		3A00000000000000000000AE /* TXTNativeRestorationPolicyTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTNativeRestorationPolicyTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A1 /* NagiReaderContractTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NagiReaderContractTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -209,6 +215,7 @@
 				4A0000000000000000000074 /* ReadiumShared in Frameworks */,
 				4A0000000000000000000075 /* ReadiumStreamer in Frameworks */,
 				4A0000000000000000000076 /* ReadiumNavigator in Frameworks */,
+				4A00000000000000000000AF /* NagiEngineCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -218,6 +225,7 @@
 			files = (
 				4A00000000000000000000A1 /* ReadiumShared in Frameworks */,
 				4A00000000000000000000A2 /* ReadiumNavigator in Frameworks */,
+				4A00000000000000000000B0 /* NagiEngineCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -403,6 +411,7 @@
 				3A000000000000000000009D /* PageCurlRenderer.swift */,
 				3A000000000000000000009E /* PageCurlShaders.metal */,
 				3A0000000000000000000079 /* ReaderArchitecture.swift */,
+				3A00000000000000000000AD /* TXTNativeRestorationPolicy.swift */,
 				3A000000000000000000007A /* ReaderRenderer.swift */,
 			);
 			path = Engine;
@@ -537,6 +546,7 @@
 				3A00000000000000000000A8 /* TXTSourceSnapshotTests.swift */,
 				3A00000000000000000000AA /* TXTChapterPartitionTests.swift */,
 				3A00000000000000000000AC /* TXTIngestDocumentTests.swift */,
+				3A00000000000000000000AE /* TXTNativeRestorationPolicyTests.swift */,
 			);
 			path = NagiReaderContractTests;
 			sourceTree = "<group>";
@@ -568,6 +578,7 @@
 			name = Nagi;
 			packageProductDependencies = (
 				6B0000000000000000000002 /* SwiftSoup */,
+				6B00000000000000000000AD /* NagiEngineCore */,
 				6B0000000000000000000074 /* ReadiumShared */,
 				6B0000000000000000000075 /* ReadiumStreamer */,
 				6B0000000000000000000076 /* ReadiumNavigator */,
@@ -590,6 +601,7 @@
 			);
 			name = NagiReaderContractTests;
 			packageProductDependencies = (
+				6B00000000000000000000AD /* NagiEngineCore */,
 				6B0000000000000000000074 /* ReadiumShared */,
 				6B0000000000000000000076 /* ReadiumNavigator */,
 			);
@@ -628,6 +640,7 @@
 			packageReferences = (
 				6A0000000000000000000002 /* XCRemoteSwiftPackageReference "SwiftSoup" */,
 				6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */,
+				6A00000000000000000000AD /* XCRemoteSwiftPackageReference "nagi-engine-core" */,
 			);
 			productRefGroup = 2A0000000000000000000009 /* Products */;
 			projectDirPath = "";
@@ -656,6 +669,14 @@
 				revision = 540131be969f0b43a599775d7b592917b38c2a59;
 			};
 		};
+		6A00000000000000000000AD /* XCRemoteSwiftPackageReference "nagi-engine-core" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/54zhien/nagi-engine-core.git";
+			requirement = {
+				kind = revision;
+				revision = 0db0eb5738a655a3f288c9c0a3d321be84fb37a8;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -678,6 +699,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 6A0000000000000000000074 /* XCRemoteSwiftPackageReference "swift-toolkit" */;
 			productName = ReadiumNavigator;
+		};
+		6B00000000000000000000AD /* NagiEngineCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 6A00000000000000000000AD /* XCRemoteSwiftPackageReference "nagi-engine-core" */;
+			productName = NagiEngineCore;
 		};
 /* End XCSwiftPackageProductDependency section */
 
@@ -747,6 +773,7 @@
 				4A0000000000000000000072 /* ReadiumNavigatorView.swift in Sources */,
 				4A0000000000000000000077 /* ReaderChrome.swift in Sources */,
 				4A0000000000000000000079 /* ReaderArchitecture.swift in Sources */,
+				4A00000000000000000000AD /* TXTNativeRestorationPolicy.swift in Sources */,
 				4A000000000000000000007A /* ReaderRenderer.swift in Sources */,
 				4A000000000000000000007B /* ReaderSettingsView.swift in Sources */,
 				4A000000000000000000007C /* BookImportParser.swift in Sources */,
@@ -789,6 +816,7 @@
 				4A00000000000000000000A8 /* TXTSourceSnapshotTests.swift in Sources */,
 				4A00000000000000000000AA /* TXTChapterPartitionTests.swift in Sources */,
 				4A00000000000000000000AC /* TXTIngestDocumentTests.swift in Sources */,
+				4A00000000000000000000AE /* TXTNativeRestorationPolicyTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -890,7 +918,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 205;
+				CURRENT_PROJECT_VERSION = 206;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -916,7 +944,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 205;
+				CURRENT_PROJECT_VERSION = 206;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
