@@ -101,41 +101,11 @@ struct TXTParser: Sendable {
         _ text: String,
         fallbackTitle: String
     ) -> [TXTChapter] {
-        let normalized = TXTSourceSnapshot.normalizeLineEndings(text)
-        let lines = normalized.components(separatedBy: "\n")
-        let starts = lines.enumerated().compactMap { index, line -> (Int, String)? in
-            guard let title = chapterTitle(from: line) else { return nil }
-            return (index, title)
-        }
-
-        guard !starts.isEmpty else {
-            let content = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
-            return content.isEmpty ? [] : [TXTChapter(title: fallbackTitle, content: content)]
-        }
-
-        var chapters: [TXTChapter] = []
-        if starts[0].0 > 0 {
-            let preface = lines[0 ..< starts[0].0]
-                .joined(separator: "\n")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            if !preface.isEmpty {
-                chapters.append(TXTChapter(title: fallbackTitle, content: preface))
-            }
-        }
-
-        chapters.append(contentsOf: starts.enumerated().compactMap { position, start in
-            let end = position + 1 < starts.count ? starts[position + 1].0 : lines.count
-            guard start.0 < end else { return nil }
-            let content = lines[start.0 ..< end]
-                .joined(separator: "\n")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !content.isEmpty else { return nil }
-            return TXTChapter(title: start.1, content: content)
-        })
-        return chapters
+        TXTChapterPartition(text: text, fallbackTitle: fallbackTitle).units.map { $0.chapter }
     }
 
-    private static func chapterTitle(from line: String) -> String? {
+    /// Shared recognizer for allocation-light metadata counting and partitioning.
+    static func chapterTitle(from line: String) -> String? {
         let title = line
             .replacingOccurrences(of: "\u{FEFF}", with: "")
             .trimmingCharacters(in: .whitespacesAndNewlines)
