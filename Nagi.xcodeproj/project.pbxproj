@@ -90,6 +90,8 @@
 		4A00000000000000000000A0 /* ReaderSurfaceContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A0 /* ReaderSurfaceContractTests.swift */; };
 		4A00000000000000000000A5 /* TXTParserTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A4 /* TXTParserTests.swift */; };
 		4A00000000000000000000A6 /* TXTReaderAssetBuilderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A6 /* TXTReaderAssetBuilderTests.swift */; };
+		4A00000000000000000000A7 /* TXTSourceSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A7 /* TXTSourceSnapshot.swift */; };
+		4A00000000000000000000A8 /* TXTSourceSnapshotTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A00000000000000000000A8 /* TXTSourceSnapshotTests.swift */; };
 		4A00000000000000000000A1 /* ReadiumShared in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000074 /* ReadiumShared */; };
 		4A00000000000000000000A2 /* ReadiumNavigator in Frameworks */ = {isa = PBXBuildFile; productRef = 6B0000000000000000000076 /* ReadiumNavigator */; };
 /* End PBXBuildFile section */
@@ -185,6 +187,8 @@
 		3A00000000000000000000A0 /* ReaderSurfaceContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReaderSurfaceContractTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A4 /* TXTParserTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTParserTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A6 /* TXTReaderAssetBuilderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTReaderAssetBuilderTests.swift; sourceTree = "<group>"; };
+		3A00000000000000000000A7 /* TXTSourceSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTSourceSnapshot.swift; sourceTree = "<group>"; };
+		3A00000000000000000000A8 /* TXTSourceSnapshotTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TXTSourceSnapshotTests.swift; sourceTree = "<group>"; };
 		3A00000000000000000000A1 /* NagiReaderContractTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NagiReaderContractTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -316,6 +320,7 @@
 			children = (
 				3A0000000000000000000009 /* FileImportService.swift */,
 				3A000000000000000000000C /* TXTParser.swift */,
+				3A00000000000000000000A7 /* TXTSourceSnapshot.swift */,
 				3A000000000000000000000D /* EPUBParser.swift */,
 				3A000000000000000000007C /* BookImportParser.swift */,
 				3A000000000000000000007E /* TXTReaderAssetService.swift */,
@@ -519,6 +524,7 @@
 				3A00000000000000000000A0 /* ReaderSurfaceContractTests.swift */,
 				3A00000000000000000000A4 /* TXTParserTests.swift */,
 				3A00000000000000000000A6 /* TXTReaderAssetBuilderTests.swift */,
+				3A00000000000000000000A8 /* TXTSourceSnapshotTests.swift */,
 			);
 			path = NagiReaderContractTests;
 			sourceTree = "<group>";
@@ -694,6 +700,7 @@
 				4A0000000000000000000009 /* Book.swift in Sources */,
 				4A000000000000000000000A /* ModelContainer.swift in Sources */,
 				4A000000000000000000000B /* TXTParser.swift in Sources */,
+				4A00000000000000000000A7 /* TXTSourceSnapshot.swift in Sources */,
 				4A000000000000000000000C /* EPUBParser.swift in Sources */,
 				4A000000000000000000000D /* LibraryViewModel.swift in Sources */,
 				4A000000000000000000000F /* Archive+BackingConfiguration.swift in Sources */,
@@ -765,6 +772,7 @@
 				4A00000000000000000000A0 /* ReaderSurfaceContractTests.swift in Sources */,
 				4A00000000000000000000A5 /* TXTParserTests.swift in Sources */,
 				4A00000000000000000000A6 /* TXTReaderAssetBuilderTests.swift in Sources */,
+				4A00000000000000000000A8 /* TXTSourceSnapshotTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -866,7 +874,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 196;
+				CURRENT_PROJECT_VERSION = 197;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -892,7 +900,7 @@
 				ASSETCATALOG_OTHER_FLAGS = "--enable-icon-stack-fallback-generation=disabled";
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 196;
+				CURRENT_PROJECT_VERSION = 197;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Nagi/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
